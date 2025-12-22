@@ -17,9 +17,9 @@ import { Timestamp } from "../../../google/protobuf/timestamp";
  */
 export interface LookupNameRequest {
     /**
-     * Required. The SuiNS name to lookup.
+     * Required. The RtdNS name to lookup.
      *
-     * Supports both `@name` as well as `name.sui` formats.
+     * Supports both `@name` as well as `name.rtd` formats.
      *
      * @generated from protobuf field: optional string name = 1
      */
@@ -52,7 +52,7 @@ export interface ReverseLookupNameRequest {
  */
 export interface ReverseLookupNameResponse {
     /**
-     * The record for the SuiNS name linked to the requested address
+     * The record for the RtdNS name linked to the requested address
      *
      * @generated from protobuf field: optional rtd.rpc.v2.NameRecord record = 1
      */
@@ -72,7 +72,7 @@ export interface NameRecord {
      */
     id?: string;
     /**
-     * The SuiNS name of this record
+     * The RtdNS name of this record
      *
      * @generated from protobuf field: optional string name = 2
      */

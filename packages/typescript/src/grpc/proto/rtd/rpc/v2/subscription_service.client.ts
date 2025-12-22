@@ -24,7 +24,7 @@ export interface ISubscriptionServiceClient {
     /**
      * Subscribe to the stream of checkpoints.
      *
-     * This API provides a subscription to the checkpoint stream for the Sui
+     * This API provides a subscription to the checkpoint stream for the Rtd
      * blockchain. When a subscription is initialized the stream will begin with
      * the latest executed checkpoint as seen by the server. Responses are
      * guaranteed to return checkpoints in-order and without gaps. This enables
@@ -50,7 +50,7 @@ export class SubscriptionServiceClient implements ISubscriptionServiceClient, Se
     /**
      * Subscribe to the stream of checkpoints.
      *
-     * This API provides a subscription to the checkpoint stream for the Sui
+     * This API provides a subscription to the checkpoint stream for the Rtd
      * blockchain. When a subscription is initialized the stream will begin with
      * the latest executed checkpoint as seen by the server. Responses are
      * guaranteed to return checkpoints in-order and without gaps. This enables

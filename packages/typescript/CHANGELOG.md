@@ -727,7 +727,7 @@
 
 - a92b03de42: The Typescript SDK has been renamed to `rtd-typescript` and includes many new features
   and breaking changes. See the
-  [full migration guide](https://sdk.linkuverse.com/typescript/migrations/sui-1.0) for details on
+  [full migration guide](https://sdk.linkuverse.com/typescript/migrations/rtd-1.0) for details on
   how to upgrade.
 
 ### Patch Changes
@@ -762,7 +762,7 @@
 
 ### Minor Changes
 
-- 929db4976a: Add normalizeSuiNSName and isValidSuiNSName utils, and add a format option to
+- 929db4976a: Add normalizeRtdNSName and isValidRtdNSName utils, and add a format option to
   SuiClient.resolveNameServiceNames
 
 ## 0.51.2
@@ -941,7 +941,7 @@
 ### Patch Changes
 
 - faa13ded9: Ensure that TransactionBlocks can be copied via structuredClone to workaround bug in
-  sui wallet
+  Rtd wallet
 - c5684bb52: rename zk to zkLogin
 
 ## 0.43.0
@@ -1026,21 +1026,21 @@
 ### Minor Changes
 
 - 67e581a5a: Added FromOrToAddress Transaction Filter
-- cce6ffbcc: Add toSuiPublicKey method for retrieving the Sui representation of a raw public key
+- cce6ffbcc: Add toRtdPublicKey method for retrieving the Rtd representation of a raw public key
 - 0f06d593a: Added a MultiSigPublicKey class for verifying multisig signatures
 - 09f4ed3fc: update signMessage to correctly wrap PersonalMessages before signing
 - 6d41059c7: Deprecate imports from the root path which can be imported from a modular export
-- cc6441f46: The Sui TS SDK has been broken up into a set of modular exports, and all exports from
+- cc6441f46: The Rtd TS SDK has been broken up into a set of modular exports, and all exports from
   the root of the package have been deprecated. The following export paths have been added:
-  - `rtd-typescript.js/client` - A client for interacting with Sui RPC nodes.
-  - `rtd-typescript.js/bcs` - A BCS builder with pre-defined types for Sui.
+  - `rtd-typescript.js/client` - A client for interacting with Rtd RPC nodes.
+  - `rtd-typescript.js/bcs` - A BCS builder with pre-defined types for Rtd.
   - `rtd-typescript.js/transaction` - Utilities for building and interacting with transactions.
   - `rtd-typescript.js/keypairs/*` - Modular exports for specific KeyPair implementations.
   - `rtd-typescript.js/verify` - Methods for verifying transactions and messages.
   - `rtd-typescript.js/cryptography` - Shared types and classes for cryptography.
   - `rtd-typescript.js/multisig` - Utilities for working with multisig signatures.
-  - `rtd-typescript.js/utils` - Utilities for formatting and parsing various Sui types.
-  - `rtd-typescript.js/faucet`- Methods for requesting sui from a faucet.
+  - `rtd-typescript.js/utils` - Utilities for formatting and parsing various Rtd types.
+  - `rtd-typescript.js/faucet`- Methods for requesting rtd from a faucet.
 
   As part of this refactor we are deprecating a number of existing APIs:
   - `JsonRPCProvider` - This Provider pattern is being replaced by a new `SuiClient`
@@ -1061,7 +1061,7 @@
   to be available in this release (with deprecation warnings). With the large number of deprecations
   there may be functionality that should be moved into the new modular version of the SDK. If you
   find there are features that were deprecated without a suitable replacement, we have created a
-  [Github Discussion thread](https://github.com/LinkUVerse/sui/discussions/13150) to track those
+  [Github Discussion thread](https://github.com/LinkUVerse/rtd/discussions/13150) to track those
   use-cases.
 
   #### Migrating imports
@@ -1117,7 +1117,7 @@
 
   #### Migrating faucet requests
 
-  The ability to request Sui from a faucet was not added to `SuiClient`, instead you will need to
+  The ability to request rtd from a faucet was not added to `SuiClient`, instead you will need to
   use a method `rtd-typescript.js/faucet` to make these requests
 
   ```diff
@@ -1126,11 +1126,11 @@
   + import { requestSuiFromFaucetV0, getFaucetHost } from 'rtd-typescript.js/faucet';
 
   - await provider.requestSuiFromFaucet(
-  -  '<YOUR SUI ADDRESS>'
+  -  '<YOUR Rtd address>'
   - );
   + await requestSuiFromFaucetV0({
   +   host: getFaucetHost('devnet'),
-  +   recipient: '<YOUR SUI ADDRESS>',
+  +   recipient: '<YOUR Rtd address>',
   +});
   ```
 
@@ -1193,7 +1193,7 @@
 
 ### Patch Changes
 
-- 09d77325a9: Add new SuiNS Toolkit package.
+- 09d77325a9: Add new RtdNS Toolkit package.
 
 ## 0.35.0
 
@@ -1297,7 +1297,7 @@
 
 ### Minor Changes
 
-- 956ec28eb: Change `signMessage` to return message bytes. Add support for sui:signMessage in the
+- 956ec28eb: Change `signMessage` to return message bytes. Add support for rtd:signMessage in the
   wallet standard
 - 4adfbff73: Use Blake2b instead of sha3_256 for address generation
 - 4c4573ebe: Removed DevInspectResultsType and now DevInspectResults has a property results of
@@ -1305,8 +1305,8 @@
 - acc2edb31: Update schema for `SuiSystemState` and `DelegatedStake`
 - 941b03af1: Change functions in transactions.ts of ts-sdk such that: `getTotalGasUsed` and
   `getTotalGasUsedUpperBound` of ts-sdk return a `bigint`,fields of `gasCostSummary` are defined as
-  `string`, `epochId` is defined as `string`. In `sui-json-rpc` the corresponding types are defined
-  as `BigInt`. Introduce `SuiEpochId` type to `sui-json-rpc` types that is a `BigInt`.
+  `string`, `epochId` is defined as `string`. In `rtd-json-rpc` the corresponding types are defined
+  as `BigInt`. Introduce `RtdEpochId` type to `rtd-json-rpc` types that is a `BigInt`.
 - a6690ac7d: Changed the default behavior of `publish` to publish an upgreadeable-by-sender package
   instead of immutable.
 - a211dc03a: Change object digest from Base64 encoded to Base58 encoded for rpc version >= 0.28.0
@@ -1332,21 +1332,21 @@
   `getLatestCheckpointSequenceNumber` returns a `string`, `gasPrice` of `devInspectTransactionBlock`
   is defined as a `string`, checkpoint sequence number of `getCheckpoint` is defined as a `string`,
   `cursor` of `getCheckpoints` is defined as a `string`. Introduce `SuiCheckpointSequenceNumber`
-  type in sui-json-rpc-types that is a `BigInt` to use instead of `CheckpointSequenceNumber` of
-  sui-types.
+  type in rtd-json-rpc-types that is a `BigInt` to use instead of `CheckpointSequenceNumber` of
+  rtd-types.
 - 6bd88570c: Rework all coin APIs to take objects as arguments instead of positional arguments.
 - f1e42f792: Consolidate get_object and get_raw_object into a single get_object endpoint which now
   takes an additional config parameter with type `SuiObjectDataOptions` and has a new return type
   `SuiObjectResponse`. By default, only object_id, version, and digest are fetched.
 - 272389c20: Support for new versioned TransactionData format
-- 3de8de361: Remove `getSuiSystemState` method. Use `getLatestSuiSystemState` method instead.
+- 3de8de361: Remove `getSuiSystemState` method. Use `getLatestRtdSystemState` method instead.
 - be3c4f51e: Add `display` field in `SuiObjectResponse` for frontend rendering. See more details in
-  https://forums.sui.io/t/nft-object-display-proposal/4872
+  https://forums.rtd.life/t/nft-object-display-proposal/4872
 - dbe73d5a4: Update `executeTransaction` and `signAndExecuteTransaction` to take in an additional
   parameter `SuiTransactionBlockResponseOptions` which is used to specify which fields to include in
   `SuiTransactionBlockResponse` (e.g., transaction, effects, events, etc). By default, only the
   transaction digest will be included.
-- c82e4b454: Introduce BigInt struct to sui-json-rpc-types to serialize and deserialize amounts
+- c82e4b454: Introduce BigInt struct to rtd-json-rpc-types to serialize and deserialize amounts
   to/from string. Change ts-sdk to serialize amounts of PaySui and Pay as string.
 - 7a2eaf4a3: Changing the SuiObjectResponse struct to use data/error fields instead of
   details/status
@@ -1354,7 +1354,7 @@
   please use `getTransactions` instead
 - 9b29bef37: Pass blake2b hash to signer API
 - 8700809b5: Add a new `getCheckpoints` endpoint that returns a paginated list of checkpoints.
-- 5c3b00cde: Add object id to staking pool and pool id to staked sui.
+- 5c3b00cde: Add object id to staking pool and pool id to staked rtd.
 - 01272ab7d: Remove deprecated `getCheckpointContents`, `getCheckpointContentsByDigest`,
   `getCheckpointSummary` and `getCheckpointSummaryByDigest` methods.
 - 9822357d6: Add getStakesByIds to get DelegatedStake queried by id
@@ -1363,13 +1363,13 @@
 - da72e73a9: Change the address of Move package for staking and validator related Move modules.
 - a0955c479: Switch from 20 to 32-byte address. Match Secp256k1.deriveKeypair with Ed25519.
 - 0c9047698: Remove all gas selection APIs from the json rpc provider.
-- d5ef1b6e5: Added dependencies to publish command, dependencies now also returned from the sui move
+- d5ef1b6e5: Added dependencies to publish command, dependencies now also returned from the rtd move
   CLI with the `--dump-bytecode-as-base64` flag
 - 0a7b42a6d: This changes almost all occurences of "delegate", "delegation" (and various
   capitalizations/forms) to their equivalent "stake"-based name. Function names, function argument
   names, RPC endpoints, Move functions, and object fields have been updated with this new naming
   convention.
-- 3de8de361: Remove `getValidators` API. Use `getLatestSuiSystemState` instead.
+- 3de8de361: Remove `getValidators` API. Use `getLatestRtdSystemState` instead.
 - dd348cf03: Refactor `getTransactions` to `queryTransactions`
 - 57c17e02a: Removed `JsonRpcProviderWithCache`, use `JsonRpcProvider` instead.
 - 65f1372dd: Rename `provider.getTransactionWithEffects` to `provider.getTransaction`. The new
@@ -1576,7 +1576,7 @@
 
 ### Minor Changes
 
-- ea71d8216: Use intent signing if sui version > 0.18
+- ea71d8216: Use intent signing if rtd version > 0.18
 
 ### Patch Changes
 
@@ -1666,7 +1666,7 @@
 - ef3571dc8: Fix gas selection bug for a vector of objects
 - cccfe9315: Add deserialization util method to LocalTxnDataSerializer
 - 2dc594ef7: Introduce getCoinDenominationInfo, which returns denomination info of a coin, now only
-  supporting SUI coin.
+  supporting Rtd coin.
 - 4f0c611ff: Protocol change to add 'initial shared version' to shared object references.
 
 ## 0.13.0

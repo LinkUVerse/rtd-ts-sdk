@@ -10,11 +10,11 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 /**
- * Flag use to disambiguate the signature schemes supported by Sui.
+ * Flag use to disambiguate the signature schemes supported by Rtd.
  *
  * Note: the enum values defined by this proto message exactly match their
  * expected BCS serialized values when serialized as a u8. See
- * [enum.SignatureScheme](https://linkulabs.github.io/sui-rust-sdk/sui_sdk_types/enum.SignatureScheme.html)
+ * [enum.SignatureScheme](https://linkulabs.github.io/rtd-rust-sdk/rtd_sdk_types/enum.SignatureScheme.html)
  * for more information about signature schemes.
  *
  * @generated from protobuf enum rtd.rpc.v2.SignatureScheme

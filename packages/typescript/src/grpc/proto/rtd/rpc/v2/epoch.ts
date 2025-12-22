@@ -29,7 +29,7 @@ export interface Epoch {
      */
     committee?: ValidatorCommittee;
     /**
-     * Snapshot of Sui's SystemState (`0x3::sui_system::SystemState`) at the
+     * Snapshot of Rtd's SystemState (`0x3::rtd_system::SystemState`) at the
      * beginning of the epoch, for past epochs, or the current state for the
      * current epoch.
      *

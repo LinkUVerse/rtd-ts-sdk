@@ -184,11 +184,11 @@ export enum ExecutionError_ExecutionErrorKind {
      */
     PUBLISH_ERROR_NON_ZERO_ADDRESS = 10,
     /**
-     * Sui Move bytecode verification error.
+     * Rtd Move bytecode verification error.
      *
-     * @generated from protobuf enum value: SUI_MOVE_VERIFICATION_ERROR = 11;
+     * @generated from protobuf enum value: RTD_MOVE_VERIFICATION_ERROR = 11;
      */
-    SUI_MOVE_VERIFICATION_ERROR = 11,
+    RTD_MOVE_VERIFICATION_ERROR = 11,
     /**
      * Error from a non-abort instruction.
      * Possible causes:
@@ -313,11 +313,11 @@ export enum ExecutionError_ExecutionErrorKind {
      */
     CERTIFICATE_DENIED = 30,
     /**
-     * Sui Move bytecode verification timed out.
+     * Rtd Move bytecode verification timed out.
      *
-     * @generated from protobuf enum value: SUI_MOVE_VERIFICATION_TIMEDOUT = 31;
+     * @generated from protobuf enum value: RTD_MOVE_VERIFICATION_TIMEDOUT = 31;
      */
-    SUI_MOVE_VERIFICATION_TIMEDOUT = 31,
+    RTD_MOVE_VERIFICATION_TIMEDOUT = 31,
     /**
      * The requested consensus object operation is not allowed.
      *

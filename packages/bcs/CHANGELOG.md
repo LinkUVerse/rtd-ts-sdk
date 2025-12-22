@@ -168,7 +168,7 @@
 
 - a92b03de42: The Typescript SDK has been renamed to `rtd-typescript` and includes many new features
   and breaking changes. See the
-  [full migration guide](https://sdk.linkuverse.com/typescript/migrations/sui-1.0) for details on
+  [full migration guide](https://sdk.linkuverse.com/typescript/migrations/rtd-1.0) for details on
   how to upgrade.
 
 ## 0.11.1
@@ -255,7 +255,7 @@
   (`stake_amount`, `pending_stake`, and `pending_withdraw`) and renamed `delegation_staking_pool` to
   `staking_pool`. Additionally removed the `validator_stake` and `delegated_stake` fields in the
   `ValidatorSet` type and replaced them with a `total_stake` field.
-- 5c3b00cde: Add object id to staking pool and pool id to staked sui.
+- 5c3b00cde: Add object id to staking pool and pool id to staked rtd.
 - 3d9a04648: Adds `deactivation_epoch` to staking pool object, and adds `inactive_pools` to the
   validator set object.
 - a8049d159: Fixes the issue with deep nested generics by introducing array type names

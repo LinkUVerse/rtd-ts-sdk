@@ -1,0 +1,50 @@
+{
+	"name": "rtd-window-wallet-core",
+	"version": "0.1.1",
+	"description": "Window wallet core functionality",
+	"license": "Apache-2.0",
+	"author": "LinkU Labs <build@linkuverse.com>",
+	"type": "commonjs",
+	"main": "./dist/cjs/index.js",
+	"module": "./dist/esm/index.js",
+	"types": "./dist/cjs/index.d.ts",
+	"exports": {
+		".": {
+			"import": "./dist/esm/index.js",
+			"require": "./dist/cjs/index.js"
+		}
+	},
+	"sideEffects": false,
+	"files": [
+		"CHANGELOG.md",
+		"dist"
+	],
+	"scripts": {
+		"clean": "rm -rf tsconfig.tsbuildinfo ./dist",
+		"build": "build-package",
+		"prettier:check": "prettier -c --ignore-unknown .",
+		"prettier:fix": "prettier -w --ignore-unknown .",
+		"eslint:check": "eslint --max-warnings=0 .",
+		"eslint:fix": "pnpm run eslint:check --fix",
+		"lint": "pnpm run eslint:check && pnpm run prettier:check",
+		"lint:fix": "pnpm run eslint:fix && pnpm run prettier:fix"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/LinkUVerse/rtd-ts-sdk.git"
+	},
+	"bugs": {
+		"url": "https://github.com/linkuverse/rtd-ts-sdk/issues"
+	},
+	"homepage": "https://github.com/LinkUVerse/rtd-ts-sdk/tree/main/packages/window-wallet-core#readme",
+	"devDependencies": {
+		"rtd-build-scripts": "workspace:*",
+		"typescript": "^5.9.3",
+		"vitest": "^4.0.15"
+	},
+	"dependencies": {
+		"rtd-utils": "workspace:*",
+		"jose": "^6.1.3",
+		"valibot": "^1.2.0"
+	}
+}

@@ -51,7 +51,7 @@ export interface ExecutedTransaction {
      *
      * This field might be empty, even if it was explicitly requested, if the
      * transaction didn't produce any events.
-     * `sui.types.TransactionEffects.events_digest` is populated if the
+     * `rtd.types.TransactionEffects.events_digest` is populated if the
      * transaction produced any events.
      *
      * @generated from protobuf field: optional rtd.rpc.v2.TransactionEvents events = 5

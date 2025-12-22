@@ -15,7 +15,7 @@ import { Package } from "./move_package";
 import { Owner } from "./owner";
 import { Bcs } from "./bcs";
 /**
- * An object on the Sui blockchain.
+ * An object on the Rtd blockchain.
  *
  * @generated from protobuf message rtd.rpc.v2.Object
  */
@@ -88,7 +88,7 @@ export interface Object {
      */
     previousTransaction?: string;
     /**
-     * The amount of SUI to rebate if this object gets deleted.
+     * The amount of RTD to rebate if this object gets deleted.
      * This number is re-calculated each time the object is mutated based on
      * the present storage gas price.
      *

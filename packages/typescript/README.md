@@ -1,13 +1,13 @@
 # Docs site
 
-For more complete docs, visit the [Sui TypeScript SDK docs](https://sdk.linkuverse.com/)
+For more complete docs, visit the [Rtd TypeScript SDK docs](https://sdk.linkuverse.com/)
 
-# Sui TypeScript SDK
+# Rtd TypeScript SDK
 
-This is the Sui TypeScript SDK built on the Sui
-[JSON RPC API](https://github.com/LinkUVerse/sui/blob/main/docs/content/references/sui-api.mdx). It
+This is the Rtd TypeScript SDK built on the Rtd
+[JSON RPC API](https://github.com/LinkUVerse/rtd/blob/main/docs/content/references/rtd-api.mdx). It
 provides utility classes and functions for applications to sign transactions and interact with the
-Sui network.
+Rtd network.
 
 ## Building Locally
 
@@ -20,11 +20,11 @@ $ pnpm install
 # Run `build` for the TypeScript SDK if you're in the `sdk/typescript` project
 $ pnpm run build
 
-# Run `sdk build` for the TypeScript SDK if you're in the root of `sui` repo
+# Run `sdk build` for the TypeScript SDK if you're in the root of `rtd` repo
 $ pnpm sdk build
 ```
 
-> All `pnpm` commands below are intended to be run in the root of the Sui repo.
+> All `pnpm` commands below are intended to be run in the root of the Rtd repo.
 
 ## Type Doc
 
@@ -68,16 +68,16 @@ https://stackoverflow.com/questions/52676244/node-version-not-updating-after-nvm
 To run E2E tests against Devnet
 
 ```
-VITE_FAUCET_URL='https://faucet.devnet.sui.io:443/v2/gas' VITE_FULLNODE_URL='https://fullnode.devnet.sui.io' pnpm --filter rtd-typescript exec vitest e2e
+VITE_FAUCET_URL='https://faucet.devnet.rtd.life:443/v2/gas' VITE_FULLNODE_URL='https://fullnode.devnet.rtd.life' pnpm --filter rtd-typescript exec vitest e2e
 ```
 
-## Connecting to Sui Network
+## Connecting to Rtd Network
 
 The `SuiClient` class provides a connection to the JSON-RPC Server and should be used for all
 read-only operations. The default URLs to connect with the RPC server are:
 
 - local: http://127.0.0.1:9000
-- Devnet: https://fullnode.devnet.sui.io
+- Devnet: https://fullnode.devnet.rtd.life
 
 ```typescript
 import { getFullnodeUrl, SuiClient } from 'rtd-typescript/client';
@@ -93,7 +93,7 @@ await client.getCoins({
 
 For local development, you can run `cargo run --bin --with-faucet --force-regenesis` to spin up a
 local network with a local validator, a fullnode, and a faucet server. Refer to
-[this guide](https://docs.sui.io/build/sui-local-network) for more information.
+[this guide](https://docs.rtd.life/build/rtd-local-network) for more information.
 
 ```typescript
 import { getFullnodeUrl, SuiClient } from 'rtd-typescript/client';
@@ -114,7 +114,7 @@ import { getFullnodeUrl, SuiClient } from 'rtd-typescript/client';
 
 // create a client connected to devnet
 const client = new SuiClient({
-	url: 'https://fullnode.devnet.sui.io',
+	url: 'https://fullnode.devnet.rtd.life',
 });
 
 // get coins owned by an address
@@ -125,8 +125,8 @@ await client.getCoins({
 
 ## Getting coins from the faucet
 
-You can request sui from the faucet when running against devnet or localnet. For testnet, visit
-faucet.sui.io.
+You can request rtd from the faucet when running against devnet or localnet. For testnet, visit
+faucet.rtd.life.
 
 ```typescript
 import { getFaucetHost, requestSuiFromFaucetV2 } from 'rtd-typescript/faucet';
@@ -140,7 +140,7 @@ await requestSuiFromFaucetV2({
 ## Writing APIs
 
 For a primer for building transactions, refer to
-[this guide](https://docs.sui.io/build/prog-trans-ts-sdk).
+[this guide](https://docs.rtd.life/build/prog-trans-ts-sdk).
 
 ### Transfer Object
 
@@ -167,7 +167,7 @@ const result = await client.signAndExecuteTransaction({
 console.log({ result });
 ```
 
-### Transfer Sui
+### Transfer Rtd
 
 To transfer `1000` MIST to another address:
 
@@ -424,7 +424,7 @@ import { getFullnodeUrl, SuiClient } from 'rtd-typescript/client';
 const client = new SuiClient({
 	url: getFullnodeUrl('testnet'),
 });
-// If coin type is not specified, it defaults to 0x2::sui::SUI
+// If coin type is not specified, it defaults to 0x2::rtd::RTD
 const coinBalance = await client.getBalance({
 	owner: '0xcc2bd176a478baea9a0de7a24cd927661cc6e860d5bacecb9a138ef20dbab231',
 	coinType: '0x65b0553a591d7b13376e03a408e112c706dc0909a79080c810b93b06f922c458::usdc::USDC',

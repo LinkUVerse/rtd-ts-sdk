@@ -413,7 +413,7 @@ export interface CircomG2 {
  * A passkey authenticator.
  *
  * See
- * [struct.PasskeyAuthenticator](https://linkulabs.github.io/sui-rust-sdk/sui_sdk_types/struct.PasskeyAuthenticator.html#bcs)
+ * [struct.PasskeyAuthenticator](https://linkulabs.github.io/rtd-rust-sdk/rtd_sdk_types/struct.PasskeyAuthenticator.html#bcs)
  * for more information on the requirements on the shape of the
  * `client_data_json` field.
  *

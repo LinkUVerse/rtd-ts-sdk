@@ -230,7 +230,7 @@ export interface MoveTable {
  */
 export interface StakeSubsidy {
     /**
-     * Balance of SUI set aside for stake subsidies that will be drawn down over time.
+     * Balance of RTD set aside for stake subsidies that will be drawn down over time.
      *
      * @generated from protobuf field: optional uint64 balance = 1
      */
@@ -326,9 +326,9 @@ export interface ValidatorSet {
      */
     pendingRemovals: bigint[];
     /**
-     * Mappings from staking pool's ID to the sui address of a validator.
+     * Mappings from staking pool's ID to the Rtd address of a validator.
      *
-     * key: address (staking pool Id), value: address (sui address of the validator)
+     * key: address (staking pool Id), value: address (Rtd address of the validator)
      *
      * @generated from protobuf field: optional rtd.rpc.v2.MoveTable staking_pool_mappings = 5
      */
@@ -350,7 +350,7 @@ export interface ValidatorSet {
      * When the candidate has met the min stake requirement, they can call `request_add_validator` to
      * officially add them to the active validator set `active_validators` next epoch.
      *
-     * key: address (sui address of the validator), value: 0x3::validator_wrapper::ValidatorWrapper
+     * key: address (Rtd address of the validator), value: 0x3::validator_wrapper::ValidatorWrapper
      *
      * @generated from protobuf field: optional rtd.rpc.v2.MoveTable validator_candidates = 7
      */
@@ -385,7 +385,7 @@ export interface Validator {
      */
     name?: string;
     /**
-     * The Sui Address of the validator. This is the sender that created the Validator object,
+     * The Rtd address of the validator. This is the sender that created the Validator object,
      * and also the address to send validator/coins to during withdraws.
      *
      * @generated from protobuf field: optional string address = 2
@@ -574,12 +574,12 @@ export interface StakingPool {
      */
     deactivationEpoch?: bigint;
     /**
-     * The total number of SUI tokens in this pool, including the SUI in the rewards_pool, as well as in all the principal
-     * in the `StakedSui` object, updated at epoch boundaries.
+     * The total number of RTD tokens in this pool, including the RTD in the rewards_pool, as well as in all the principal
+     * in the `StakedRtd` object, updated at epoch boundaries.
      *
-     * @generated from protobuf field: optional uint64 sui_balance = 4
+     * @generated from protobuf field: optional uint64 rtd_balance = 4
      */
-    suiBalance?: bigint;
+    rtdBalance?: bigint;
     /**
      * The epoch stake rewards will be added here at the end of each epoch.
      *
@@ -611,11 +611,11 @@ export interface StakingPool {
     pendingStake?: bigint;
     /**
      * Pending stake withdrawn during the current epoch, emptied at epoch boundaries.
-     * This includes both the principal and rewards SUI withdrawn.
+     * This includes both the principal and rewards RTD withdrawn.
      *
-     * @generated from protobuf field: optional uint64 pending_total_sui_withdraw = 9
+     * @generated from protobuf field: optional uint64 pending_total_rtd_withdraw = 9
      */
-    pendingTotalSuiWithdraw?: bigint;
+    pendingTotalRtdWithdraw?: bigint;
     /**
      * Pending pool token withdrawn during the current epoch, emptied at epoch boundaries.
      *
@@ -801,12 +801,12 @@ class StakingPool$Type extends MessageType<StakingPool> {
             { no: 1, name: "id", kind: "scalar", opt: true, T: 9 /*ScalarType.STRING*/ },
             { no: 2, name: "activation_epoch", kind: "scalar", opt: true, T: 4 /*ScalarType.UINT64*/, L: 0 /*LongType.BIGINT*/ },
             { no: 3, name: "deactivation_epoch", kind: "scalar", opt: true, T: 4 /*ScalarType.UINT64*/, L: 0 /*LongType.BIGINT*/ },
-            { no: 4, name: "sui_balance", kind: "scalar", opt: true, T: 4 /*ScalarType.UINT64*/, L: 0 /*LongType.BIGINT*/ },
+            { no: 4, name: "rtd_balance", kind: "scalar", opt: true, T: 4 /*ScalarType.UINT64*/, L: 0 /*LongType.BIGINT*/ },
             { no: 5, name: "rewards_pool", kind: "scalar", opt: true, T: 4 /*ScalarType.UINT64*/, L: 0 /*LongType.BIGINT*/ },
             { no: 6, name: "pool_token_balance", kind: "scalar", opt: true, T: 4 /*ScalarType.UINT64*/, L: 0 /*LongType.BIGINT*/ },
             { no: 7, name: "exchange_rates", kind: "message", T: () => MoveTable },
             { no: 8, name: "pending_stake", kind: "scalar", opt: true, T: 4 /*ScalarType.UINT64*/, L: 0 /*LongType.BIGINT*/ },
-            { no: 9, name: "pending_total_sui_withdraw", kind: "scalar", opt: true, T: 4 /*ScalarType.UINT64*/, L: 0 /*LongType.BIGINT*/ },
+            { no: 9, name: "pending_total_rtd_withdraw", kind: "scalar", opt: true, T: 4 /*ScalarType.UINT64*/, L: 0 /*LongType.BIGINT*/ },
             { no: 10, name: "pending_pool_token_withdraw", kind: "scalar", opt: true, T: 4 /*ScalarType.UINT64*/, L: 0 /*LongType.BIGINT*/ },
             { no: 11, name: "extra_fields", kind: "message", T: () => MoveTable }
         ]);

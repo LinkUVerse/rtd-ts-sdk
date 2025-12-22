@@ -1,0 +1,8 @@
+[package]
+name = "hero"
+version = "0.0.1"
+edition = "2024.beta"
+
+
+[addresses]
+hero =  "0x0"

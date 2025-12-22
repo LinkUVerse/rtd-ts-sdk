@@ -15,10 +15,10 @@ import { Timestamp } from "../../../google/protobuf/timestamp";
 import { GasCostSummary } from "./gas_cost_summary";
 import { Bcs } from "./bcs";
 /**
- * A header for a checkpoint on the Sui blockchain.
+ * A header for a checkpoint on the Rtd blockchain.
  *
- * On the Sui network, checkpoints define the history of the blockchain. They are quite similar to
- * the concept of blocks used by other blockchains like Bitcoin or Ethereum. The Sui blockchain,
+ * On the Rtd network, checkpoints define the history of the blockchain. They are quite similar to
+ * the concept of blocks used by other blockchains like Bitcoin or Ethereum. The Rtd blockchain,
  * however, forms checkpoints after transaction execution has already happened to provide a
  * certified history of the chain, instead of being formed before execution.
  *
@@ -170,7 +170,7 @@ export enum CheckpointCommitment_CheckpointCommitmentKind {
     CHECKPOINT_COMMITMENT_KIND_UNKNOWN = 0,
     /**
      * An elliptic curve multiset hash attesting to the set of objects that
-     * comprise the live state of the Sui blockchain.
+     * comprise the live state of the Rtd blockchain.
      *
      * @generated from protobuf enum value: ECMH_LIVE_OBJECT_SET = 1;
      */

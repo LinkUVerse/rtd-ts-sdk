@@ -12,7 +12,7 @@
 import { MessageType } from "@protobuf-ts/runtime";
 /**
  * `Bcs` contains an arbitrary type that is serialized using the
- * [BCS](https://linkulabs.github.io/sui-rust-sdk/sui_sdk_types/index.html#bcs)
+ * [BCS](https://linkulabs.github.io/rtd-rust-sdk/rtd_sdk_types/index.html#bcs)
  * format as well as a name that identifies the type of the serialized value.
  *
  * @generated from protobuf message rtd.rpc.v2.Bcs

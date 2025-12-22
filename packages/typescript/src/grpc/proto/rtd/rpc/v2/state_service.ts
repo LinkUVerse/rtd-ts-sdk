@@ -74,7 +74,7 @@ export interface GetCoinInfoResponse {
 export interface CoinMetadata {
     /**
      * ObjectId of the `0x2::coin::CoinMetadata` object or
-     * 0x2::sui::coin_registry::Currency object (when registered with CoinRegistry).
+     * 0x2::rtd::coin_registry::Currency object (when registered with CoinRegistry).
      *
      * @generated from protobuf field: optional string id = 1
      */
@@ -285,7 +285,7 @@ export enum RegulatedCoinMetadata_CoinRegulatedState {
  */
 export interface GetBalanceRequest {
     /**
-     * Required. The owner's Sui address.
+     * Required. The owner's Rtd address.
      *
      * @generated from protobuf field: optional string owner = 1
      */
@@ -318,7 +318,7 @@ export interface GetBalanceResponse {
  */
 export interface ListBalancesRequest {
     /**
-     * Required. The owner's Sui address.
+     * Required. The owner's Rtd address.
      *
      * @generated from protobuf field: optional string owner = 1
      */
@@ -565,7 +565,7 @@ export interface ListOwnedObjectsRequest {
      * `Coin<T>` objects regardless of the type parameter `T`. Providing a type
      * with a type param will restrict the returned objects to only those objects
      * that match the provided type parameters, e.g.
-     * `0x2::coin::Coin<0x2::rtd::RTD>` will only return `Coin<SUI>` objects.
+     * `0x2::coin::Coin<0x2::rtd::RTD>` will only return `Coin<RTD>` objects.
      *
      * @generated from protobuf field: optional string object_type = 5
      */

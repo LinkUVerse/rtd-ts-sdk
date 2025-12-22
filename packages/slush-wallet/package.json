@@ -1,0 +1,55 @@
+{
+	"name": "rtd-slush-wallet",
+	"version": "0.2.12",
+	"description": "Wallet adapter for Slush web wallet",
+	"license": "Apache-2.0",
+	"author": "LinkU Labs <build@linkuverse.com>",
+	"type": "commonjs",
+	"main": "./dist/cjs/index.js",
+	"module": "./dist/esm/index.js",
+	"types": "./dist/cjs/index.d.ts",
+	"exports": {
+		".": {
+			"import": "./dist/esm/index.js",
+			"require": "./dist/cjs/index.js"
+		}
+	},
+	"sideEffects": false,
+	"files": [
+		"CHANGELOG.md",
+		"dist",
+		"experimental"
+	],
+	"scripts": {
+		"clean": "rm -rf tsconfig.tsbuildinfo ./dist",
+		"build": "build-package",
+		"prettier:check": "prettier -c --ignore-unknown .",
+		"prettier:fix": "prettier -w --ignore-unknown .",
+		"eslint:check": "eslint --max-warnings=0 .",
+		"eslint:fix": "pnpm run eslint:check --fix",
+		"lint": "pnpm run eslint:check && pnpm run prettier:check",
+		"lint:fix": "pnpm run eslint:fix && pnpm run prettier:fix"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/LinkUVerse/rtd-ts-sdk.git"
+	},
+	"bugs": {
+		"url": "https://github.com/linkuverse/rtd-ts-sdk/issues"
+	},
+	"homepage": "https://github.com/LinkUVerse/rtd-ts-sdk/tree/main/packages/slush-wallet#readme",
+	"devDependencies": {
+		"rtd-build-scripts": "workspace:*",
+		"@types/node": "^24.10.1",
+		"typescript": "^5.9.3",
+		"vitest": "^4.0.15"
+	},
+	"dependencies": {
+		"rtd-typescript": "workspace:*",
+		"rtd-utils": "workspace:*",
+		"rtd-wallet-standard": "workspace:*",
+		"rtd-window-wallet-core": "workspace:*",
+		"mitt": "^3.0.1",
+		"valibot": "^1.2.0"
+	}
+}

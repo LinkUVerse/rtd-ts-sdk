@@ -19,7 +19,7 @@ export interface Package {
     /**
      * The PackageId of this package
      *
-     * A package's `storage_id` is the Sui ObjectId of the package on-chain.
+     * A package's `storage_id` is the Rtd ObjectId of the package on-chain.
      * Outside of system packages the `storage_id` for every package version is
      * different.
      *

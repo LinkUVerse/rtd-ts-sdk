@@ -1,0 +1,6 @@
+[package]
+name = "Kiosk"
+version = "0.0.2"
+
+[addresses]
+kiosk = "0x0"
