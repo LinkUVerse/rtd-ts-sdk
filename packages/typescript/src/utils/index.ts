@@ -1,17 +1,17 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 export { formatAddress, formatDigest } from './format.js';
 export {
-	isValidSuiAddress,
-	isValidSuiObjectId,
+	isValidRtdAddress,
+	isValidRtdObjectId,
 	isValidTransactionDigest,
 	normalizeStructTag,
-	normalizeSuiAddress,
-	normalizeSuiObjectId,
+	normalizeRtdAddress,
+	normalizeRtdObjectId,
 	parseStructTag,
-	SUI_ADDRESS_LENGTH,
-} from './sui-types.js';
+	RTD_ADDRESS_LENGTH,
+} from './rtd-types.js';
 
 export {
 	fromB64,
@@ -24,20 +24,20 @@ export {
 	toBase64,
 	fromBase58,
 	toBase58,
-} from '@mysten/bcs';
-export { isValidSuiNSName, normalizeSuiNSName } from './suins.js';
+} from '@linku/bcs';
+export { isValidRtdNSName, normalizeRtdNSName } from './rtdns.js';
 
 export {
-	SUI_DECIMALS,
-	MIST_PER_SUI,
+	RTD_DECIMALS,
+	MIST_PER_RTD,
 	MOVE_STDLIB_ADDRESS,
-	SUI_FRAMEWORK_ADDRESS,
-	SUI_SYSTEM_ADDRESS,
-	SUI_CLOCK_OBJECT_ID,
-	SUI_SYSTEM_MODULE_NAME,
-	SUI_TYPE_ARG,
-	SUI_SYSTEM_STATE_OBJECT_ID,
-	SUI_RANDOM_OBJECT_ID,
+	RTD_FRAMEWORK_ADDRESS,
+	RTD_SYSTEM_ADDRESS,
+	RTD_CLOCK_OBJECT_ID,
+	RTD_SYSTEM_MODULE_NAME,
+	RTD_TYPE_ARG,
+	RTD_SYSTEM_STATE_OBJECT_ID,
+	RTD_RANDOM_OBJECT_ID,
 } from './constants.js';
 
 export { isValidNamedPackage, isValidNamedType } from './move-registry.js';

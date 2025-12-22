@@ -1,4 +1,4 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 const CODE_TO_ERROR_TYPE: Record<number, string> = {
@@ -20,9 +20,9 @@ const CODE_TO_ERROR_TYPE: Record<number, string> = {
 	'-32002': 'TransactionExecutionClientError',
 };
 
-export class SuiHTTPTransportError extends Error {}
+export class RtdHTTPTransportError extends Error {}
 
-export class JsonRpcError extends SuiHTTPTransportError {
+export class JsonRpcError extends RtdHTTPTransportError {
 	code: number;
 	type: string;
 
@@ -33,7 +33,7 @@ export class JsonRpcError extends SuiHTTPTransportError {
 	}
 }
 
-export class SuiHTTPStatusError extends SuiHTTPTransportError {
+export class RtdHTTPStatusError extends RtdHTTPTransportError {
 	status: number;
 	statusText: string;
 

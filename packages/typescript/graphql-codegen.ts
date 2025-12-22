@@ -1,10 +1,10 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 import type { CodegenConfig } from '@graphql-codegen/cli';
 
 const header = `
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 /* eslint-disable */
 `.trimStart();
@@ -12,7 +12,7 @@ const header = `
 const config: CodegenConfig = {
 	overwrite: true,
 	schema:
-		'https://raw.githubusercontent.com/MystenLabs/sui/refs/heads/main/crates/sui-indexer-alt-graphql/schema.graphql',
+		'https://raw.githubusercontent.com/LinkUVerse/rtd/refs/heads/main/crates/rtd-indexer-alt-graphql/schema.graphql',
 	documents: ['src/graphql/queries/*.graphql'],
 	ignoreNoDocuments: true,
 	generates: {
@@ -23,7 +23,7 @@ const config: CodegenConfig = {
 					Base64: 'string',
 					DateTime: 'string',
 					ObjectID: 'string',
-					SuiAddress: 'string',
+					RtdAddress: 'string',
 					JSON: 'unknown',
 					UInt53: 'number',
 					MoveData: '../types.js#MoveData',

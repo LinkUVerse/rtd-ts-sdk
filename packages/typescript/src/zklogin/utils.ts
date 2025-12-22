@@ -1,4 +1,4 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 import { hexToBytes } from '@noble/hashes/utils';
@@ -41,7 +41,7 @@ export function toBigEndianBytes(num: bigint, width: number): Uint8Array {
 }
 
 export function getExtendedEphemeralPublicKey(publicKey: PublicKey) {
-	return publicKey.toSuiPublicKey();
+	return publicKey.toRtdPublicKey();
 }
 
 /**

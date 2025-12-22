@@ -1,12 +1,12 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 import { TypeTagSerializer } from '../bcs/type-tag-serializer.js';
 import type { TransactionPlugin } from '../transactions/index.js';
 import { deriveDynamicFieldID } from '../utils/dynamic-fields.js';
-import { normalizeStructTag, parseStructTag, SUI_ADDRESS_LENGTH } from '../utils/sui-types.js';
+import { normalizeStructTag, parseStructTag, RTD_ADDRESS_LENGTH } from '../utils/rtd-types.js';
 import { Experimental_BaseClient } from './client.js';
-import type { ClientWithExtensions, Experimental_SuiClientTypes } from './types.js';
+import type { ClientWithExtensions, Experimental_RtdClientTypes } from './types.js';
 import { MvrClient } from './mvr.js';
 
 export type ClientWithCoreApi = ClientWithExtensions<{
@@ -14,22 +14,22 @@ export type ClientWithCoreApi = ClientWithExtensions<{
 }>;
 
 export interface Experimental_CoreClientOptions
-	extends Experimental_SuiClientTypes.SuiClientOptions {
+	extends Experimental_RtdClientTypes.RtdClientOptions {
 	base: Experimental_BaseClient;
-	mvr?: Experimental_SuiClientTypes.MvrOptions;
+	mvr?: Experimental_RtdClientTypes.MvrOptions;
 }
 
 const DEFAULT_MVR_URLS: Record<string, string> = {
-	mainnet: 'https://mainnet.mvr.mystenlabs.com',
-	testnet: 'https://testnet.mvr.mystenlabs.com',
+	mainnet: 'https://mainnet.mvr.linkuverse.com',
+	testnet: 'https://testnet.mvr.linkuverse.com',
 };
 
 export abstract class Experimental_CoreClient
 	extends Experimental_BaseClient
-	implements Experimental_SuiClientTypes.TransportMethods
+	implements Experimental_RtdClientTypes.TransportMethods
 {
 	core = this;
-	mvr: Experimental_SuiClientTypes.MvrMethods;
+	mvr: Experimental_RtdClientTypes.MvrMethods;
 
 	constructor(options: Experimental_CoreClientOptions) {
 		super(options);
@@ -43,12 +43,12 @@ export abstract class Experimental_CoreClient
 	}
 
 	abstract getObjects(
-		options: Experimental_SuiClientTypes.GetObjectsOptions,
-	): Promise<Experimental_SuiClientTypes.GetObjectsResponse>;
+		options: Experimental_RtdClientTypes.GetObjectsOptions,
+	): Promise<Experimental_RtdClientTypes.GetObjectsResponse>;
 
 	async getObject(
-		options: Experimental_SuiClientTypes.GetObjectOptions,
-	): Promise<Experimental_SuiClientTypes.GetObjectResponse> {
+		options: Experimental_RtdClientTypes.GetObjectOptions,
+	): Promise<Experimental_RtdClientTypes.GetObjectResponse> {
 		const { objectId } = options;
 		const {
 			objects: [result],
@@ -60,58 +60,58 @@ export abstract class Experimental_CoreClient
 	}
 
 	abstract getCoins(
-		options: Experimental_SuiClientTypes.GetCoinsOptions,
-	): Promise<Experimental_SuiClientTypes.GetCoinsResponse>;
+		options: Experimental_RtdClientTypes.GetCoinsOptions,
+	): Promise<Experimental_RtdClientTypes.GetCoinsResponse>;
 
 	abstract getOwnedObjects(
-		options: Experimental_SuiClientTypes.GetOwnedObjectsOptions,
-	): Promise<Experimental_SuiClientTypes.GetOwnedObjectsResponse>;
+		options: Experimental_RtdClientTypes.GetOwnedObjectsOptions,
+	): Promise<Experimental_RtdClientTypes.GetOwnedObjectsResponse>;
 
 	abstract getBalance(
-		options: Experimental_SuiClientTypes.GetBalanceOptions,
-	): Promise<Experimental_SuiClientTypes.GetBalanceResponse>;
+		options: Experimental_RtdClientTypes.GetBalanceOptions,
+	): Promise<Experimental_RtdClientTypes.GetBalanceResponse>;
 
 	abstract getAllBalances(
-		options: Experimental_SuiClientTypes.GetAllBalancesOptions,
-	): Promise<Experimental_SuiClientTypes.GetAllBalancesResponse>;
+		options: Experimental_RtdClientTypes.GetAllBalancesOptions,
+	): Promise<Experimental_RtdClientTypes.GetAllBalancesResponse>;
 
 	abstract getTransaction(
-		options: Experimental_SuiClientTypes.GetTransactionOptions,
-	): Promise<Experimental_SuiClientTypes.GetTransactionResponse>;
+		options: Experimental_RtdClientTypes.GetTransactionOptions,
+	): Promise<Experimental_RtdClientTypes.GetTransactionResponse>;
 
 	abstract executeTransaction(
-		options: Experimental_SuiClientTypes.ExecuteTransactionOptions,
-	): Promise<Experimental_SuiClientTypes.ExecuteTransactionResponse>;
+		options: Experimental_RtdClientTypes.ExecuteTransactionOptions,
+	): Promise<Experimental_RtdClientTypes.ExecuteTransactionResponse>;
 
 	abstract dryRunTransaction(
-		options: Experimental_SuiClientTypes.DryRunTransactionOptions,
-	): Promise<Experimental_SuiClientTypes.DryRunTransactionResponse>;
+		options: Experimental_RtdClientTypes.DryRunTransactionOptions,
+	): Promise<Experimental_RtdClientTypes.DryRunTransactionResponse>;
 
 	abstract getReferenceGasPrice(
-		options?: Experimental_SuiClientTypes.GetReferenceGasPriceOptions,
-	): Promise<Experimental_SuiClientTypes.GetReferenceGasPriceResponse>;
+		options?: Experimental_RtdClientTypes.GetReferenceGasPriceOptions,
+	): Promise<Experimental_RtdClientTypes.GetReferenceGasPriceResponse>;
 
 	abstract getDynamicFields(
-		options: Experimental_SuiClientTypes.GetDynamicFieldsOptions,
-	): Promise<Experimental_SuiClientTypes.GetDynamicFieldsResponse>;
+		options: Experimental_RtdClientTypes.GetDynamicFieldsOptions,
+	): Promise<Experimental_RtdClientTypes.GetDynamicFieldsResponse>;
 
 	abstract resolveTransactionPlugin(): TransactionPlugin;
 
 	abstract verifyZkLoginSignature(
-		options: Experimental_SuiClientTypes.VerifyZkLoginSignatureOptions,
-	): Promise<Experimental_SuiClientTypes.ZkLoginVerifyResponse>;
+		options: Experimental_RtdClientTypes.VerifyZkLoginSignatureOptions,
+	): Promise<Experimental_RtdClientTypes.ZkLoginVerifyResponse>;
 
 	abstract getMoveFunction(
-		options: Experimental_SuiClientTypes.GetMoveFunctionOptions,
-	): Promise<Experimental_SuiClientTypes.GetMoveFunctionResponse>;
+		options: Experimental_RtdClientTypes.GetMoveFunctionOptions,
+	): Promise<Experimental_RtdClientTypes.GetMoveFunctionResponse>;
 
 	abstract defaultNameServiceName(
-		options: Experimental_SuiClientTypes.DefaultNameServiceNameOptions,
-	): Promise<Experimental_SuiClientTypes.DefaultNameServiceNameResponse>;
+		options: Experimental_RtdClientTypes.DefaultNameServiceNameOptions,
+	): Promise<Experimental_RtdClientTypes.DefaultNameServiceNameResponse>;
 
 	async getDynamicField(
-		options: Experimental_SuiClientTypes.GetDynamicFieldOptions,
-	): Promise<Experimental_SuiClientTypes.GetDynamicFieldResponse> {
+		options: Experimental_RtdClientTypes.GetDynamicFieldOptions,
+	): Promise<Experimental_RtdClientTypes.GetDynamicFieldResponse> {
 		const normalizedNameType = TypeTagSerializer.parseFromStr(
 			(
 				await this.core.mvr.resolveType({
@@ -153,7 +153,7 @@ export abstract class Experimental_CoreClient
 						typeof fieldType.typeParams[1] === 'string'
 							? fieldType.typeParams[1]
 							: normalizeStructTag(fieldType.typeParams[1]),
-					bcs: content.slice(SUI_ADDRESS_LENGTH + options.name.bcs.length),
+					bcs: content.slice(RTD_ADDRESS_LENGTH + options.name.bcs.length),
 				},
 			},
 		};
@@ -168,7 +168,7 @@ export abstract class Experimental_CoreClient
 		signal?: AbortSignal;
 		/** The amount of time to wait for transaction. Defaults to one minute. */
 		timeout?: number;
-	} & Experimental_SuiClientTypes.GetTransactionOptions): Promise<Experimental_SuiClientTypes.GetTransactionResponse> {
+	} & Experimental_RtdClientTypes.GetTransactionOptions): Promise<Experimental_RtdClientTypes.GetTransactionResponse> {
 		const abortSignal = signal
 			? AbortSignal.any([AbortSignal.timeout(timeout), signal])
 			: AbortSignal.timeout(timeout);

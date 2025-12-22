@@ -1,4 +1,4 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 import { bcs } from '../bcs/index.js';
@@ -14,7 +14,7 @@ export function messageWithIntent(scope: IntentScope, message: Uint8Array) {
 			intent: {
 				scope: { [scope as 'PersonalMessage']: true },
 				version: { V0: true },
-				appId: { Sui: true },
+				appId: { Rtd: true },
 			},
 			value: message,
 		})

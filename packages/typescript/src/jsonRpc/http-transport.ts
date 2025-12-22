@@ -1,8 +1,8 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 import { PACKAGE_VERSION, TARGETED_RPC_VERSION } from '../version.js';
-import { JsonRpcError, SuiHTTPStatusError } from './errors.js';
+import { JsonRpcError, RtdHTTPStatusError } from './errors.js';
 import type { WebsocketClientOptions } from './rpc-websocket-client.js';
 import { WebsocketClient } from './rpc-websocket-client.js';
 
@@ -61,7 +61,7 @@ export class JsonRpcHTTPTransport implements JsonRpcTransport {
 
 		if (!fetchFn) {
 			throw new Error(
-				'The current environment does not support fetch, you can provide a fetch implementation in the options for SuiHTTPTransport.',
+				'The current environment does not support fetch, you can provide a fetch implementation in the options for RtdHTTPTransport.',
 			);
 		}
 
@@ -73,7 +73,7 @@ export class JsonRpcHTTPTransport implements JsonRpcTransport {
 			const WebSocketConstructor = this.#options.WebSocketConstructor ?? WebSocket;
 			if (!WebSocketConstructor) {
 				throw new Error(
-					'The current environment does not support WebSocket, you can provide a WebSocketConstructor in the options for SuiHTTPTransport.',
+					'The current environment does not support WebSocket, you can provide a WebSocketConstructor in the options for RtdHTTPTransport.',
 				);
 			}
 
@@ -112,7 +112,7 @@ export class JsonRpcHTTPTransport implements JsonRpcTransport {
 		});
 
 		if (!res.ok) {
-			throw new SuiHTTPStatusError(
+			throw new RtdHTTPStatusError(
 				`Unexpected status code: ${res.status}`,
 				res.status,
 				res.statusText,

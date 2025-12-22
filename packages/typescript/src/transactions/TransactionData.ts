@@ -1,12 +1,12 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { toBase58 } from '@mysten/bcs';
+import { toBase58 } from '@linku/bcs';
 import type { InferInput } from 'valibot';
 import { parse } from 'valibot';
 
 import { bcs } from '../bcs/index.js';
-import { normalizeSuiAddress } from '../utils/sui-types.js';
+import { normalizeRtdAddress } from '../utils/rtd-types.js';
 import type {
 	Argument,
 	CallArg,
@@ -22,8 +22,8 @@ import type { SerializedTransactionDataV2Schema } from './data/v2.js';
 import { hashTypedData } from './hash.js';
 import { getIdFromCallArg, remapCommandArguments } from './utils.js';
 import type { TransactionResult } from './Transaction.js';
-function prepareSuiAddress(address: string) {
-	return normalizeSuiAddress(address).replace('0x', '');
+function prepareRtdAddress(address: string) {
+	return normalizeRtdAddress(address).replace('0x', '');
 }
 
 export class TransactionDataBuilder implements TransactionData {
@@ -175,11 +175,11 @@ export class TransactionDataBuilder implements TransactionData {
 		}
 
 		const transactionData = {
-			sender: prepareSuiAddress(sender),
+			sender: prepareRtdAddress(sender),
 			expiration: expiration ? expiration : { None: true },
 			gasData: {
 				payment: gasData.payment,
-				owner: prepareSuiAddress(this.gasData.owner ?? sender),
+				owner: prepareRtdAddress(this.gasData.owner ?? sender),
 				price: BigInt(gasData.price),
 				budget: BigInt(gasData.budget),
 			},
@@ -516,7 +516,7 @@ export class TransactionDataBuilder implements TransactionData {
 							resolvedInput.Object.ImmOrOwnedObject ?? resolvedInput.Object.Receiving!;
 
 						if (
-							normalizeSuiAddress(original.objectId) !== normalizeSuiAddress(resolved.objectId) ||
+							normalizeRtdAddress(original.objectId) !== normalizeRtdAddress(resolved.objectId) ||
 							(original.version != null && original.version !== resolved.version) ||
 							(original.digest != null && original.digest !== resolved.digest) ||
 							// Objects with shared object properties should not resolve to owned objects
@@ -532,7 +532,7 @@ export class TransactionDataBuilder implements TransactionData {
 						const resolved = resolvedInput.Object.SharedObject;
 
 						if (
-							normalizeSuiAddress(original.objectId) !== normalizeSuiAddress(resolved.objectId) ||
+							normalizeRtdAddress(original.objectId) !== normalizeRtdAddress(resolved.objectId) ||
 							(original.initialSharedVersion != null &&
 								original.initialSharedVersion !== resolved.initialSharedVersion) ||
 							(original.mutable != null && original.mutable !== resolved.mutable) ||

@@ -1,15 +1,15 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 import type { Argument } from './data/internal.js';
 
 import type { ClientWithCoreApi } from '../experimental/index.js';
 import type { TransactionDataBuilder } from './TransactionData.js';
-import type { BcsType } from '@mysten/bcs';
+import type { BcsType } from '@linku/bcs';
 import { Inputs } from './Inputs.js';
 import { bcs } from '../bcs/index.js';
 import { jsonRpcClientResolveTransactionPlugin } from '../jsonRpc/json-rpc-resolver.js';
-import type { SuiJsonRpcClient } from '../jsonRpc/client.js';
+import type { RtdJsonRpcClient } from '../jsonRpc/client.js';
 
 export interface BuildTransactionOptions {
 	client?: ClientWithCoreApi;
@@ -61,7 +61,7 @@ export async function resolveTransactionPlugin(
 	const client = getClient(options);
 	const plugin =
 		client.core?.resolveTransactionPlugin() ??
-		jsonRpcClientResolveTransactionPlugin(client as SuiJsonRpcClient);
+		jsonRpcClientResolveTransactionPlugin(client as RtdJsonRpcClient);
 
 	return plugin(transactionData, options, async () => {
 		await validate(transactionData);
@@ -84,7 +84,7 @@ function validate(transactionData: TransactionDataBuilder) {
 export function getClient(options: BuildTransactionOptions) {
 	if (!options.client) {
 		throw new Error(
-			`No sui client passed to Transaction#build, but transaction data was not sufficient to build offline.`,
+			`No rtd client passed to Transaction#build, but transaction data was not sufficient to build offline.`,
 		);
 	}
 

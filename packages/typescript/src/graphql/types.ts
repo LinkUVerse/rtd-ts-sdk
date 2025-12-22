@@ -1,4 +1,4 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 export type MoveData =
@@ -82,6 +82,6 @@ export interface CustomScalars {
 	MoveTypeLayout: MoveTypeLayout;
 	MoveTypeSignature: MoveTypeSignature;
 	OpenMoveTypeSignature: OpenMoveTypeSignature;
-	SuiAddress: string;
+	RtdAddress: string;
 	UInt53: number;
 }

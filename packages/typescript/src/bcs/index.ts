@@ -1,7 +1,7 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { bcs } from '@mysten/bcs';
+import { bcs } from '@linku/bcs';
 
 import {
 	Address,
@@ -29,7 +29,7 @@ import {
 	SenderSignedTransaction,
 	SharedObjectRef,
 	StructTag,
-	SuiObjectRef,
+	RtdObjectRef,
 	TransactionData,
 	TransactionDataV1,
 	TransactionExpiration,
@@ -41,9 +41,9 @@ import { TransactionEffects } from './effects.js';
 export type { TypeTag } from './types.js';
 
 export { TypeTagSerializer } from './type-tag-serializer.js';
-export { BcsType, BcsStruct, BcsEnum, BcsTuple, type BcsTypeOptions } from '@mysten/bcs';
+export { BcsType, BcsStruct, BcsEnum, BcsTuple, type BcsTypeOptions } from '@linku/bcs';
 
-const suiBcs = {
+const rtdBcs = {
 	...bcs,
 	U8: bcs.u8(),
 	U16: bcs.u16(),
@@ -79,7 +79,7 @@ const suiBcs = {
 	SenderSignedTransaction,
 	SharedObjectRef,
 	StructTag,
-	SuiObjectRef,
+	RtdObjectRef,
 	TransactionData,
 	TransactionDataV1,
 	TransactionEffects,
@@ -93,4 +93,4 @@ export {
 	type PureTypeName,
 } from './pure.js';
 
-export { suiBcs as bcs };
+export { rtdBcs as bcs };

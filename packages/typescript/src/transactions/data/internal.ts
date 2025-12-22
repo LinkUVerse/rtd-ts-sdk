@@ -1,7 +1,7 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import type { EnumInputShape, EnumOutputShape } from '@mysten/bcs';
+import type { EnumInputShape, EnumOutputShape } from '@linku/bcs';
 import type { GenericSchema, InferInput, InferOutput } from 'valibot';
 import {
 	array,
@@ -24,8 +24,8 @@ import {
 	unknown,
 } from 'valibot';
 
-import { isValidSuiAddress, normalizeSuiAddress } from '../../utils/sui-types.js';
-import type { Simplify } from '@mysten/utils';
+import { isValidRtdAddress, normalizeRtdAddress } from '../../utils/rtd-types.js';
+import type { Simplify } from '@linku/utils';
 
 type EnumSchemaInput<T extends Record<string, GenericSchema<any>>> = EnumInputShape<
 	Simplify<{
@@ -59,12 +59,12 @@ export function safeEnum<T extends Record<string, GenericSchema<any>>>(options: 
 	) as EnumSchema<T>;
 }
 
-export const SuiAddress = pipe(
+export const RtdAddress = pipe(
 	string(),
-	transform((value) => normalizeSuiAddress(value)),
-	check(isValidSuiAddress),
+	transform((value) => normalizeRtdAddress(value)),
+	check(isValidRtdAddress),
 );
-export const ObjectID = SuiAddress;
+export const ObjectID = RtdAddress;
 export const BCSBytes = string();
 export const JsonU64 = pipe(
 	union([string(), pipe(number(), integer())]),
@@ -78,16 +78,16 @@ export const JsonU64 = pipe(
 		}
 	}, 'Invalid u64'),
 );
-// https://github.com/MystenLabs/sui/blob/df41d5fa8127634ff4285671a01ead00e519f806/crates/sui-types/src/base_types.rs#L138
+// https://github.com/LinkUVerse/rtd/blob/df41d5fa8127634ff4285671a01ead00e519f806/crates/rtd-types/src/base_types.rs#L138
 // Implemented as a tuple in rust
 export const ObjectRefSchema = object({
-	objectId: SuiAddress,
+	objectId: RtdAddress,
 	version: JsonU64,
 	digest: string(),
 });
 export type ObjectRef = InferOutput<typeof ObjectRefSchema>;
 
-// https://github.com/MystenLabs/sui/blob/df41d5fa8127634ff4285671a01ead00e519f806/crates/sui-types/src/transaction.rs#L690-L702
+// https://github.com/LinkUVerse/rtd/blob/df41d5fa8127634ff4285671a01ead00e519f806/crates/rtd-types/src/transaction.rs#L690-L702
 export const ArgumentSchema = pipe(
 	union([
 		object({ GasCoin: literal(true) }),
@@ -117,16 +117,16 @@ export const ArgumentSchema = pipe(
 
 export type Argument = InferOutput<typeof ArgumentSchema>;
 
-// https://github.com/MystenLabs/sui/blob/df41d5fa8127634ff4285671a01ead00e519f806/crates/sui-types/src/transaction.rs#L1387-L1392
+// https://github.com/LinkUVerse/rtd/blob/df41d5fa8127634ff4285671a01ead00e519f806/crates/rtd-types/src/transaction.rs#L1387-L1392
 export const GasDataSchema = object({
 	budget: nullable(JsonU64),
 	price: nullable(JsonU64),
-	owner: nullable(SuiAddress),
+	owner: nullable(RtdAddress),
 	payment: nullable(array(ObjectRefSchema)),
 });
 export type GasData = InferOutput<typeof GasDataSchema>;
 
-// https://github.com/MystenLabs/sui/blob/df41d5fa8127634ff4285671a01ead00e519f806/external-crates/move/crates/move-core-types/src/language_storage.rs#L140-L147
+// https://github.com/LinkUVerse/rtd/blob/df41d5fa8127634ff4285671a01ead00e519f806/external-crates/move/crates/move-core-types/src/language_storage.rs#L140-L147
 export const StructTagSchema = object({
 	address: string(),
 	module: string(),
@@ -136,7 +136,7 @@ export const StructTagSchema = object({
 });
 export type StructTag = InferOutput<typeof StructTagSchema>;
 
-// https://github.com/MystenLabs/sui/blob/cea8742e810142a8145fd83c4c142d61e561004a/crates/sui-graphql-rpc/schema/current_progress_schema.graphql#L1614-L1627
+// https://github.com/LinkUVerse/rtd/blob/cea8742e810142a8145fd83c4c142d61e561004a/crates/rtd-graphql-rpc/schema/current_progress_schema.graphql#L1614-L1627
 export type OpenMoveTypeSignatureBody =
 	| 'address'
 	| 'bool'
@@ -178,14 +178,14 @@ export const OpenMoveTypeSignatureBodySchema: GenericSchema<OpenMoveTypeSignatur
 	object({ typeParameter: pipe(number(), integer()) }),
 ]);
 
-// https://github.com/MystenLabs/sui/blob/cea8742e810142a8145fd83c4c142d61e561004a/crates/sui-graphql-rpc/schema/current_progress_schema.graphql#L1609-L1612
+// https://github.com/LinkUVerse/rtd/blob/cea8742e810142a8145fd83c4c142d61e561004a/crates/rtd-graphql-rpc/schema/current_progress_schema.graphql#L1609-L1612
 export const OpenMoveTypeSignatureSchema = object({
 	ref: nullable(union([literal('&'), literal('&mut')])),
 	body: OpenMoveTypeSignatureBodySchema,
 });
 export type OpenMoveTypeSignature = InferOutput<typeof OpenMoveTypeSignatureSchema>;
 
-// https://github.com/MystenLabs/sui/blob/df41d5fa8127634ff4285671a01ead00e519f806/crates/sui-types/src/transaction.rs#L707-L718
+// https://github.com/LinkUVerse/rtd/blob/df41d5fa8127634ff4285671a01ead00e519f806/crates/rtd-types/src/transaction.rs#L707-L718
 const ProgrammableMoveCallSchema = object({
 	package: ObjectID,
 	module: string(),
@@ -203,7 +203,7 @@ export const $Intent = object({
 	data: record(string(), unknown()),
 });
 
-// https://github.com/MystenLabs/sui/blob/df41d5fa8127634ff4285671a01ead00e519f806/crates/sui-types/src/transaction.rs#L657-L685
+// https://github.com/LinkUVerse/rtd/blob/df41d5fa8127634ff4285671a01ead00e519f806/crates/rtd-types/src/transaction.rs#L657-L685
 export const CommandSchema = safeEnum({
 	MoveCall: ProgrammableMoveCallSchema,
 	TransferObjects: object({
@@ -277,7 +277,7 @@ export type Command<Arg = Argument> = EnumOutputShape<{
 	};
 }>;
 
-// https://github.com/MystenLabs/sui/blob/df41d5fa8127634ff4285671a01ead00e519f806/crates/sui-types/src/transaction.rs#L102-L114
+// https://github.com/LinkUVerse/rtd/blob/df41d5fa8127634ff4285671a01ead00e519f806/crates/rtd-types/src/transaction.rs#L102-L114
 export const ObjectArgSchema = safeEnum({
 	ImmOrOwnedObject: ObjectRefSchema,
 	SharedObject: object({
@@ -289,7 +289,7 @@ export const ObjectArgSchema = safeEnum({
 	Receiving: ObjectRefSchema,
 });
 
-// https://github.com/MystenLabs/sui/blob/df41d5fa8127634ff4285671a01ead00e519f806/crates/sui-types/src/transaction.rs#L75-L80
+// https://github.com/LinkUVerse/rtd/blob/df41d5fa8127634ff4285671a01ead00e519f806/crates/rtd-types/src/transaction.rs#L75-L80
 const CallArgSchema = safeEnum({
 	Object: ObjectArgSchema,
 	Pure: object({
@@ -324,7 +324,7 @@ export type TransactionExpiration = InferOutput<typeof TransactionExpiration>;
 
 export const TransactionDataSchema = object({
 	version: literal(2),
-	sender: nullish(SuiAddress),
+	sender: nullish(RtdAddress),
 	expiration: nullish(TransactionExpiration),
 	gasData: GasDataSchema,
 	inputs: array(CallArgSchema),

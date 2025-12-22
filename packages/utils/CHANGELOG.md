@@ -1,4 +1,4 @@
-# @mysten/utils
+# @linku/utils
 
 ## 0.2.0
 

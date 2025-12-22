@@ -1,4 +1,4 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 export class FaucetRateLimitError extends Error {}
@@ -76,9 +76,9 @@ async function faucetRequest<T>({ host, path, body, headers, method }: FaucetReq
 }
 
 /**
- * @deprecated "Use requestSuiFromFaucetV2 instead"
+ * @deprecated "Use requestRtdFromFaucetV2 instead"
  */
-export async function requestSuiFromFaucetV0(input: {
+export async function requestRtdFromFaucetV0(input: {
 	host: string;
 	recipient: string;
 	headers?: HeadersInit;
@@ -103,9 +103,9 @@ export async function requestSuiFromFaucetV0(input: {
 }
 
 /**
- * @deprecated "Use requestSuiFromFaucetV2 instead"
+ * @deprecated "Use requestRtdFromFaucetV2 instead"
  */
-export async function requestSuiFromFaucetV1(input: {
+export async function requestRtdFromFaucetV1(input: {
 	host: string;
 	recipient: string;
 	headers?: HeadersInit;
@@ -129,7 +129,7 @@ export async function requestSuiFromFaucetV1(input: {
 	return response;
 }
 
-export async function requestSuiFromFaucetV2(input: {
+export async function requestRtdFromFaucetV2(input: {
 	host: string;
 	recipient: string;
 	headers?: HeadersInit;
@@ -154,7 +154,7 @@ export async function requestSuiFromFaucetV2(input: {
 }
 
 /**
- * @deprecated "Use requestSuiFromFaucetV2 which returns directly a success or failure status"
+ * @deprecated "Use requestRtdFromFaucetV2 which returns directly a success or failure status"
  */
 export async function getFaucetRequestStatus(input: {
 	host: string;
@@ -178,9 +178,9 @@ export async function getFaucetRequestStatus(input: {
 export function getFaucetHost(network: 'testnet' | 'devnet' | 'localnet') {
 	switch (network) {
 		case 'testnet':
-			return 'https://faucet.testnet.sui.io';
+			return 'https://faucet.testnet.rtd.life';
 		case 'devnet':
-			return 'https://faucet.devnet.sui.io';
+			return 'https://faucet.devnet.rtd.life';
 		case 'localnet':
 			return 'http://127.0.0.1:9123';
 		default:

@@ -1,20 +1,20 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-import { fromBase58, toBase64, toHex } from '@mysten/bcs';
+import { fromBase58, toBase64, toHex } from '@linku/bcs';
 
 import type { Signer } from '../cryptography/index.js';
 import { Experimental_BaseClient } from '../experimental/client.js';
-import type { Experimental_SuiClientTypes } from '../experimental/types.js';
+import type { Experimental_RtdClientTypes } from '../experimental/types.js';
 import type { Transaction } from '../transactions/Transaction.js';
 import { isTransaction } from '../transactions/Transaction.js';
 import {
-	isValidSuiAddress,
-	isValidSuiObjectId,
+	isValidRtdAddress,
+	isValidRtdObjectId,
 	isValidTransactionDigest,
-	normalizeSuiAddress,
-	normalizeSuiObjectId,
-} from '../utils/sui-types.js';
-import { normalizeSuiNSName } from '../utils/suins.js';
+	normalizeRtdAddress,
+	normalizeRtdObjectId,
+} from '../utils/rtd-types.js';
+import { normalizeRtdNSName } from '../utils/rtdns.js';
 import { JsonRpcHTTPTransport } from './http-transport.js';
 import type { JsonRpcTransport } from './http-transport.js';
 import type {
@@ -47,7 +47,7 @@ import type {
 	GetDynamicFieldObjectParams,
 	GetDynamicFieldsParams,
 	GetLatestCheckpointSequenceNumberParams,
-	GetLatestSuiSystemStateParams,
+	GetLatestRtdSystemStateParams,
 	GetMoveFunctionArgTypesParams,
 	GetNormalizedMoveFunctionParams,
 	GetNormalizedMoveModuleParams,
@@ -79,17 +79,17 @@ import type {
 	ResolveNameServiceNamesParams,
 	SubscribeEventParams,
 	SubscribeTransactionParams,
-	SuiEvent,
-	SuiMoveFunctionArgType,
-	SuiMoveNormalizedFunction,
-	SuiMoveNormalizedModule,
-	SuiMoveNormalizedModules,
-	SuiMoveNormalizedStruct,
-	SuiObjectResponse,
-	SuiObjectResponseQuery,
-	SuiSystemStateSummary,
-	SuiTransactionBlockResponse,
-	SuiTransactionBlockResponseQuery,
+	RtdEvent,
+	RtdMoveFunctionArgType,
+	RtdMoveNormalizedFunction,
+	RtdMoveNormalizedModule,
+	RtdMoveNormalizedModules,
+	RtdMoveNormalizedStruct,
+	RtdObjectResponse,
+	RtdObjectResponseQuery,
+	RtdSystemStateSummary,
+	RtdTransactionBlockResponse,
+	RtdTransactionBlockResponseQuery,
 	TransactionEffects,
 	TryGetPastObjectParams,
 	Unsubscribe,
@@ -113,12 +113,12 @@ export interface OrderArguments {
 }
 
 /**
- * Configuration options for the SuiClient
+ * Configuration options for the RtdClient
  * You must provide either a `url` or a `transport`
  */
-export type SuiJsonRpcClientOptions = NetworkOrTransport & {
-	network?: Experimental_SuiClientTypes.Network;
-	mvr?: Experimental_SuiClientTypes.MvrOptions;
+export type RtdJsonRpcClientOptions = NetworkOrTransport & {
+	network?: Experimental_RtdClientTypes.Network;
+	mvr?: Experimental_RtdClientTypes.MvrOptions;
 };
 
 type NetworkOrTransport =
@@ -131,29 +131,29 @@ type NetworkOrTransport =
 			url?: never;
 	  };
 
-const SUI_CLIENT_BRAND = Symbol.for('@mysten/SuiClient') as never;
+const RTD_CLIENT_BRAND = Symbol.for('@linku/RtdClient') as never;
 
-export function isSuiJsonRpcClient(client: unknown): client is SuiJsonRpcClient {
+export function isRtdJsonRpcClient(client: unknown): client is RtdJsonRpcClient {
 	return (
-		typeof client === 'object' && client !== null && (client as any)[SUI_CLIENT_BRAND] === true
+		typeof client === 'object' && client !== null && (client as any)[RTD_CLIENT_BRAND] === true
 	);
 }
 
-export class SuiJsonRpcClient extends Experimental_BaseClient {
+export class RtdJsonRpcClient extends Experimental_BaseClient {
 	core: JSONRpcCoreClient;
 	jsonRpc = this;
 	protected transport: JsonRpcTransport;
 
-	get [SUI_CLIENT_BRAND]() {
+	get [RTD_CLIENT_BRAND]() {
 		return true;
 	}
 
 	/**
-	 * Establish a connection to a Sui RPC endpoint
+	 * Establish a connection to a Rtd RPC endpoint
 	 *
 	 * @param options configuration options for the API Client
 	 */
-	constructor(options: SuiJsonRpcClientOptions) {
+	constructor(options: RtdJsonRpcClientOptions) {
 		super({ network: options.network ?? 'unknown' });
 		this.transport = options.transport ?? new JsonRpcHTTPTransport({ url: options.url });
 		this.core = new JSONRpcCoreClient({
@@ -182,8 +182,8 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 		limit,
 		signal,
 	}: GetCoinsParams): Promise<PaginatedCoins> {
-		if (!owner || !isValidSuiAddress(normalizeSuiAddress(owner))) {
-			throw new Error('Invalid Sui address');
+		if (!owner || !isValidRtdAddress(normalizeRtdAddress(owner))) {
+			throw new Error('Invalid Rtd address');
 		}
 
 		if (coinType && hasMvrName(coinType)) {
@@ -195,7 +195,7 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 		}
 
 		return await this.transport.request({
-			method: 'suix_getCoins',
+			method: 'rtdx_getCoins',
 			params: [owner, coinType, cursor, limit],
 			signal: signal,
 		});
@@ -205,12 +205,12 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 	 * Get all Coin objects owned by an address.
 	 */
 	async getAllCoins(input: GetAllCoinsParams): Promise<PaginatedCoins> {
-		if (!input.owner || !isValidSuiAddress(normalizeSuiAddress(input.owner))) {
-			throw new Error('Invalid Sui address');
+		if (!input.owner || !isValidRtdAddress(normalizeRtdAddress(input.owner))) {
+			throw new Error('Invalid Rtd address');
 		}
 
 		return await this.transport.request({
-			method: 'suix_getAllCoins',
+			method: 'rtdx_getAllCoins',
 			params: [input.owner, input.cursor, input.limit],
 			signal: input.signal,
 		});
@@ -220,8 +220,8 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 	 * Get the total coin balance for one coin type, owned by the address owner.
 	 */
 	async getBalance({ owner, coinType, signal }: GetBalanceParams): Promise<CoinBalance> {
-		if (!owner || !isValidSuiAddress(normalizeSuiAddress(owner))) {
-			throw new Error('Invalid Sui address');
+		if (!owner || !isValidRtdAddress(normalizeRtdAddress(owner))) {
+			throw new Error('Invalid Rtd address');
 		}
 
 		if (coinType && hasMvrName(coinType)) {
@@ -233,7 +233,7 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 		}
 
 		return await this.transport.request({
-			method: 'suix_getBalance',
+			method: 'rtdx_getBalance',
 			params: [owner, coinType],
 			signal: signal,
 		});
@@ -243,11 +243,11 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 	 * Get the total coin balance for all coin types, owned by the address owner.
 	 */
 	async getAllBalances(input: GetAllBalancesParams): Promise<CoinBalance[]> {
-		if (!input.owner || !isValidSuiAddress(normalizeSuiAddress(input.owner))) {
-			throw new Error('Invalid Sui address');
+		if (!input.owner || !isValidRtdAddress(normalizeRtdAddress(input.owner))) {
+			throw new Error('Invalid Rtd address');
 		}
 		return await this.transport.request({
-			method: 'suix_getAllBalances',
+			method: 'rtdx_getAllBalances',
 			params: [input.owner],
 			signal: input.signal,
 		});
@@ -266,7 +266,7 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 		}
 
 		return await this.transport.request({
-			method: 'suix_getCoinMetadata',
+			method: 'rtdx_getCoinMetadata',
 			params: [coinType],
 			signal: signal,
 		});
@@ -285,7 +285,7 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 		}
 
 		return await this.transport.request({
-			method: 'suix_getTotalSupply',
+			method: 'rtdx_getTotalSupply',
 			params: [coinType],
 			signal: signal,
 		});
@@ -312,7 +312,7 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 		module,
 		function: fn,
 		signal,
-	}: GetMoveFunctionArgTypesParams): Promise<SuiMoveFunctionArgType[]> {
+	}: GetMoveFunctionArgTypesParams): Promise<RtdMoveFunctionArgType[]> {
 		if (pkg && isValidNamedPackage(pkg)) {
 			pkg = (
 				await this.core.mvr.resolvePackage({
@@ -322,7 +322,7 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 		}
 
 		return await this.transport.request({
-			method: 'sui_getMoveFunctionArgTypes',
+			method: 'rtd_getMoveFunctionArgTypes',
 			params: [pkg, module, fn],
 			signal: signal,
 		});
@@ -335,7 +335,7 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 	async getNormalizedMoveModulesByPackage({
 		package: pkg,
 		signal,
-	}: GetNormalizedMoveModulesByPackageParams): Promise<SuiMoveNormalizedModules> {
+	}: GetNormalizedMoveModulesByPackageParams): Promise<RtdMoveNormalizedModules> {
 		if (pkg && isValidNamedPackage(pkg)) {
 			pkg = (
 				await this.core.mvr.resolvePackage({
@@ -345,7 +345,7 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 		}
 
 		return await this.transport.request({
-			method: 'sui_getNormalizedMoveModulesByPackage',
+			method: 'rtd_getNormalizedMoveModulesByPackage',
 			params: [pkg],
 			signal: signal,
 		});
@@ -358,7 +358,7 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 		package: pkg,
 		module,
 		signal,
-	}: GetNormalizedMoveModuleParams): Promise<SuiMoveNormalizedModule> {
+	}: GetNormalizedMoveModuleParams): Promise<RtdMoveNormalizedModule> {
 		if (pkg && isValidNamedPackage(pkg)) {
 			pkg = (
 				await this.core.mvr.resolvePackage({
@@ -368,7 +368,7 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 		}
 
 		return await this.transport.request({
-			method: 'sui_getNormalizedMoveModule',
+			method: 'rtd_getNormalizedMoveModule',
 			params: [pkg, module],
 			signal: signal,
 		});
@@ -382,7 +382,7 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 		module,
 		function: fn,
 		signal,
-	}: GetNormalizedMoveFunctionParams): Promise<SuiMoveNormalizedFunction> {
+	}: GetNormalizedMoveFunctionParams): Promise<RtdMoveNormalizedFunction> {
 		if (pkg && isValidNamedPackage(pkg)) {
 			pkg = (
 				await this.core.mvr.resolvePackage({
@@ -392,7 +392,7 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 		}
 
 		return await this.transport.request({
-			method: 'sui_getNormalizedMoveFunction',
+			method: 'rtd_getNormalizedMoveFunction',
 			params: [pkg, module, fn],
 			signal: signal,
 		});
@@ -406,7 +406,7 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 		module,
 		struct,
 		signal,
-	}: GetNormalizedMoveStructParams): Promise<SuiMoveNormalizedStruct> {
+	}: GetNormalizedMoveStructParams): Promise<RtdMoveNormalizedStruct> {
 		if (pkg && isValidNamedPackage(pkg)) {
 			pkg = (
 				await this.core.mvr.resolvePackage({
@@ -416,7 +416,7 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 		}
 
 		return await this.transport.request({
-			method: 'sui_getNormalizedMoveStruct',
+			method: 'rtd_getNormalizedMoveStruct',
 			params: [pkg, module, struct],
 			signal: signal,
 		});
@@ -426,8 +426,8 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 	 * Get all objects owned by an address
 	 */
 	async getOwnedObjects(input: GetOwnedObjectsParams): Promise<PaginatedObjectsResponse> {
-		if (!input.owner || !isValidSuiAddress(normalizeSuiAddress(input.owner))) {
-			throw new Error('Invalid Sui address');
+		if (!input.owner || !isValidRtdAddress(normalizeRtdAddress(input.owner))) {
+			throw new Error('Invalid Rtd address');
 		}
 
 		const filter = input.filter
@@ -454,13 +454,13 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 		}
 
 		return await this.transport.request({
-			method: 'suix_getOwnedObjects',
+			method: 'rtdx_getOwnedObjects',
 			params: [
 				input.owner,
 				{
 					filter,
 					options: input.options,
-				} as SuiObjectResponseQuery,
+				} as RtdObjectResponseQuery,
 				input.cursor,
 				input.limit,
 			],
@@ -471,12 +471,12 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 	/**
 	 * Get details about an object
 	 */
-	async getObject(input: GetObjectParams): Promise<SuiObjectResponse> {
-		if (!input.id || !isValidSuiObjectId(normalizeSuiObjectId(input.id))) {
-			throw new Error('Invalid Sui Object id');
+	async getObject(input: GetObjectParams): Promise<RtdObjectResponse> {
+		if (!input.id || !isValidRtdObjectId(normalizeRtdObjectId(input.id))) {
+			throw new Error('Invalid Rtd Object id');
 		}
 		return await this.transport.request({
-			method: 'sui_getObject',
+			method: 'rtd_getObject',
 			params: [input.id, input.options],
 			signal: input.signal,
 		});
@@ -484,7 +484,7 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 
 	async tryGetPastObject(input: TryGetPastObjectParams): Promise<ObjectRead> {
 		return await this.transport.request({
-			method: 'sui_tryGetPastObject',
+			method: 'rtd_tryGetPastObject',
 			params: [input.id, input.version, input.options],
 			signal: input.signal,
 		});
@@ -493,10 +493,10 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 	/**
 	 * Batch get details about a list of objects. If any of the object ids are duplicates the call will fail
 	 */
-	async multiGetObjects(input: MultiGetObjectsParams): Promise<SuiObjectResponse[]> {
+	async multiGetObjects(input: MultiGetObjectsParams): Promise<RtdObjectResponse[]> {
 		input.ids.forEach((id) => {
-			if (!id || !isValidSuiObjectId(normalizeSuiObjectId(id))) {
-				throw new Error(`Invalid Sui Object id ${id}`);
+			if (!id || !isValidRtdObjectId(normalizeRtdObjectId(id))) {
+				throw new Error(`Invalid Rtd Object id ${id}`);
 			}
 		});
 		const hasDuplicates = input.ids.length !== new Set(input.ids).size;
@@ -505,7 +505,7 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 		}
 
 		return await this.transport.request({
-			method: 'sui_multiGetObjects',
+			method: 'rtd_multiGetObjects',
 			params: [input.ids, input.options],
 			signal: input.signal,
 		});
@@ -536,12 +536,12 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 		}
 
 		return await this.transport.request({
-			method: 'suix_queryTransactionBlocks',
+			method: 'rtdx_queryTransactionBlocks',
 			params: [
 				{
 					filter,
 					options,
-				} as SuiTransactionBlockResponseQuery,
+				} as RtdTransactionBlockResponseQuery,
 				cursor,
 				limit,
 				(order || 'descending') === 'descending',
@@ -552,12 +552,12 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 
 	async getTransactionBlock(
 		input: GetTransactionBlockParams,
-	): Promise<SuiTransactionBlockResponse> {
+	): Promise<RtdTransactionBlockResponse> {
 		if (!isValidTransactionDigest(input.digest)) {
 			throw new Error('Invalid Transaction digest');
 		}
 		return await this.transport.request({
-			method: 'sui_getTransactionBlock',
+			method: 'rtd_getTransactionBlock',
 			params: [input.digest, input.options],
 			signal: input.signal,
 		});
@@ -565,7 +565,7 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 
 	async multiGetTransactionBlocks(
 		input: MultiGetTransactionBlocksParams,
-	): Promise<SuiTransactionBlockResponse[]> {
+	): Promise<RtdTransactionBlockResponse[]> {
 		input.digests.forEach((d) => {
 			if (!isValidTransactionDigest(d)) {
 				throw new Error(`Invalid Transaction digest ${d}`);
@@ -578,7 +578,7 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 		}
 
 		return await this.transport.request({
-			method: 'sui_multiGetTransactionBlocks',
+			method: 'rtd_multiGetTransactionBlocks',
 			params: [input.digests, input.options],
 			signal: input.signal,
 		});
@@ -590,9 +590,9 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 		options,
 		requestType,
 		signal,
-	}: ExecuteTransactionBlockParams): Promise<SuiTransactionBlockResponse> {
-		const result: SuiTransactionBlockResponse = await this.transport.request({
-			method: 'sui_executeTransactionBlock',
+	}: ExecuteTransactionBlockParams): Promise<RtdTransactionBlockResponse> {
+		const result: RtdTransactionBlockResponse = await this.transport.request({
+			method: 'rtd_executeTransactionBlock',
 			params: [
 				typeof transactionBlock === 'string' ? transactionBlock : toBase64(transactionBlock),
 				Array.isArray(signature) ? signature : [signature],
@@ -624,13 +624,13 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 	} & Omit<
 		ExecuteTransactionBlockParams,
 		'transactionBlock' | 'signature'
-	>): Promise<SuiTransactionBlockResponse> {
+	>): Promise<RtdTransactionBlockResponse> {
 		let transactionBytes;
 
 		if (transaction instanceof Uint8Array) {
 			transactionBytes = transaction;
 		} else {
-			transaction.setSenderIfNotSet(signer.toSuiAddress());
+			transaction.setSenderIfNotSet(signer.toRtdAddress());
 			transactionBytes = await transaction.build({ client: this });
 		}
 
@@ -649,7 +649,7 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 
 	async getTotalTransactionBlocks({ signal }: { signal?: AbortSignal } = {}): Promise<bigint> {
 		const resp = await this.transport.request<string>({
-			method: 'sui_getTotalTransactionBlocks',
+			method: 'rtd_getTotalTransactionBlocks',
 			params: [],
 			signal,
 		});
@@ -661,7 +661,7 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 	 */
 	async getReferenceGasPrice({ signal }: GetReferenceGasPriceParams = {}): Promise<bigint> {
 		const resp = await this.transport.request<string>({
-			method: 'suix_getReferenceGasPrice',
+			method: 'rtdx_getReferenceGasPrice',
 			params: [],
 			signal,
 		});
@@ -672,11 +672,11 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 	 * Return the delegated stakes for an address
 	 */
 	async getStakes(input: GetStakesParams): Promise<DelegatedStake[]> {
-		if (!input.owner || !isValidSuiAddress(normalizeSuiAddress(input.owner))) {
-			throw new Error('Invalid Sui address');
+		if (!input.owner || !isValidRtdAddress(normalizeRtdAddress(input.owner))) {
+			throw new Error('Invalid Rtd address');
 		}
 		return await this.transport.request({
-			method: 'suix_getStakes',
+			method: 'rtdx_getStakes',
 			params: [input.owner],
 			signal: input.signal,
 		});
@@ -686,14 +686,14 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 	 * Return the delegated stakes queried by id.
 	 */
 	async getStakesByIds(input: GetStakesByIdsParams): Promise<DelegatedStake[]> {
-		input.stakedSuiIds.forEach((id) => {
-			if (!id || !isValidSuiObjectId(normalizeSuiObjectId(id))) {
-				throw new Error(`Invalid Sui Stake id ${id}`);
+		input.stakedRtdIds.forEach((id) => {
+			if (!id || !isValidRtdObjectId(normalizeRtdObjectId(id))) {
+				throw new Error(`Invalid Rtd Stake id ${id}`);
 			}
 		});
 		return await this.transport.request({
-			method: 'suix_getStakesByIds',
-			params: [input.stakedSuiIds],
+			method: 'rtdx_getStakesByIds',
+			params: [input.stakedRtdIds],
 			signal: input.signal,
 		});
 	}
@@ -701,11 +701,11 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 	/**
 	 * Return the latest system state content.
 	 */
-	async getLatestSuiSystemState({
+	async getLatestRtdSystemState({
 		signal,
-	}: GetLatestSuiSystemStateParams = {}): Promise<SuiSystemStateSummary> {
+	}: GetLatestRtdSystemStateParams = {}): Promise<RtdSystemStateSummary> {
 		return await this.transport.request({
-			method: 'suix_getLatestSuiSystemState',
+			method: 'rtdx_getLatestRtdSystemState',
 			params: [],
 			signal,
 		});
@@ -761,7 +761,7 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 		}
 
 		return await this.transport.request({
-			method: 'suix_queryEvents',
+			method: 'rtdx_queryEvents',
 			params: [query, cursor, limit, (order || 'descending') === 'descending'],
 			signal,
 		});
@@ -775,12 +775,12 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 	async subscribeEvent(
 		input: SubscribeEventParams & {
 			/** function to run when we receive a notification of a new event matching the filter */
-			onMessage: (event: SuiEvent) => void;
+			onMessage: (event: RtdEvent) => void;
 		},
 	): Promise<Unsubscribe> {
 		return this.transport.subscribe({
-			method: 'suix_subscribeEvent',
-			unsubscribe: 'suix_unsubscribeEvent',
+			method: 'rtdx_subscribeEvent',
+			unsubscribe: 'rtdx_unsubscribeEvent',
 			params: [input.filter],
 			onMessage: input.onMessage,
 			signal: input.signal,
@@ -797,8 +797,8 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 		},
 	): Promise<Unsubscribe> {
 		return this.transport.subscribe({
-			method: 'suix_subscribeTransaction',
-			unsubscribe: 'suix_unsubscribeTransaction',
+			method: 'rtdx_subscribeTransaction',
+			unsubscribe: 'rtdx_unsubscribeTransaction',
 			params: [input.filter],
 			onMessage: input.onMessage,
 			signal: input.signal,
@@ -833,7 +833,7 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 		input.signal?.throwIfAborted();
 
 		return await this.transport.request({
-			method: 'sui_devInspectTransactionBlock',
+			method: 'rtd_devInspectTransactionBlock',
 			params: [input.sender, devInspectTxBytes, input.gasPrice?.toString(), input.epoch],
 			signal: input.signal,
 		});
@@ -846,7 +846,7 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 		input: DryRunTransactionBlockParams,
 	): Promise<DryRunTransactionBlockResponse> {
 		return await this.transport.request({
-			method: 'sui_dryRunTransactionBlock',
+			method: 'rtd_dryRunTransactionBlock',
 			params: [
 				typeof input.transactionBlock === 'string'
 					? input.transactionBlock
@@ -859,11 +859,11 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 	 * Return the list of dynamic field objects owned by an object
 	 */
 	async getDynamicFields(input: GetDynamicFieldsParams): Promise<DynamicFieldPage> {
-		if (!input.parentId || !isValidSuiObjectId(normalizeSuiObjectId(input.parentId))) {
-			throw new Error('Invalid Sui Object id');
+		if (!input.parentId || !isValidRtdObjectId(normalizeRtdObjectId(input.parentId))) {
+			throw new Error('Invalid Rtd Object id');
 		}
 		return await this.transport.request({
-			method: 'suix_getDynamicFields',
+			method: 'rtdx_getDynamicFields',
 			params: [input.parentId, input.cursor, input.limit],
 			signal: input.signal,
 		});
@@ -872,9 +872,9 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 	/**
 	 * Return the dynamic field object information for a specified object
 	 */
-	async getDynamicFieldObject(input: GetDynamicFieldObjectParams): Promise<SuiObjectResponse> {
+	async getDynamicFieldObject(input: GetDynamicFieldObjectParams): Promise<RtdObjectResponse> {
 		return await this.transport.request({
-			method: 'suix_getDynamicFieldObject',
+			method: 'rtdx_getDynamicFieldObject',
 			params: [input.parentId, input.name],
 			signal: input.signal,
 		});
@@ -887,7 +887,7 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 		signal,
 	}: GetLatestCheckpointSequenceNumberParams = {}): Promise<string> {
 		const resp = await this.transport.request({
-			method: 'sui_getLatestCheckpointSequenceNumber',
+			method: 'rtd_getLatestCheckpointSequenceNumber',
 			params: [],
 			signal,
 		});
@@ -899,7 +899,7 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 	 */
 	async getCheckpoint(input: GetCheckpointParams): Promise<Checkpoint> {
 		return await this.transport.request({
-			method: 'sui_getCheckpoint',
+			method: 'rtd_getCheckpoint',
 			params: [input.id],
 			signal: input.signal,
 		});
@@ -912,7 +912,7 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 		input: PaginationArguments<CheckpointPage['nextCursor']> & GetCheckpointsParams,
 	): Promise<CheckpointPage> {
 		return await this.transport.request({
-			method: 'sui_getCheckpoints',
+			method: 'rtd_getCheckpoints',
 			params: [input.cursor, input?.limit, input.descendingOrder],
 			signal: input.signal,
 		});
@@ -923,7 +923,7 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 	 */
 	async getCommitteeInfo(input?: GetCommitteeInfoParams): Promise<CommitteeInfo> {
 		return await this.transport.request({
-			method: 'suix_getCommitteeInfo',
+			method: 'rtdx_getCommitteeInfo',
 			params: [input?.epoch],
 			signal: input?.signal,
 		});
@@ -931,7 +931,7 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 
 	async getNetworkMetrics({ signal }: { signal?: AbortSignal } = {}): Promise<NetworkMetrics> {
 		return await this.transport.request({
-			method: 'suix_getNetworkMetrics',
+			method: 'rtdx_getNetworkMetrics',
 			params: [],
 			signal,
 		});
@@ -939,7 +939,7 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 
 	async getAddressMetrics({ signal }: { signal?: AbortSignal } = {}): Promise<AddressMetrics> {
 		return await this.transport.request({
-			method: 'suix_getLatestAddressMetrics',
+			method: 'rtdx_getLatestAddressMetrics',
 			params: [],
 			signal,
 		});
@@ -952,7 +952,7 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 		} & PaginationArguments<EpochMetricsPage['nextCursor']>,
 	): Promise<EpochMetricsPage> {
 		return await this.transport.request({
-			method: 'suix_getEpochMetrics',
+			method: 'rtdx_getEpochMetrics',
 			params: [input?.cursor, input?.limit, input?.descendingOrder],
 			signal: input?.signal,
 		});
@@ -963,7 +963,7 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 		signal?: AbortSignal;
 	}): Promise<AllEpochsAddressMetrics> {
 		return await this.transport.request({
-			method: 'suix_getAllEpochAddressMetrics',
+			method: 'rtdx_getAllEpochAddressMetrics',
 			params: [input?.descendingOrder],
 			signal: input?.signal,
 		});
@@ -979,7 +979,7 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 		} & PaginationArguments<EpochPage['nextCursor']>,
 	): Promise<EpochPage> {
 		return await this.transport.request({
-			method: 'suix_getEpochs',
+			method: 'rtdx_getEpochs',
 			params: [input?.cursor, input?.limit, input?.descendingOrder],
 			signal: input?.signal,
 		});
@@ -990,7 +990,7 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 	 */
 	async getMoveCallMetrics({ signal }: { signal?: AbortSignal } = {}): Promise<MoveCallMetrics> {
 		return await this.transport.request({
-			method: 'suix_getMoveCallMetrics',
+			method: 'rtdx_getMoveCallMetrics',
 			params: [],
 			signal,
 		});
@@ -1001,7 +1001,7 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 	 */
 	async getCurrentEpoch({ signal }: { signal?: AbortSignal } = {}): Promise<EpochInfo> {
 		return await this.transport.request({
-			method: 'suix_getCurrentEpoch',
+			method: 'rtdx_getCurrentEpoch',
 			params: [],
 			signal,
 		});
@@ -1012,13 +1012,13 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 	 */
 	async getValidatorsApy({ signal }: { signal?: AbortSignal } = {}): Promise<ValidatorsApy> {
 		return await this.transport.request({
-			method: 'suix_getValidatorsApy',
+			method: 'rtdx_getValidatorsApy',
 			params: [],
 			signal,
 		});
 	}
 
-	// TODO: Migrate this to `sui_getChainIdentifier` once it is widely available.
+	// TODO: Migrate this to `rtd_getChainIdentifier` once it is widely available.
 	async getChainIdentifier({ signal }: { signal?: AbortSignal } = {}): Promise<string> {
 		const checkpoint = await this.getCheckpoint({ id: '0', signal });
 		const bytes = fromBase58(checkpoint.digest);
@@ -1027,7 +1027,7 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 
 	async resolveNameServiceAddress(input: ResolveNameServiceAddressParams): Promise<string | null> {
 		return await this.transport.request({
-			method: 'suix_resolveNameServiceAddress',
+			method: 'rtdx_resolveNameServiceAddress',
 			params: [input.name],
 			signal: input.signal,
 		});
@@ -1041,7 +1041,7 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 	}): Promise<ResolvedNameServiceNames> {
 		const { nextCursor, hasNextPage, data }: ResolvedNameServiceNames =
 			await this.transport.request({
-				method: 'suix_resolveNameServiceNames',
+				method: 'rtdx_resolveNameServiceNames',
 				params: [input.address, input.cursor, input.limit],
 				signal: input.signal,
 			});
@@ -1049,13 +1049,13 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 		return {
 			hasNextPage,
 			nextCursor,
-			data: data.map((name) => normalizeSuiNSName(name, format)),
+			data: data.map((name) => normalizeRtdNSName(name, format)),
 		};
 	}
 
 	async getProtocolConfig(input?: GetProtocolConfigParams): Promise<ProtocolConfig> {
 		return await this.transport.request({
-			method: 'sui_getProtocolConfig',
+			method: 'rtd_getProtocolConfig',
 			params: [input?.version],
 			signal: input?.signal,
 		});
@@ -1063,7 +1063,7 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 
 	async verifyZkLoginSignature(input: VerifyZkLoginSignatureParams): Promise<ZkLoginVerifyResult> {
 		return await this.transport.request({
-			method: 'sui_verifyZkLoginSignature',
+			method: 'rtd_verifyZkLoginSignature',
 			params: [input.bytes, input.signature, input.intentScope, input.author],
 			signal: input.signal,
 		});
@@ -1088,8 +1088,8 @@ export class SuiJsonRpcClient extends Experimental_BaseClient {
 		/** The amount of time to wait between checks for the transaction block. Defaults to 2 seconds. */
 		pollInterval?: number;
 	} & Parameters<
-		SuiJsonRpcClient['getTransactionBlock']
-	>[0]): Promise<SuiTransactionBlockResponse> {
+		RtdJsonRpcClient['getTransactionBlock']
+	>[0]): Promise<RtdTransactionBlockResponse> {
 		const timeoutSignal = AbortSignal.timeout(timeout);
 		const timeoutPromise = new Promise((_, reject) => {
 			timeoutSignal.addEventListener('abort', () => reject(timeoutSignal.reason));

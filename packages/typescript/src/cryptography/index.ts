@@ -1,4 +1,4 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 export {
@@ -24,13 +24,13 @@ export type { IntentScope } from './intent.js';
 export {
 	PRIVATE_KEY_SIZE,
 	LEGACY_PRIVATE_KEY_SIZE,
-	SUI_PRIVATE_KEY_PREFIX,
+	RTD_PRIVATE_KEY_PREFIX,
 	type ParsedKeypair,
 	type SignatureWithBytes,
 	Signer,
 	Keypair,
-	decodeSuiPrivateKey,
-	encodeSuiPrivateKey,
+	decodeRtdPrivateKey,
+	encodeRtdPrivateKey,
 } from './keypair.js';
 
 export { PublicKey } from './publickey.js';

@@ -35,7 +35,7 @@
 ### Patch Changes
 
 - Updated dependencies [ea1ac70]
-  - @mysten/utils@0.2.0
+  - @linku/utils@0.2.0
 
 ## 1.7.0
 
@@ -52,14 +52,14 @@
 
 - 1c4a82d: update links in package.json
 - Updated dependencies [1c4a82d]
-  - @mysten/utils@0.1.1
+  - @linku/utils@0.1.1
 
 ## 1.6.3
 
 ### Patch Changes
 
 - Updated dependencies [a00522b]
-  - @mysten/utils@0.1.0
+  - @linku/utils@0.1.0
 
 ## 1.6.2
 
@@ -67,7 +67,7 @@
 
 - bb7c03a: Update dependencies
 - Updated dependencies [bb7c03a]
-  - @mysten/utils@0.0.1
+  - @linku/utils@0.0.1
 
 ## 1.6.1
 
@@ -166,9 +166,9 @@
 
 ### Major Changes
 
-- a92b03de42: The Typescript SDK has been renamed to `@mysten/sui` and includes many new features
+- a92b03de42: The Typescript SDK has been renamed to `@linku/rtd` and includes many new features
   and breaking changes. See the
-  [full migration guide](https://sdk.mystenlabs.com/typescript/migrations/sui-1.0) for details on
+  [full migration guide](https://sdk.linkuverse.com/typescript/migrations/sui-1.0) for details on
   how to upgrade.
 
 ## 0.11.1
@@ -199,7 +199,7 @@
 
 ### Patch Changes
 
-- dd362ec1d6: Update docs url to sdk.mystenlabs.com
+- dd362ec1d6: Update docs url to sdk.linkuverse.com
 
 ## 0.9.0
 
@@ -218,7 +218,7 @@
 
 ### Minor Changes
 
-- 1bc430161: Add new type-safe schema builder. See https://sdk.mystenlabs.com/bcs for updated
+- 1bc430161: Add new type-safe schema builder. See https://sdk.linkuverse.com/bcs for updated
   documentation
 - e4484852b: Add isSerializedBcs helper
 

@@ -1,9 +1,9 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { splitGenericParameters } from '@mysten/bcs';
+import { splitGenericParameters } from '@linku/bcs';
 
-import { normalizeSuiAddress } from '../utils/sui-types.js';
+import { normalizeRtdAddress } from '../utils/rtd-types.js';
 import type { TypeTag } from './types.js';
 
 const VECTOR_REGEX = /^vector<(.+)>$/;
@@ -40,7 +40,7 @@ export class TypeTagSerializer {
 
 		const structMatch = str.match(STRUCT_REGEX);
 		if (structMatch) {
-			const address = normalizeAddress ? normalizeSuiAddress(structMatch[1]) : structMatch[1];
+			const address = normalizeAddress ? normalizeRtdAddress(structMatch[1]) : structMatch[1];
 			return {
 				struct: {
 					address,

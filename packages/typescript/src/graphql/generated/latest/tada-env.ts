@@ -214,7 +214,7 @@ const introspection = {
               "kind": "NON_NULL",
               "ofType": {
                 "kind": "SCALAR",
-                "name": "SuiAddress"
+                "name": "RtdAddress"
               }
             },
             "args": [],
@@ -288,7 +288,7 @@ const introspection = {
             "isDeprecated": false
           },
           {
-            "name": "defaultSuinsName",
+            "name": "defaultRtdnsName",
             "type": {
               "kind": "SCALAR",
               "name": "String"
@@ -1420,7 +1420,7 @@ const introspection = {
               "kind": "NON_NULL",
               "ofType": {
                 "kind": "SCALAR",
-                "name": "SuiAddress"
+                "name": "RtdAddress"
               }
             },
             "args": [],
@@ -1512,7 +1512,7 @@ const introspection = {
             "isDeprecated": false
           },
           {
-            "name": "defaultSuinsName",
+            "name": "defaultRtdnsName",
             "type": {
               "kind": "SCALAR",
               "name": "String"
@@ -2383,7 +2383,7 @@ const introspection = {
             "name": "address",
             "type": {
               "kind": "SCALAR",
-              "name": "SuiAddress"
+              "name": "RtdAddress"
             },
             "args": [],
             "isDeprecated": false
@@ -2455,7 +2455,7 @@ const introspection = {
               "kind": "NON_NULL",
               "ofType": {
                 "kind": "SCALAR",
-                "name": "SuiAddress"
+                "name": "RtdAddress"
               }
             },
             "args": [],
@@ -2529,7 +2529,7 @@ const introspection = {
             "isDeprecated": false
           },
           {
-            "name": "defaultSuinsName",
+            "name": "defaultRtdnsName",
             "type": {
               "kind": "SCALAR",
               "name": "String"
@@ -3949,7 +3949,7 @@ const introspection = {
             "name": "sender",
             "type": {
               "kind": "SCALAR",
-              "name": "SuiAddress"
+              "name": "RtdAddress"
             }
           },
           {
@@ -4331,7 +4331,7 @@ const introspection = {
               "kind": "NON_NULL",
               "ofType": {
                 "kind": "SCALAR",
-                "name": "SuiAddress"
+                "name": "RtdAddress"
               }
             },
             "args": [],
@@ -4396,7 +4396,7 @@ const introspection = {
             "isDeprecated": false
           },
           {
-            "name": "defaultSuinsName",
+            "name": "defaultRtdnsName",
             "type": {
               "kind": "SCALAR",
               "name": "String"
@@ -5076,7 +5076,7 @@ const introspection = {
             "name": "originalId",
             "type": {
               "kind": "SCALAR",
-              "name": "SuiAddress"
+              "name": "RtdAddress"
             },
             "args": [],
             "isDeprecated": false
@@ -5085,7 +5085,7 @@ const introspection = {
             "name": "upgradedId",
             "type": {
               "kind": "SCALAR",
-              "name": "SuiAddress"
+              "name": "RtdAddress"
             },
             "args": [],
             "isDeprecated": false
@@ -6282,7 +6282,7 @@ const introspection = {
               "kind": "NON_NULL",
               "ofType": {
                 "kind": "SCALAR",
-                "name": "SuiAddress"
+                "name": "RtdAddress"
               }
             },
             "args": [],
@@ -6374,7 +6374,7 @@ const introspection = {
             "isDeprecated": false
           },
           {
-            "name": "defaultSuinsName",
+            "name": "defaultRtdnsName",
             "type": {
               "kind": "SCALAR",
               "name": "String"
@@ -6951,7 +6951,7 @@ const introspection = {
               "kind": "NON_NULL",
               "ofType": {
                 "kind": "SCALAR",
-                "name": "SuiAddress"
+                "name": "RtdAddress"
               }
             },
             "args": [],
@@ -7016,7 +7016,7 @@ const introspection = {
             "isDeprecated": false
           },
           {
-            "name": "defaultSuinsName",
+            "name": "defaultRtdnsName",
             "type": {
               "kind": "SCALAR",
               "name": "String"
@@ -7938,7 +7938,7 @@ const introspection = {
             "name": "address",
             "type": {
               "kind": "SCALAR",
-              "name": "SuiAddress"
+              "name": "RtdAddress"
             },
             "args": [],
             "isDeprecated": false
@@ -8011,7 +8011,7 @@ const introspection = {
               "kind": "NON_NULL",
               "ofType": {
                 "kind": "SCALAR",
-                "name": "SuiAddress"
+                "name": "RtdAddress"
               }
             },
             "args": [],
@@ -8094,7 +8094,7 @@ const introspection = {
             "isDeprecated": false
           },
           {
-            "name": "defaultSuinsName",
+            "name": "defaultRtdnsName",
             "type": {
               "kind": "SCALAR",
               "name": "String"
@@ -8563,7 +8563,7 @@ const introspection = {
               "kind": "NON_NULL",
               "ofType": {
                 "kind": "SCALAR",
-                "name": "SuiAddress"
+                "name": "RtdAddress"
               }
             },
             "args": [],
@@ -8788,7 +8788,7 @@ const introspection = {
             "name": "owner",
             "type": {
               "kind": "SCALAR",
-              "name": "SuiAddress"
+              "name": "RtdAddress"
             }
           },
           {
@@ -8818,7 +8818,7 @@ const introspection = {
               "kind": "NON_NULL",
               "ofType": {
                 "kind": "SCALAR",
-                "name": "SuiAddress"
+                "name": "RtdAddress"
               }
             }
           },
@@ -9008,7 +9008,7 @@ const introspection = {
               "kind": "NON_NULL",
               "ofType": {
                 "kind": "SCALAR",
-                "name": "SuiAddress"
+                "name": "RtdAddress"
               }
             }
           },
@@ -9395,7 +9395,7 @@ const introspection = {
                 "kind": "NON_NULL",
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "SuiAddress"
+                  "name": "RtdAddress"
                 }
               }
             },
@@ -9456,7 +9456,7 @@ const introspection = {
                   "kind": "NON_NULL",
                   "ofType": {
                     "kind": "SCALAR",
-                    "name": "SuiAddress"
+                    "name": "RtdAddress"
                   }
                 }
               },
@@ -9901,7 +9901,7 @@ const introspection = {
                   "kind": "NON_NULL",
                   "ofType": {
                     "kind": "SCALAR",
-                    "name": "SuiAddress"
+                    "name": "RtdAddress"
                   }
                 }
               },
@@ -9942,7 +9942,7 @@ const introspection = {
                   "kind": "NON_NULL",
                   "ofType": {
                     "kind": "SCALAR",
-                    "name": "SuiAddress"
+                    "name": "RtdAddress"
                   }
                 }
               },
@@ -10045,7 +10045,7 @@ const introspection = {
                   "kind": "NON_NULL",
                   "ofType": {
                     "kind": "SCALAR",
-                    "name": "SuiAddress"
+                    "name": "RtdAddress"
                   }
                 }
               },
@@ -10079,7 +10079,7 @@ const introspection = {
                   "kind": "NON_NULL",
                   "ofType": {
                     "kind": "SCALAR",
-                    "name": "SuiAddress"
+                    "name": "RtdAddress"
                   }
                 }
               },
@@ -10219,7 +10219,7 @@ const introspection = {
             "isDeprecated": false
           },
           {
-            "name": "suinsName",
+            "name": "rtdnsName",
             "type": {
               "kind": "OBJECT",
               "name": "Address"
@@ -10366,7 +10366,7 @@ const introspection = {
                   "kind": "NON_NULL",
                   "ofType": {
                     "kind": "SCALAR",
-                    "name": "SuiAddress"
+                    "name": "RtdAddress"
                   }
                 }
               },
@@ -10473,7 +10473,7 @@ const introspection = {
             "name": "address",
             "type": {
               "kind": "SCALAR",
-              "name": "SuiAddress"
+              "name": "RtdAddress"
             },
             "args": [],
             "isDeprecated": false
@@ -10780,7 +10780,7 @@ const introspection = {
             "name": "address",
             "type": {
               "kind": "SCALAR",
-              "name": "SuiAddress"
+              "name": "RtdAddress"
             },
             "args": [],
             "isDeprecated": false
@@ -10994,7 +10994,7 @@ const introspection = {
       },
       {
         "kind": "SCALAR",
-        "name": "SuiAddress"
+        "name": "RtdAddress"
       },
       {
         "kind": "ENUM",
@@ -11591,14 +11591,14 @@ const introspection = {
             "name": "affectedAddress",
             "type": {
               "kind": "SCALAR",
-              "name": "SuiAddress"
+              "name": "RtdAddress"
             }
           },
           {
             "name": "affectedObject",
             "type": {
               "kind": "SCALAR",
-              "name": "SuiAddress"
+              "name": "RtdAddress"
             }
           },
           {
@@ -11640,7 +11640,7 @@ const introspection = {
             "name": "sentAddress",
             "type": {
               "kind": "SCALAR",
-              "name": "SuiAddress"
+              "name": "RtdAddress"
             }
           }
         ],
@@ -11873,7 +11873,7 @@ const introspection = {
             "name": "definingId",
             "type": {
               "kind": "SCALAR",
-              "name": "SuiAddress"
+              "name": "RtdAddress"
             },
             "args": [],
             "isDeprecated": false
@@ -12023,7 +12023,7 @@ const introspection = {
             "name": "currentPackage",
             "type": {
               "kind": "SCALAR",
-              "name": "SuiAddress"
+              "name": "RtdAddress"
             },
             "args": [],
             "isDeprecated": false
@@ -12036,7 +12036,7 @@ const introspection = {
                 "kind": "NON_NULL",
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "SuiAddress"
+                  "name": "RtdAddress"
                 }
               }
             },
@@ -12096,7 +12096,7 @@ const introspection = {
               "kind": "NON_NULL",
               "ofType": {
                 "kind": "SCALAR",
-                "name": "SuiAddress"
+                "name": "RtdAddress"
               }
             },
             "args": [],
@@ -12188,7 +12188,7 @@ const introspection = {
             "isDeprecated": false
           },
           {
-            "name": "defaultSuinsName",
+            "name": "defaultRtdnsName",
             "type": {
               "kind": "SCALAR",
               "name": "String"
@@ -12391,7 +12391,7 @@ const introspection = {
             "isDeprecated": false
           },
           {
-            "name": "pendingTotalSuiWithdraw",
+            "name": "pendingTotalRtdWithdraw",
             "type": {
               "kind": "SCALAR",
               "name": "BigInt"
@@ -12479,14 +12479,14 @@ const introspection = {
               "kind": "NON_NULL",
               "ofType": {
                 "kind": "SCALAR",
-                "name": "SuiAddress"
+                "name": "RtdAddress"
               }
             },
             "args": [],
             "isDeprecated": false
           },
           {
-            "name": "stakingPoolSuiBalance",
+            "name": "stakingPoolRtdBalance",
             "type": {
               "kind": "SCALAR",
               "name": "BigInt"
@@ -12765,7 +12765,7 @@ const introspection = {
             "name": "inactivePoolsId",
             "type": {
               "kind": "SCALAR",
-              "name": "SuiAddress"
+              "name": "RtdAddress"
             },
             "args": [],
             "isDeprecated": false
@@ -12783,7 +12783,7 @@ const introspection = {
             "name": "pendingActiveValidatorsId",
             "type": {
               "kind": "SCALAR",
-              "name": "SuiAddress"
+              "name": "RtdAddress"
             },
             "args": [],
             "isDeprecated": false
@@ -12816,7 +12816,7 @@ const introspection = {
             "name": "stakingPoolMappingsId",
             "type": {
               "kind": "SCALAR",
-              "name": "SuiAddress"
+              "name": "RtdAddress"
             },
             "args": [],
             "isDeprecated": false
@@ -12843,7 +12843,7 @@ const introspection = {
             "name": "validatorCandidatesId",
             "type": {
               "kind": "SCALAR",
-              "name": "SuiAddress"
+              "name": "RtdAddress"
             },
             "args": [],
             "isDeprecated": false

@@ -1,11 +1,11 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { toBase64 } from '@mysten/bcs';
+import { toBase64 } from '@linku/bcs';
 import type { InferInput } from 'valibot';
 import { parse } from 'valibot';
 
-import { normalizeSuiObjectId } from '../utils/sui-types.js';
+import { normalizeRtdObjectId } from '../utils/rtd-types.js';
 import type { Argument, CallArg, Command } from './data/internal.js';
 import { ArgumentSchema } from './data/internal.js';
 import type { AsyncTransactionThunk, Transaction } from './Transaction.js';
@@ -17,7 +17,7 @@ export type TransactionArgument =
 export type TransactionInput = CallArg;
 
 // Keep in sync with constants in
-// crates/sui-framework/packages/sui-framework/sources/package.move
+// crates/rtd-framework/packages/rtd-framework/sources/package.move
 export enum UpgradePolicy {
 	COMPATIBLE = 0,
 	ADDITIVE = 128,
@@ -111,7 +111,7 @@ export const Commands = {
 				modules: modules.map((module) =>
 					typeof module === 'string' ? module : toBase64(new Uint8Array(module)),
 				),
-				dependencies: dependencies.map((dep) => normalizeSuiObjectId(dep)),
+				dependencies: dependencies.map((dep) => normalizeRtdObjectId(dep)),
 			},
 		};
 	},
@@ -132,7 +132,7 @@ export const Commands = {
 				modules: modules.map((module) =>
 					typeof module === 'string' ? module : toBase64(new Uint8Array(module)),
 				),
-				dependencies: dependencies.map((dep) => normalizeSuiObjectId(dep)),
+				dependencies: dependencies.map((dep) => normalizeRtdObjectId(dep)),
 				package: packageId,
 				ticket: parse(ArgumentSchema, ticket),
 			},

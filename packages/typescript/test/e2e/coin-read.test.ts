@@ -1,4 +1,4 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -18,10 +18,10 @@ describe('CoinRead API', () => {
 	});
 
 	it('Get coins with/without type', async () => {
-		const suiCoins = await toolbox.client.getCoins({
+		const rtdCoins = await toolbox.client.getCoins({
 			owner: toolbox.address(),
 		});
-		expect(suiCoins.data.length).toEqual(5);
+		expect(rtdCoins.data.length).toEqual(5);
 
 		const testCoins = await toolbox.client.getCoins({
 			owner: publishToolbox.address(),
@@ -42,21 +42,21 @@ describe('CoinRead API', () => {
 		expect(publisherAllCoins.hasNextPage).toEqual(false);
 
 		//test paging with limit
-		const someSuiCoins = await toolbox.client.getCoins({
+		const someRtdCoins = await toolbox.client.getCoins({
 			owner: toolbox.address(),
 			limit: 3,
 		});
-		expect(someSuiCoins.data.length).toEqual(3);
-		expect(someSuiCoins.nextCursor).toBeTruthy();
+		expect(someRtdCoins.data.length).toEqual(3);
+		expect(someRtdCoins.nextCursor).toBeTruthy();
 	});
 
 	it('Get balance with/without type', async () => {
-		const suiBalance = await toolbox.client.getBalance({
+		const rtdBalance = await toolbox.client.getBalance({
 			owner: toolbox.address(),
 		});
-		expect(suiBalance.coinType).toEqual('0x2::sui::SUI');
-		expect(suiBalance.coinObjectCount).toEqual(5);
-		expect(Number(suiBalance.totalBalance)).toBeGreaterThan(0);
+		expect(rtdBalance.coinType).toEqual('0x2::rtd::RTD');
+		expect(rtdBalance.coinObjectCount).toEqual(5);
+		expect(Number(rtdBalance.totalBalance)).toBeGreaterThan(0);
 
 		const testBalance = await toolbox.client.getBalance({
 			owner: publishToolbox.address(),

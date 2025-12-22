@@ -1,4 +1,4 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 export type SharedObjectRef = {
@@ -12,7 +12,7 @@ export type SharedObjectRef = {
 	mutable: boolean;
 };
 
-export type SuiObjectRef = {
+export type RtdObjectRef = {
 	/** Base64 string representing the object digest */
 	objectId: string;
 	/** Object version */
@@ -25,9 +25,9 @@ export type SuiObjectRef = {
  * An object argument.
  */
 export type ObjectArg =
-	| { ImmOrOwnedObject: SuiObjectRef }
+	| { ImmOrOwnedObject: RtdObjectRef }
 	| { SharedObject: SharedObjectRef }
-	| { Receiving: SuiObjectRef };
+	| { Receiving: RtdObjectRef };
 
 export type ObjectCallArg = {
 	Object: ObjectArg;
@@ -78,7 +78,7 @@ export type StructTag = {
 };
 
 /**
- * Sui TypeTag object. A decoupled `0x...::module::Type<???>` parameter.
+ * Rtd TypeTag object. A decoupled `0x...::module::Type<???>` parameter.
  */
 export type TypeTag =
 	| { bool: null | true }
@@ -99,7 +99,7 @@ export type TypeTag =
  * The GasData to be used in the transaction.
  */
 export type GasData = {
-	payment: SuiObjectRef[];
+	payment: RtdObjectRef[];
 	owner: string; // Gas Object's owner
 	price: number;
 	budget: number;

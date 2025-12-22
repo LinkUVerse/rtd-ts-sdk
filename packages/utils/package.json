@@ -1,9 +1,9 @@
 {
-	"name": "@mysten/utils",
+	"name": "@linku/utils",
 	"version": "0.2.0",
-	"description": "Shared utilities for @mysten/* packages",
+	"description": "Shared utilities for @linku/* packages",
 	"license": "Apache-2.0",
-	"author": "Mysten Labs <build@mystenlabs.com>",
+	"author": "LinkU Labs <build@linkuverse.com>",
 	"sideEffects": false,
 	"type": "commonjs",
 	"main": "./dist/cjs/index.js",
@@ -33,17 +33,17 @@
 	},
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/MystenLabs/ts-sdks.git"
+		"url": "git+https://github.com/LinkUVerse/rtd-ts-sdk.git"
 	},
 	"keywords": [
 		"utils"
 	],
 	"bugs": {
-		"url": "https://github.com/MystenLabs/ts-sdks/issues"
+		"url": "https://github.com/LinkUVerse/rtd-ts-sdk/issues"
 	},
-	"homepage": "https://github.com/MystenLabs/ts-sdks/tree/main/packages/utils#readme",
+	"homepage": "https://github.com/LinkUVerse/ts-sdks/tree/main/packages/utils#readme",
 	"devDependencies": {
-		"@mysten/build-scripts": "workspace:*",
+		"@linku/build-scripts": "workspace:*",
 		"typescript": "^5.9.3",
 		"vitest": "^4.0.15"
 	},

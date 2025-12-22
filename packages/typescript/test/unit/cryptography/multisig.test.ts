@@ -1,7 +1,7 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { fromBase64, toBase58, toBase64 } from '@mysten/bcs';
+import { fromBase64, toBase58, toBase64 } from '@linku/bcs';
 import { secp256r1 } from '@noble/curves/p256';
 import { beforeAll, describe, expect, it, test } from 'vitest';
 
@@ -46,7 +46,7 @@ describe('Multisig scenarios', () => {
 		];
 
 		const tx = new Transaction();
-		tx.setSender(k3.getPublicKey().toSuiAddress());
+		tx.setSender(k3.getPublicKey().toRtdAddress());
 		tx.setGasPrice(5);
 		tx.setGasBudget(100);
 		tx.setGasPayment([
@@ -419,7 +419,7 @@ describe('Multisig address creation:', () => {
 			],
 			threshold: 1,
 		});
-		const multisigAddress = multisigPublicKey.toSuiAddress();
+		const multisigAddress = multisigPublicKey.toRtdAddress();
 
 		expect(multisigAddress).toEqual(
 			'0x77a9fbf3c695d78dd83449a81a9e70aa79a77dbfd6fb72037bf09201c12052cd',
@@ -435,7 +435,7 @@ describe('Multisig address creation:', () => {
 			],
 			threshold: 1,
 		});
-		expect(publicKey.toSuiAddress()).toEqual(
+		expect(publicKey.toRtdAddress()).toEqual(
 			'0xb9c0780a3943cde13a2409bf1a6f06ae60b0dff2b2f373260cf627aa4f43a588',
 		);
 		const data = new Uint8Array(
@@ -627,7 +627,7 @@ describe('MultisigKeypair', () => {
 		];
 
 		const tx = new Transaction();
-		tx.setSender(k3.getPublicKey().toSuiAddress());
+		tx.setSender(k3.getPublicKey().toRtdAddress());
 		tx.setGasPrice(5);
 		tx.setGasBudget(100);
 		tx.setGasPayment([
@@ -662,10 +662,10 @@ describe('MultisigKeypair', () => {
 		}
 
 		const signerPubKey = await verifyTransactionSignature(bytes, multisig.signature);
-		expect(signerPubKey.toSuiAddress()).toEqual(publicKey.toSuiAddress());
+		expect(signerPubKey.toRtdAddress()).toEqual(publicKey.toRtdAddress());
 		expect(await publicKey.verifyTransaction(bytes, multisig.signature)).toEqual(true);
 		const signerPubKey2 = await verifyTransactionSignature(bytes, multisig2.signature);
-		expect(signerPubKey2.toSuiAddress()).toEqual(publicKey.toSuiAddress());
+		expect(signerPubKey2.toRtdAddress()).toEqual(publicKey.toRtdAddress());
 		expect(await publicKey.verifyTransaction(bytes, multisig2.signature)).toEqual(true);
 	});
 
@@ -734,13 +734,13 @@ describe('MultisigKeypair', () => {
 		}
 
 		const signerPubKey = await verifyPersonalMessageSignature(bytes, multisig.signature);
-		expect(signerPubKey.toSuiAddress()).toEqual(publicKey.toSuiAddress());
+		expect(signerPubKey.toRtdAddress()).toEqual(publicKey.toRtdAddress());
 		expect(await publicKey.verifyPersonalMessage(bytes, multisig.signature)).toEqual(true);
 		const signerPubKey2 = await verifyPersonalMessageSignature(bytes, multisig2.signature);
-		expect(signerPubKey2.toSuiAddress()).toEqual(publicKey.toSuiAddress());
+		expect(signerPubKey2.toRtdAddress()).toEqual(publicKey.toRtdAddress());
 		expect(await publicKey.verifyPersonalMessage(bytes, multisig2.signature)).toEqual(true);
 		const signerPubKey3 = await verifyPersonalMessageSignature(bytes, multisig3.signature);
-		expect(signerPubKey3.toSuiAddress()).toEqual(publicKey.toSuiAddress());
+		expect(signerPubKey3.toRtdAddress()).toEqual(publicKey.toRtdAddress());
 		expect(await publicKey.verifyPersonalMessage(bytes, multisig3.signature)).toEqual(true);
 	});
 
@@ -834,7 +834,7 @@ describe('MultisigKeypair', () => {
 		});
 
 		expect(() => publicKey.getSigner(k2)).toThrow(
-			new Error(`Signer ${pk2.toSuiAddress()} is not part of the MultiSig public key`),
+			new Error(`Signer ${pk2.toRtdAddress()} is not part of the MultiSig public key`),
 		);
 	});
 });

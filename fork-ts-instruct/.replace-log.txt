@@ -1,0 +1,75 @@
+Replacement Log - Mon Dec 22 01:15:04 CST 2025
+========================================
+Phase1: @mysten/sui -> @linku/rtd
+Phase1: @mysten/bcs -> @linku/bcs
+Phase1: @mysten/utils -> @linku/utils
+Phase1: @mysten/build-scripts -> @linku/build-scripts
+Phase1: @mysten/* -> @linku/*
+Phase2: MystenLabs -> LinkUVerse
+Phase2: Mysten Labs -> LinkU Labs
+Phase2: mystenlabs.com -> linkuverse.com
+Phase3: fullnode.mainnet.sui.io -> fullnode.mainnet.rtd.life
+Phase3: fullnode.testnet.sui.io -> fullnode.testnet.rtd.life
+Phase3: fullnode.devnet.sui.io -> fullnode.devnet.rtd.life
+Phase3: faucet.testnet.sui.io -> faucet.testnet.rtd.life
+Phase3: faucet.devnet.sui.io -> faucet.devnet.rtd.life
+Phase3: mainnet.sui.io -> mainnet.rtd.life
+Phase3: testnet.sui.io -> testnet.rtd.life
+Phase3: devnet.sui.io -> devnet.rtd.life
+Phase4: SuiClient -> RtdClient (213)
+Phase4: SuiGraphQLClient -> RtdGraphQLClient (17)
+Phase4: SuiGrpcClient -> RtdGrpcClient (8)
+Phase4: SuiHTTPTransport -> RtdHTTPTransport (17)
+Phase4: SuiTransport -> RtdTransport (3)
+Phase4: SuiObjectRef -> RtdObjectRef (32)
+Phase4: SuiObjectData -> RtdObjectData (28)
+Phase4: SuiObjectResponse -> RtdObjectResponse (12)
+Phase4: SuiParsedData -> RtdParsedData (6)
+Phase4: SuiMoveObject -> RtdMoveObject (1)
+Phase4: SuiMovePackage -> RtdMovePackage (1)
+Phase4: SuiMoveNormalizedType -> RtdMoveNormalizedType (21)
+Phase4: SuiMoveNormalizedFunction -> RtdMoveNormalizedFunction (4)
+Phase4: SuiMoveNormalizedModule -> RtdMoveNormalizedModule (7)
+Phase4: SuiMoveNormalizedStruct -> RtdMoveNormalizedStruct (4)
+Phase4: SuiEvent -> RtdEvent (13)
+Phase4: SuiObjectChange -> RtdObjectChange (17)
+Phase4: SuiTransactionBlock -> RtdTransactionBlock (46)
+Phase4: SuiExecutionResult -> RtdExecutionResult (2)
+Phase4: SuiCallArg -> RtdCallArg (5)
+Phase4: SuiAddress -> RtdAddress (437)
+Phase4: isValidSuiObjectId -> isValidRtdObjectId (7)
+Phase4: normalizeSuiObjectId -> normalizeRtdObjectId (20)
+Phase4: requestSuiFromFaucetV0 -> requestRtdFromFaucetV0 (2)
+Phase4: requestSuiFromFaucetV1 -> requestRtdFromFaucetV1 (2)
+Phase4: requestSuiFromFaucetV2 -> requestRtdFromFaucetV2 (7)
+Phase4: toSuiPublicKey -> toRtdPublicKey (11)
+Phase4: toSuiBytes -> toRtdBytes (17)
+Phase4: decodeSuiPrivateKey -> decodeRtdPrivateKey (16)
+Phase4: encodeSuiPrivateKey -> encodeRtdPrivateKey (8)
+Phase4: SuiNS -> RtdNS (105)
+Phase5: SUI_DECIMALS -> RTD_DECIMALS (2)
+Phase5: SUI_ADDRESS_LENGTH -> RTD_ADDRESS_LENGTH (19)
+Phase5: SUI_FRAMEWORK_ADDRESS -> RTD_FRAMEWORK_ADDRESS (7)
+Phase5: SUI_SYSTEM_ADDRESS -> RTD_SYSTEM_ADDRESS (2)
+Phase5: SUI_CLOCK_OBJECT_ID -> RTD_CLOCK_OBJECT_ID (8)
+Phase5: SUI_SYSTEM_MODULE_NAME -> RTD_SYSTEM_MODULE_NAME (2)
+Phase5: SUI_TYPE_ARG -> RTD_TYPE_ARG (11)
+Phase5: SUI_SYSTEM_STATE_OBJECT_ID -> RTD_SYSTEM_STATE_OBJECT_ID (8)
+Phase5: SUI_RANDOM_OBJECT_ID -> RTD_RANDOM_OBJECT_ID (2)
+Phase5: SUI_PRIVATE_KEY_PREFIX -> RTD_PRIVATE_KEY_PREFIX (4)
+Phase5: MIST_PER_SUI -> MIST_PER_RTD (2)
+Phase5: SUI_NS_NAME_REGEX -> RTD_NS_NAME_REGEX (3)
+Phase5: SUI_NS_DOMAIN_REGEX -> RTD_NS_DOMAIN_REGEX (3)
+Phase5: MAX_SUI_NS_NAME_LENGTH -> MAX_RTD_NS_NAME_LENGTH (2)
+Phase5: SUI_CLIENT_BRAND -> RTD_CLIENT_BRAND (3)
+Phase6: suiprivkey -> rtdprivkey
+Phase7: ::sui::SUI -> ::rtd::RTD
+Phase7: ::sui:: -> ::rtd::
+Phase7: sui_system -> rtd_system
+Phase8: .sui -> .rtd (domain suffix)
+Phase9: General sui- -> rtd- replacements
+FileRename: ./packages/typescript/src/utils/sui-types.ts -> ./packages/typescript/src/utils/rtd-types.ts
+FileRename: ./packages/typescript/src/utils/suins.ts -> ./packages/typescript/src/utils/rtdns.ts
+DirRename: src/grpc/proto/sui -> src/grpc/proto/rtd
+Phase12: Import paths updated
+Phase13: Special files updated

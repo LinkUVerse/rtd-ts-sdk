@@ -1,13 +1,13 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import type { SerializedBcs } from '@mysten/bcs';
-import { fromBase64, isSerializedBcs } from '@mysten/bcs';
+import type { SerializedBcs } from '@linku/bcs';
+import { fromBase64, isSerializedBcs } from '@linku/bcs';
 import type { InferInput } from 'valibot';
 import { is, parse } from 'valibot';
 
 import type { SignatureWithBytes, Signer } from '../cryptography/index.js';
-import { normalizeSuiAddress } from '../utils/sui-types.js';
+import { normalizeRtdAddress } from '../utils/rtd-types.js';
 import type { TransactionArgument } from './Commands.js';
 import { Commands } from './Commands.js';
 import type { CallArg, Command, Argument, ObjectRef } from './data/internal.js';
@@ -114,7 +114,7 @@ function createTransactionResult(
 	}) as TransactionResult;
 }
 
-const TRANSACTION_BRAND = Symbol.for('@mysten/transaction') as never;
+const TRANSACTION_BRAND = Symbol.for('@linku/transaction') as never;
 
 interface SignOptions extends BuildTransactionOptions {
 	signer: Signer;
@@ -138,7 +138,7 @@ const modulePluginRegistry: TransactionPluginRegistry = {
 	serializationPlugins: new Map(),
 };
 
-const TRANSACTION_REGISTRY_KEY = Symbol.for('@mysten/transaction/registry');
+const TRANSACTION_REGISTRY_KEY = Symbol.for('@linku/transaction/registry');
 function getGlobalPluginRegistry() {
 	try {
 		const target = globalThis as {
@@ -401,7 +401,7 @@ export class Transaction {
 						typeof value === 'string'
 							? {
 									$kind: 'UnresolvedObject',
-									UnresolvedObject: { objectId: normalizeSuiAddress(value) },
+									UnresolvedObject: { objectId: normalizeRtdAddress(value) },
 								}
 							: value,
 					);

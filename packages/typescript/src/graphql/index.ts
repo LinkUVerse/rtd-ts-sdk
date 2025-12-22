@@ -1,4 +1,4 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 export {
@@ -6,7 +6,7 @@ export {
 	type GraphQLQueryOptions,
 	type GraphQLQueryResult,
 	type GraphQLResponseErrors,
-	type SuiGraphQLClientOptions,
-	SuiGraphQLClient,
-	SuiGraphQLRequestError,
+	type RtdGraphQLClientOptions,
+	RtdGraphQLClient,
+	RtdGraphQLRequestError,
 } from './client.js';

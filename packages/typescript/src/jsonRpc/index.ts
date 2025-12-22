@@ -1,4 +1,4 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 export {
@@ -11,10 +11,10 @@ export {
 } from './http-transport.js';
 export type * from './types/index.js';
 export {
-	type SuiJsonRpcClientOptions,
+	type RtdJsonRpcClientOptions,
 	type PaginationArguments,
 	type OrderArguments,
-	isSuiJsonRpcClient,
-	SuiJsonRpcClient,
+	isRtdJsonRpcClient,
+	RtdJsonRpcClient,
 } from './client.js';
-export { SuiHTTPStatusError, SuiHTTPTransportError, JsonRpcError } from './errors.js';
+export { RtdHTTPStatusError, RtdHTTPTransportError, JsonRpcError } from './errors.js';

@@ -1,4 +1,4 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 import { ClientCache } from '../../experimental/cache.js';
@@ -52,7 +52,7 @@ const cacheMap = new WeakMap<object, ClientCache>();
  *
  * To install this plugin globally in your app, use:
  * ```
- * Transaction.registerGlobalSerializationPlugin("namedPackagesPlugin", namedPackagesPlugin({ suiGraphQLClient }));
+ * Transaction.registerGlobalSerializationPlugin("namedPackagesPlugin", namedPackagesPlugin({ rtdGraphQLClient }));
  * ```
  *
  * You can also define `overrides` to pre-populate name resolutions locally (removes the GraphQL request).
@@ -103,7 +103,7 @@ export const namedPackagesPlugin = (options?: NamedPackagesPluginOptions) => {
 export function getClient(options: BuildTransactionOptions) {
 	if (!options.client) {
 		throw new Error(
-			`No sui client passed to Transaction#build, but transaction data was not sufficient to build offline.`,
+			`No rtd client passed to Transaction#build, but transaction data was not sufficient to build offline.`,
 		);
 	}
 

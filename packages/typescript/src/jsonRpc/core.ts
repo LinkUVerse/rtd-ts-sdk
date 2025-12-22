@@ -1,47 +1,47 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { fromBase64 } from '@mysten/bcs';
+import { fromBase64 } from '@linku/bcs';
 
 import { bcs } from '../bcs/index.js';
 import type {
 	ObjectOwner,
-	SuiMoveAbilitySet,
-	SuiMoveNormalizedType,
-	SuiMoveVisibility,
-	SuiObjectChange,
-	SuiObjectData,
-	SuiTransactionBlockResponse,
+	RtdMoveAbilitySet,
+	RtdMoveNormalizedType,
+	RtdMoveVisibility,
+	RtdObjectChange,
+	RtdObjectData,
+	RtdTransactionBlockResponse,
 	TransactionEffects,
 } from './types/index.js';
 import { Transaction } from '../transactions/Transaction.js';
 import { jsonRpcClientResolveTransactionPlugin } from './json-rpc-resolver.js';
 import { TransactionDataBuilder } from '../transactions/TransactionData.js';
-import { chunk } from '@mysten/utils';
-import { normalizeSuiAddress } from '../utils/sui-types.js';
+import { chunk } from '@linku/utils';
+import { normalizeRtdAddress } from '../utils/rtd-types.js';
 import { Experimental_CoreClient } from '../experimental/core.js';
-import type { Experimental_SuiClientTypes } from '../experimental/types.js';
+import type { Experimental_RtdClientTypes } from '../experimental/types.js';
 import { ObjectError } from '../experimental/errors.js';
 import { parseTransactionBcs, parseTransactionEffectsBcs } from '../experimental/index.js';
-import type { SuiJsonRpcClient } from './client.js';
+import type { RtdJsonRpcClient } from './client.js';
 
 export class JSONRpcCoreClient extends Experimental_CoreClient {
-	#jsonRpcClient: SuiJsonRpcClient;
+	#jsonRpcClient: RtdJsonRpcClient;
 
 	constructor({
 		jsonRpcClient,
 		mvr,
 	}: {
-		jsonRpcClient: SuiJsonRpcClient;
-		mvr?: Experimental_SuiClientTypes.MvrOptions;
+		jsonRpcClient: RtdJsonRpcClient;
+		mvr?: Experimental_RtdClientTypes.MvrOptions;
 	}) {
 		super({ network: jsonRpcClient.network, base: jsonRpcClient, mvr });
 		this.#jsonRpcClient = jsonRpcClient;
 	}
 
-	async getObjects(options: Experimental_SuiClientTypes.GetObjectsOptions) {
+	async getObjects(options: Experimental_RtdClientTypes.GetObjectsOptions) {
 		const batches = chunk(options.objectIds, 50);
-		const results: Experimental_SuiClientTypes.GetObjectsResponse['objects'] = [];
+		const results: Experimental_RtdClientTypes.GetObjectsResponse['objects'] = [];
 
 		for (const batch of batches) {
 			const objects = await this.#jsonRpcClient.multiGetObjects({
@@ -68,7 +68,7 @@ export class JSONRpcCoreClient extends Experimental_CoreClient {
 			objects: results,
 		};
 	}
-	async getOwnedObjects(options: Experimental_SuiClientTypes.GetOwnedObjectsOptions) {
+	async getOwnedObjects(options: Experimental_RtdClientTypes.GetOwnedObjectsOptions) {
 		const objects = await this.#jsonRpcClient.getOwnedObjects({
 			owner: options.address,
 			limit: options.limit,
@@ -96,7 +96,7 @@ export class JSONRpcCoreClient extends Experimental_CoreClient {
 		};
 	}
 
-	async getCoins(options: Experimental_SuiClientTypes.GetCoinsOptions) {
+	async getCoins(options: Experimental_RtdClientTypes.GetCoinsOptions) {
 		const coins = await this.#jsonRpcClient.getCoins({
 			owner: options.address,
 			coinType: options.coinType,
@@ -133,7 +133,7 @@ export class JSONRpcCoreClient extends Experimental_CoreClient {
 		};
 	}
 
-	async getBalance(options: Experimental_SuiClientTypes.GetBalanceOptions) {
+	async getBalance(options: Experimental_RtdClientTypes.GetBalanceOptions) {
 		const balance = await this.#jsonRpcClient.getBalance({
 			owner: options.address,
 			coinType: options.coinType,
@@ -147,7 +147,7 @@ export class JSONRpcCoreClient extends Experimental_CoreClient {
 			},
 		};
 	}
-	async getAllBalances(options: Experimental_SuiClientTypes.GetAllBalancesOptions) {
+	async getAllBalances(options: Experimental_RtdClientTypes.GetAllBalancesOptions) {
 		const balances = await this.#jsonRpcClient.getAllBalances({
 			owner: options.address,
 			signal: options.signal,
@@ -162,7 +162,7 @@ export class JSONRpcCoreClient extends Experimental_CoreClient {
 			cursor: null,
 		};
 	}
-	async getTransaction(options: Experimental_SuiClientTypes.GetTransactionOptions) {
+	async getTransaction(options: Experimental_RtdClientTypes.GetTransactionOptions) {
 		const transaction = await this.#jsonRpcClient.getTransactionBlock({
 			digest: options.digest,
 			options: {
@@ -180,7 +180,7 @@ export class JSONRpcCoreClient extends Experimental_CoreClient {
 			transaction: parseTransaction(transaction),
 		};
 	}
-	async executeTransaction(options: Experimental_SuiClientTypes.ExecuteTransactionOptions) {
+	async executeTransaction(options: Experimental_RtdClientTypes.ExecuteTransactionOptions) {
 		const transaction = await this.#jsonRpcClient.executeTransactionBlock({
 			transactionBlock: options.transaction,
 			signature: options.signatures,
@@ -199,7 +199,7 @@ export class JSONRpcCoreClient extends Experimental_CoreClient {
 			transaction: parseTransaction(transaction),
 		};
 	}
-	async dryRunTransaction(options: Experimental_SuiClientTypes.DryRunTransactionOptions) {
+	async dryRunTransaction(options: Experimental_RtdClientTypes.DryRunTransactionOptions) {
 		const tx = Transaction.from(options.transaction);
 		const result = await this.#jsonRpcClient.dryRunTransactionBlock({
 			transactionBlock: options.transaction,
@@ -227,7 +227,7 @@ export class JSONRpcCoreClient extends Experimental_CoreClient {
 			},
 		};
 	}
-	async getReferenceGasPrice(options?: Experimental_SuiClientTypes.GetReferenceGasPriceOptions) {
+	async getReferenceGasPrice(options?: Experimental_RtdClientTypes.GetReferenceGasPriceOptions) {
 		const referenceGasPrice = await this.#jsonRpcClient.getReferenceGasPrice({
 			signal: options?.signal,
 		});
@@ -236,7 +236,7 @@ export class JSONRpcCoreClient extends Experimental_CoreClient {
 		};
 	}
 
-	async getDynamicFields(options: Experimental_SuiClientTypes.GetDynamicFieldsOptions) {
+	async getDynamicFields(options: Experimental_RtdClientTypes.GetDynamicFieldsOptions) {
 		const dynamicFields = await this.#jsonRpcClient.getDynamicFields({
 			parentId: options.parentId,
 			limit: options.limit,
@@ -259,7 +259,7 @@ export class JSONRpcCoreClient extends Experimental_CoreClient {
 		};
 	}
 
-	async verifyZkLoginSignature(options: Experimental_SuiClientTypes.VerifyZkLoginSignatureOptions) {
+	async verifyZkLoginSignature(options: Experimental_RtdClientTypes.VerifyZkLoginSignatureOptions) {
 		const result = await this.#jsonRpcClient.verifyZkLoginSignature({
 			bytes: options.bytes,
 			signature: options.signature,
@@ -274,8 +274,8 @@ export class JSONRpcCoreClient extends Experimental_CoreClient {
 	}
 
 	async defaultNameServiceName(
-		options: Experimental_SuiClientTypes.DefaultNameServiceNameOptions,
-	): Promise<Experimental_SuiClientTypes.DefaultNameServiceNameResponse> {
+		options: Experimental_RtdClientTypes.DefaultNameServiceNameOptions,
+	): Promise<Experimental_RtdClientTypes.DefaultNameServiceNameResponse> {
 		const name = (await this.#jsonRpcClient.resolveNameServiceNames(options)).data[0];
 		return {
 			data: {
@@ -289,8 +289,8 @@ export class JSONRpcCoreClient extends Experimental_CoreClient {
 	}
 
 	async getMoveFunction(
-		options: Experimental_SuiClientTypes.GetMoveFunctionOptions,
-	): Promise<Experimental_SuiClientTypes.GetMoveFunctionResponse> {
+		options: Experimental_RtdClientTypes.GetMoveFunctionOptions,
+	): Promise<Experimental_RtdClientTypes.GetMoveFunctionResponse> {
 		const result = await this.#jsonRpcClient.getNormalizedMoveFunction({
 			package: (await this.mvr.resolvePackage({ package: options.packageId })).package,
 			module: options.moduleName,
@@ -299,7 +299,7 @@ export class JSONRpcCoreClient extends Experimental_CoreClient {
 
 		return {
 			function: {
-				packageId: normalizeSuiAddress(options.packageId),
+				packageId: normalizeRtdAddress(options.packageId),
 				moduleName: options.moduleName,
 				name: options.name,
 				visibility: parseVisibility(result.visibility),
@@ -308,14 +308,14 @@ export class JSONRpcCoreClient extends Experimental_CoreClient {
 					isPhantom: false,
 					constraints: parseAbilities(abilities),
 				})),
-				parameters: result.parameters.map((param) => parseNormalizedSuiMoveType(param)),
-				returns: result.return.map((ret) => parseNormalizedSuiMoveType(ret)),
+				parameters: result.parameters.map((param) => parseNormalizedRtdMoveType(param)),
+				returns: result.return.map((ret) => parseNormalizedRtdMoveType(ret)),
 			},
 		};
 	}
 }
 
-function parseObject(object: SuiObjectData): Experimental_SuiClientTypes.ObjectResponse {
+function parseObject(object: RtdObjectData): Experimental_RtdClientTypes.ObjectResponse {
 	return {
 		id: object.objectId,
 		version: object.version,
@@ -329,7 +329,7 @@ function parseObject(object: SuiObjectData): Experimental_SuiClientTypes.ObjectR
 	};
 }
 
-function parseOwner(owner: ObjectOwner): Experimental_SuiClientTypes.ObjectOwner {
+function parseOwner(owner: ObjectOwner): Experimental_RtdClientTypes.ObjectOwner {
 	if (owner === 'Immutable') {
 		return {
 			$kind: 'Immutable',
@@ -398,8 +398,8 @@ function parseOwnerAddress(owner: ObjectOwner): string | null {
 }
 
 function parseTransaction(
-	transaction: SuiTransactionBlockResponse,
-): Experimental_SuiClientTypes.TransactionResponse {
+	transaction: RtdTransactionBlockResponse,
+): Experimental_RtdClientTypes.TransactionResponse {
 	const parsedTx = bcs.SenderSignedData.parse(fromBase64(transaction.rawTransaction!))[0];
 	const objectTypes: Record<string, string> = {};
 
@@ -446,13 +446,13 @@ function parseTransactionEffectsJson({
 }: {
 	bytes?: Uint8Array;
 	effects: TransactionEffects;
-	objectChanges: SuiObjectChange[] | null;
+	objectChanges: RtdObjectChange[] | null;
 }): {
-	effects: Experimental_SuiClientTypes.TransactionEffects;
+	effects: Experimental_RtdClientTypes.TransactionEffects;
 	objectTypes: Record<string, string>;
 } {
-	const changedObjects: Experimental_SuiClientTypes.ChangedObject[] = [];
-	const unchangedConsensusObjects: Experimental_SuiClientTypes.UnchangedConsensusObject[] = [];
+	const changedObjects: Experimental_RtdClientTypes.ChangedObject[] = [];
+	const unchangedConsensusObjects: Experimental_RtdClientTypes.UnchangedConsensusObject[] = [];
 	const objectTypes: Record<string, string> = {};
 
 	objectChanges?.forEach((change) => {
@@ -602,34 +602,34 @@ const Coin = bcs.struct('Coin', {
 	balance: Balance,
 });
 
-function parseNormalizedSuiMoveType(
-	type: SuiMoveNormalizedType,
-): Experimental_SuiClientTypes.OpenSignature {
+function parseNormalizedRtdMoveType(
+	type: RtdMoveNormalizedType,
+): Experimental_RtdClientTypes.OpenSignature {
 	if (typeof type !== 'string') {
 		if ('Reference' in type) {
 			return {
 				reference: 'immutable',
-				body: parseNormalizedSuiMoveTypeBody(type.Reference),
+				body: parseNormalizedRtdMoveTypeBody(type.Reference),
 			};
 		}
 
 		if ('MutableReference' in type) {
 			return {
 				reference: 'mutable',
-				body: parseNormalizedSuiMoveTypeBody(type.MutableReference),
+				body: parseNormalizedRtdMoveTypeBody(type.MutableReference),
 			};
 		}
 	}
 
 	return {
 		reference: null,
-		body: parseNormalizedSuiMoveTypeBody(type),
+		body: parseNormalizedRtdMoveTypeBody(type),
 	};
 }
 
-function parseNormalizedSuiMoveTypeBody(
-	type: SuiMoveNormalizedType,
-): Experimental_SuiClientTypes.OpenSignatureBody {
+function parseNormalizedRtdMoveTypeBody(
+	type: RtdMoveNormalizedType,
+): Experimental_RtdClientTypes.OpenSignatureBody {
 	switch (type) {
 		case 'Address':
 			return { $kind: 'address' };
@@ -656,7 +656,7 @@ function parseNormalizedSuiMoveTypeBody(
 	if ('Vector' in type) {
 		return {
 			$kind: 'vector',
-			vector: parseNormalizedSuiMoveTypeBody(type.Vector),
+			vector: parseNormalizedRtdMoveTypeBody(type.Vector),
 		};
 	}
 
@@ -664,8 +664,8 @@ function parseNormalizedSuiMoveTypeBody(
 		return {
 			$kind: 'datatype',
 			datatype: {
-				typeName: `${normalizeSuiAddress(type.Struct.address)}::${type.Struct.module}::${type.Struct.name}`,
-				typeParameters: type.Struct.typeArguments.map((t) => parseNormalizedSuiMoveTypeBody(t)),
+				typeName: `${normalizeRtdAddress(type.Struct.address)}::${type.Struct.module}::${type.Struct.name}`,
+				typeParameters: type.Struct.typeArguments.map((t) => parseNormalizedRtdMoveTypeBody(t)),
 			},
 		};
 	}
@@ -680,7 +680,7 @@ function parseNormalizedSuiMoveTypeBody(
 	throw new Error(`Unknown type: ${JSON.stringify(type)}`);
 }
 
-function parseAbilities(abilitySet: SuiMoveAbilitySet): Experimental_SuiClientTypes.Ability[] {
+function parseAbilities(abilitySet: RtdMoveAbilitySet): Experimental_RtdClientTypes.Ability[] {
 	return abilitySet.abilities.map((ability) => {
 		switch (ability) {
 			case 'Copy':
@@ -697,7 +697,7 @@ function parseAbilities(abilitySet: SuiMoveAbilitySet): Experimental_SuiClientTy
 	});
 }
 
-function parseVisibility(visibility: SuiMoveVisibility): Experimental_SuiClientTypes.Visibility {
+function parseVisibility(visibility: RtdMoveVisibility): Experimental_RtdClientTypes.Visibility {
 	switch (visibility) {
 		case 'Public':
 			return 'public';

@@ -17,8 +17,8 @@ export default defineConfig({
 	},
 	resolve: {
 		alias: {
-			'@mysten/bcs': new URL('../../../bcs/src', import.meta.url).pathname,
-			'@mysten/utils': new URL('../../../utils/src', import.meta.url).pathname,
+			'@linku/bcs': new URL('../../../bcs/src', import.meta.url).pathname,
+			'@linku/utils': new URL('../../../utils/src', import.meta.url).pathname,
 		},
 	},
 });

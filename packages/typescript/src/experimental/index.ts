@@ -1,4 +1,4 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 import { Experimental_BaseClient } from './client.js';
@@ -6,8 +6,8 @@ import type { ClientWithCoreApi, Experimental_CoreClientOptions } from './core.j
 import { Experimental_CoreClient } from './core.js';
 import type {
 	ClientWithExtensions,
-	Experimental_SuiClientTypes,
-	SuiClientRegistration,
+	Experimental_RtdClientTypes,
+	RtdClientRegistration,
 } from './types.js';
 export { parseTransactionBcs, parseTransactionEffectsBcs } from './transports/utils.js';
 
@@ -16,8 +16,8 @@ export {
 	Experimental_CoreClient,
 	type Experimental_CoreClientOptions,
 	type ClientWithExtensions,
-	type Experimental_SuiClientTypes,
-	type SuiClientRegistration,
+	type Experimental_RtdClientTypes,
+	type RtdClientRegistration,
 	type ClientWithCoreApi,
 };
 

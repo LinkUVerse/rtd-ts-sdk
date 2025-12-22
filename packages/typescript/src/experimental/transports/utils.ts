@@ -1,13 +1,13 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 import { bcs } from '../../bcs/index.js';
 import { TransactionDataBuilder } from '../../transactions/TransactionData.js';
-import type { Experimental_SuiClientTypes } from '../types.js';
+import type { Experimental_RtdClientTypes } from '../types.js';
 
 export function parseTransactionBcs(
 	bytes: Uint8Array,
-): Experimental_SuiClientTypes.TransactionResponse['transaction'] {
+): Experimental_RtdClientTypes.TransactionResponse['transaction'] {
 	return {
 		...TransactionDataBuilder.fromBytes(bytes).snapshot(),
 		bcs: bytes,
@@ -16,7 +16,7 @@ export function parseTransactionBcs(
 
 export function parseTransactionEffectsBcs(
 	effects: Uint8Array,
-): Experimental_SuiClientTypes.TransactionEffects {
+): Experimental_RtdClientTypes.TransactionEffects {
 	const parsed = bcs.TransactionEffects.parse(effects);
 
 	switch (parsed.$kind) {
@@ -34,7 +34,7 @@ export function parseTransactionEffectsBcs(
 function parseTransactionEffectsV1(_: {
 	bytes: Uint8Array;
 	effects: NonNullable<(typeof bcs.TransactionEffects.$inferType)['V1']>;
-}): Experimental_SuiClientTypes.TransactionEffects {
+}): Experimental_RtdClientTypes.TransactionEffects {
 	throw new Error('V1 effects are not supported yet');
 }
 
@@ -44,9 +44,9 @@ function parseTransactionEffectsV2({
 }: {
 	bytes: Uint8Array;
 	effects: NonNullable<(typeof bcs.TransactionEffects.$inferType)['V2']>;
-}): Experimental_SuiClientTypes.TransactionEffects {
+}): Experimental_RtdClientTypes.TransactionEffects {
 	const changedObjects = effects.changedObjects.map(
-		([id, change]): Experimental_SuiClientTypes.ChangedObject => {
+		([id, change]): Experimental_RtdClientTypes.ChangedObject => {
 			return {
 				id,
 				inputState: change.inputState.$kind === 'Exist' ? 'Exists' : 'DoesNotExist',
@@ -95,7 +95,7 @@ function parseTransactionEffectsV2({
 		lamportVersion: effects.lamportVersion,
 		changedObjects,
 		unchangedConsensusObjects: effects.unchangedSharedObjects.map(
-			([objectId, object]): Experimental_SuiClientTypes.UnchangedConsensusObject => {
+			([objectId, object]): Experimental_RtdClientTypes.UnchangedConsensusObject => {
 				return {
 					kind:
 						object.$kind === 'MutateDeleted'

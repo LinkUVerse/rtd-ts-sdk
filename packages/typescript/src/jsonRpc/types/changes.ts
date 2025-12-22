@@ -1,11 +1,11 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import type { SuiObjectChange } from './generated.js';
+import type { RtdObjectChange } from './generated.js';
 
-export type SuiObjectChangePublished = Extract<SuiObjectChange, { type: 'published' }>;
-export type SuiObjectChangeTransferred = Extract<SuiObjectChange, { type: 'transferred' }>;
-export type SuiObjectChangeMutated = Extract<SuiObjectChange, { type: 'mutated' }>;
-export type SuiObjectChangeDeleted = Extract<SuiObjectChange, { type: 'deleted' }>;
-export type SuiObjectChangeWrapped = Extract<SuiObjectChange, { type: 'wrapped' }>;
-export type SuiObjectChangeCreated = Extract<SuiObjectChange, { type: 'created' }>;
+export type RtdObjectChangePublished = Extract<RtdObjectChange, { type: 'published' }>;
+export type RtdObjectChangeTransferred = Extract<RtdObjectChange, { type: 'transferred' }>;
+export type RtdObjectChangeMutated = Extract<RtdObjectChange, { type: 'mutated' }>;
+export type RtdObjectChangeDeleted = Extract<RtdObjectChange, { type: 'deleted' }>;
+export type RtdObjectChangeWrapped = Extract<RtdObjectChange, { type: 'wrapped' }>;
+export type RtdObjectChangeCreated = Extract<RtdObjectChange, { type: 'created' }>;

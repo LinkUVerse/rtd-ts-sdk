@@ -1,11 +1,11 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 import type { ObjectResponseError } from '../client/index.js';
 
-export class SuiClientError extends Error {}
+export class RtdClientError extends Error {}
 
-export class ObjectError extends SuiClientError {
+export class ObjectError extends RtdClientError {
 	code: string;
 
 	constructor(code: string, message: string) {

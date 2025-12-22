@@ -1,6 +1,6 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-import { toBase64 } from '@mysten/bcs';
+import { toBase64 } from '@linku/bcs';
 
 import type { SignatureScheme } from '../cryptography/index.js';
 import { Signer } from '../cryptography/index.js';
@@ -20,11 +20,11 @@ export class MultiSigSigner extends Signer {
 
 		const weights = pubkey.getPublicKeys().map(({ weight, publicKey }) => ({
 			weight,
-			address: publicKey.toSuiAddress(),
+			address: publicKey.toRtdAddress(),
 		}));
 
 		for (const signer of signers) {
-			const address = signer.toSuiAddress();
+			const address = signer.toRtdAddress();
 			if (uniqueKeys.has(address)) {
 				throw new Error(`Can't create MultiSigSigner with duplicate signers`);
 			}

@@ -1,98 +1,98 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from 'vitest';
 
-import { isValidSuiNSName, normalizeSuiNSName } from '../../../src/utils';
+import { isValidRtdNSName, normalizeRtdNSName } from '../../../src/utils';
 
-describe('isValidSuiNSName', () => {
-	test('valid SuiNS names', () => {
-		expect(isValidSuiNSName('example.sui')).toBe(true);
-		expect(isValidSuiNSName('EXAMPLE.sui')).toBe(true);
-		expect(isValidSuiNSName('@example')).toBe(true);
-		expect(isValidSuiNSName('1.example.sui')).toBe(true);
-		expect(isValidSuiNSName('1@example')).toBe(true);
-		expect(isValidSuiNSName('a.b.c.example.sui')).toBe(true);
-		expect(isValidSuiNSName('A.B.c.123@Example')).toBe(true);
-		expect(isValidSuiNSName('1-a@1-b')).toBe(true);
-		expect(isValidSuiNSName('1-a.1-b.sui')).toBe(true);
-		expect(isValidSuiNSName('-@test')).toBe(false);
-		expect(isValidSuiNSName('-1@test')).toBe(false);
-		expect(isValidSuiNSName('test@-')).toBe(false);
-		expect(isValidSuiNSName('test@-1')).toBe(false);
-		expect(isValidSuiNSName('test@-a')).toBe(false);
-		expect(isValidSuiNSName('test.sui2')).toBe(false);
-		expect(isValidSuiNSName('.sui2')).toBe(false);
-		expect(isValidSuiNSName('test@')).toBe(false);
-		expect(isValidSuiNSName('@@')).toBe(false);
-		expect(isValidSuiNSName('@@test')).toBe(false);
-		expect(isValidSuiNSName('test@test.test')).toBe(false);
-		expect(isValidSuiNSName('@test.test')).toBe(false);
-		expect(isValidSuiNSName('#@test')).toBe(false);
-		expect(isValidSuiNSName('test@#')).toBe(false);
-		expect(isValidSuiNSName('test.#.sui')).toBe(false);
-		expect(isValidSuiNSName('#.sui')).toBe(false);
-		expect(isValidSuiNSName('@.test.sue')).toBe(false);
+describe('isValidRtdNSName', () => {
+	test('valid RtdNS names', () => {
+		expect(isValidRtdNSName('example.rtd')).toBe(true);
+		expect(isValidRtdNSName('EXAMPLE.rtd')).toBe(true);
+		expect(isValidRtdNSName('@example')).toBe(true);
+		expect(isValidRtdNSName('1.example.rtd')).toBe(true);
+		expect(isValidRtdNSName('1@example')).toBe(true);
+		expect(isValidRtdNSName('a.b.c.example.rtd')).toBe(true);
+		expect(isValidRtdNSName('A.B.c.123@Example')).toBe(true);
+		expect(isValidRtdNSName('1-a@1-b')).toBe(true);
+		expect(isValidRtdNSName('1-a.1-b.rtd')).toBe(true);
+		expect(isValidRtdNSName('-@test')).toBe(false);
+		expect(isValidRtdNSName('-1@test')).toBe(false);
+		expect(isValidRtdNSName('test@-')).toBe(false);
+		expect(isValidRtdNSName('test@-1')).toBe(false);
+		expect(isValidRtdNSName('test@-a')).toBe(false);
+		expect(isValidRtdNSName('test.rtd2')).toBe(false);
+		expect(isValidRtdNSName('.rtd2')).toBe(false);
+		expect(isValidRtdNSName('test@')).toBe(false);
+		expect(isValidRtdNSName('@@')).toBe(false);
+		expect(isValidRtdNSName('@@test')).toBe(false);
+		expect(isValidRtdNSName('test@test.test')).toBe(false);
+		expect(isValidRtdNSName('@test.test')).toBe(false);
+		expect(isValidRtdNSName('#@test')).toBe(false);
+		expect(isValidRtdNSName('test@#')).toBe(false);
+		expect(isValidRtdNSName('test.#.rtd')).toBe(false);
+		expect(isValidRtdNSName('#.rtd')).toBe(false);
+		expect(isValidRtdNSName('@.test.sue')).toBe(false);
 
-		expect(isValidSuiNSName('hello-.sui')).toBe(false);
-		expect(isValidSuiNSName('hello--.sui')).toBe(false);
-		expect(isValidSuiNSName('hello.-sui')).toBe(false);
-		expect(isValidSuiNSName('hello.--sui')).toBe(false);
-		expect(isValidSuiNSName('hello.sui-')).toBe(false);
-		expect(isValidSuiNSName('hello.sui--')).toBe(false);
-		expect(isValidSuiNSName('hello-@sui')).toBe(false);
-		expect(isValidSuiNSName('hello--@sui')).toBe(false);
-		expect(isValidSuiNSName('hello@-sui')).toBe(false);
-		expect(isValidSuiNSName('hello@--sui')).toBe(false);
-		expect(isValidSuiNSName('hello@sui-')).toBe(false);
-		expect(isValidSuiNSName('hello@sui--')).toBe(false);
-		expect(isValidSuiNSName('hello--world@sui')).toBe(false);
+		expect(isValidRtdNSName('hello-.rtd')).toBe(false);
+		expect(isValidRtdNSName('hello--.rtd')).toBe(false);
+		expect(isValidRtdNSName('hello.-rtd')).toBe(false);
+		expect(isValidRtdNSName('hello.--rtd')).toBe(false);
+		expect(isValidRtdNSName('hello.rtd-')).toBe(false);
+		expect(isValidRtdNSName('hello.rtd--')).toBe(false);
+		expect(isValidRtdNSName('hello-@rtd')).toBe(false);
+		expect(isValidRtdNSName('hello--@rtd')).toBe(false);
+		expect(isValidRtdNSName('hello@-rtd')).toBe(false);
+		expect(isValidRtdNSName('hello@--rtd')).toBe(false);
+		expect(isValidRtdNSName('hello@rtd-')).toBe(false);
+		expect(isValidRtdNSName('hello@rtd--')).toBe(false);
+		expect(isValidRtdNSName('hello--world@rtd')).toBe(false);
 	});
 });
 
-describe('normalizeSuiNSName', () => {
-	test('normalize SuiNS names', () => {
-		expect(normalizeSuiNSName('example.sui')).toMatch('@example');
-		expect(normalizeSuiNSName('EXAMPLE.sui')).toMatch('@example');
-		expect(normalizeSuiNSName('@example')).toMatch('@example');
-		expect(normalizeSuiNSName('1.example.sui')).toMatch('1@example');
-		expect(normalizeSuiNSName('1@example')).toMatch('1@example');
-		expect(normalizeSuiNSName('a.b.c.example.sui')).toMatch('a.b.c@example');
-		expect(normalizeSuiNSName('A.B.c.123@Example')).toMatch('a.b.c.123@example');
-		expect(normalizeSuiNSName('1-a@1-b')).toMatch('1-a@1-b');
-		expect(normalizeSuiNSName('1-a.1-b.sui')).toMatch('1-a@1-b');
+describe('normalizeRtdNSName', () => {
+	test('normalize RtdNS names', () => {
+		expect(normalizeRtdNSName('example.rtd')).toMatch('@example');
+		expect(normalizeRtdNSName('EXAMPLE.rtd')).toMatch('@example');
+		expect(normalizeRtdNSName('@example')).toMatch('@example');
+		expect(normalizeRtdNSName('1.example.rtd')).toMatch('1@example');
+		expect(normalizeRtdNSName('1@example')).toMatch('1@example');
+		expect(normalizeRtdNSName('a.b.c.example.rtd')).toMatch('a.b.c@example');
+		expect(normalizeRtdNSName('A.B.c.123@Example')).toMatch('a.b.c.123@example');
+		expect(normalizeRtdNSName('1-a@1-b')).toMatch('1-a@1-b');
+		expect(normalizeRtdNSName('1-a.1-b.rtd')).toMatch('1-a@1-b');
 
-		expect(normalizeSuiNSName('example.sui', 'dot')).toMatch('example.sui');
-		expect(normalizeSuiNSName('EXAMPLE.sui', 'dot')).toMatch('example.sui');
-		expect(normalizeSuiNSName('@example', 'dot')).toMatch('example.sui');
-		expect(normalizeSuiNSName('1.example.sui', 'dot')).toMatch('1.example.sui');
-		expect(normalizeSuiNSName('1@example', 'dot')).toMatch('1.example.sui');
-		expect(normalizeSuiNSName('a.b.c.example.sui', 'dot')).toMatch('a.b.c.example.sui');
-		expect(normalizeSuiNSName('A.B.c.123@Example', 'dot')).toMatch('a.b.c.123.example.sui');
-		expect(normalizeSuiNSName('1-a@1-b', 'dot')).toMatch('1-a.1-b.sui');
-		expect(normalizeSuiNSName('1-a.1-b.sui', 'dot')).toMatch('1-a.1-b.sui');
+		expect(normalizeRtdNSName('example.rtd', 'dot')).toMatch('example.rtd');
+		expect(normalizeRtdNSName('EXAMPLE.rtd', 'dot')).toMatch('example.rtd');
+		expect(normalizeRtdNSName('@example', 'dot')).toMatch('example.rtd');
+		expect(normalizeRtdNSName('1.example.rtd', 'dot')).toMatch('1.example.rtd');
+		expect(normalizeRtdNSName('1@example', 'dot')).toMatch('1.example.rtd');
+		expect(normalizeRtdNSName('a.b.c.example.rtd', 'dot')).toMatch('a.b.c.example.rtd');
+		expect(normalizeRtdNSName('A.B.c.123@Example', 'dot')).toMatch('a.b.c.123.example.rtd');
+		expect(normalizeRtdNSName('1-a@1-b', 'dot')).toMatch('1-a.1-b.rtd');
+		expect(normalizeRtdNSName('1-a.1-b.rtd', 'dot')).toMatch('1-a.1-b.rtd');
 
-		expect(() => normalizeSuiNSName('-@test')).toThrowError('Invalid SuiNS name -@test');
-		expect(normalizeSuiNSName('1-a@1-b')).toMatchInlineSnapshot('"1-a@1-b"');
-		expect(normalizeSuiNSName('1-a.1-b.sui')).toMatchInlineSnapshot('"1-a@1-b"');
-		expect(() => normalizeSuiNSName('-@test')).toThrowError('Invalid SuiNS name -@test');
-		expect(() => normalizeSuiNSName('-1@test')).toThrowError('Invalid SuiNS name -1@test');
-		expect(() => normalizeSuiNSName('test@-')).toThrowError('Invalid SuiNS name test@-');
-		expect(() => normalizeSuiNSName('test@-1')).toThrowError('Invalid SuiNS name test@-1');
-		expect(() => normalizeSuiNSName('test@-a')).toThrowError('Invalid SuiNS name test@-a');
-		expect(() => normalizeSuiNSName('test.sui2')).toThrowError('Invalid SuiNS name test.sui2');
-		expect(() => normalizeSuiNSName('.sui2')).toThrowError('Invalid SuiNS name .sui2');
-		expect(() => normalizeSuiNSName('test@')).toThrowError('Invalid SuiNS name test@');
-		expect(() => normalizeSuiNSName('@@')).toThrowError('Invalid SuiNS name @@');
-		expect(() => normalizeSuiNSName('@@test')).toThrowError('Invalid SuiNS name @@test');
-		expect(() => normalizeSuiNSName('test@test.test')).toThrowError(
-			'Invalid SuiNS name test@test.test',
+		expect(() => normalizeRtdNSName('-@test')).toThrowError('Invalid RtdNS name -@test');
+		expect(normalizeRtdNSName('1-a@1-b')).toMatchInlineSnapshot('"1-a@1-b"');
+		expect(normalizeRtdNSName('1-a.1-b.rtd')).toMatchInlineSnapshot('"1-a@1-b"');
+		expect(() => normalizeRtdNSName('-@test')).toThrowError('Invalid RtdNS name -@test');
+		expect(() => normalizeRtdNSName('-1@test')).toThrowError('Invalid RtdNS name -1@test');
+		expect(() => normalizeRtdNSName('test@-')).toThrowError('Invalid RtdNS name test@-');
+		expect(() => normalizeRtdNSName('test@-1')).toThrowError('Invalid RtdNS name test@-1');
+		expect(() => normalizeRtdNSName('test@-a')).toThrowError('Invalid RtdNS name test@-a');
+		expect(() => normalizeRtdNSName('test.rtd2')).toThrowError('Invalid RtdNS name test.rtd2');
+		expect(() => normalizeRtdNSName('.rtd2')).toThrowError('Invalid RtdNS name .rtd2');
+		expect(() => normalizeRtdNSName('test@')).toThrowError('Invalid RtdNS name test@');
+		expect(() => normalizeRtdNSName('@@')).toThrowError('Invalid RtdNS name @@');
+		expect(() => normalizeRtdNSName('@@test')).toThrowError('Invalid RtdNS name @@test');
+		expect(() => normalizeRtdNSName('test@test.test')).toThrowError(
+			'Invalid RtdNS name test@test.test',
 		);
-		expect(() => normalizeSuiNSName('@test.test')).toThrowError('Invalid SuiNS name @test.test');
-		expect(() => normalizeSuiNSName('#@test')).toThrowError('Invalid SuiNS name #@test');
-		expect(() => normalizeSuiNSName('test@#')).toThrowError('Invalid SuiNS name test@#');
-		expect(() => normalizeSuiNSName('test.#.sui')).toThrowError('Invalid SuiNS name test.#.sui');
-		expect(() => normalizeSuiNSName('#.sui')).toThrowError('Invalid SuiNS name #.sui');
-		expect(() => normalizeSuiNSName('@.test.sue')).toThrowError('Invalid SuiNS name @.test.sue');
+		expect(() => normalizeRtdNSName('@test.test')).toThrowError('Invalid RtdNS name @test.test');
+		expect(() => normalizeRtdNSName('#@test')).toThrowError('Invalid RtdNS name #@test');
+		expect(() => normalizeRtdNSName('test@#')).toThrowError('Invalid RtdNS name test@#');
+		expect(() => normalizeRtdNSName('test.#.rtd')).toThrowError('Invalid RtdNS name test.#.rtd');
+		expect(() => normalizeRtdNSName('#.rtd')).toThrowError('Invalid RtdNS name #.rtd');
+		expect(() => normalizeRtdNSName('@.test.sue')).toThrowError('Invalid RtdNS name @.test.sue');
 	});
 });

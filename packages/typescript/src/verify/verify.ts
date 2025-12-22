@@ -1,7 +1,7 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { fromBase64 } from '@mysten/bcs';
+import { fromBase64 } from '@linku/bcs';
 
 import type { PublicKey, SignatureFlag, SignatureScheme } from '../cryptography/index.js';
 import { parseSerializedSignature, SIGNATURE_FLAG_TO_SCHEME } from '../cryptography/index.js';
@@ -130,14 +130,14 @@ export function publicKeyFromRawBytes(
 			throw new Error(`Unsupported signature scheme ${signatureScheme}`);
 	}
 
-	if (options.address && publicKey.toSuiAddress() !== options.address) {
+	if (options.address && publicKey.toRtdAddress() !== options.address) {
 		throw new Error(`Public key bytes do not match the provided address`);
 	}
 
 	return publicKey;
 }
 
-export function publicKeyFromSuiBytes(
+export function publicKeyFromRtdBytes(
 	publicKey: string | Uint8Array,
 	options: { client?: ZkLoginCompatibleClient; address?: string } = {},
 ) {

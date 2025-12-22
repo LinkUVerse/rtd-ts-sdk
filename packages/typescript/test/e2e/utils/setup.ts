@@ -1,4 +1,4 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 import path from 'path';
@@ -8,22 +8,22 @@ import { retry } from 'ts-retry-promise';
 import { expect, inject } from 'vitest';
 import { WebSocket } from 'ws';
 
-import type { SuiObjectChangePublished } from '../../../src/client/index.js';
-import { getFullnodeUrl, SuiClient, SuiHTTPTransport } from '../../../src/client/index.js';
+import type { RtdObjectChangePublished } from '../../../src/client/index.js';
+import { getFullnodeUrl, RtdClient, RtdHTTPTransport } from '../../../src/client/index.js';
 import type { Keypair } from '../../../src/cryptography/index.js';
 import {
 	FaucetRateLimitError,
 	getFaucetHost,
-	requestSuiFromFaucetV2,
+	requestRtdFromFaucetV2,
 } from '../../../src/faucet/index.js';
 import { Ed25519Keypair } from '../../../src/keypairs/ed25519/index.js';
 import { Transaction, UpgradePolicy } from '../../../src/transactions/index.js';
-import { SUI_TYPE_ARG } from '../../../src/utils/index.js';
+import { RTD_TYPE_ARG } from '../../../src/utils/index.js';
 
 const DEFAULT_FAUCET_URL = import.meta.env.FAUCET_URL ?? getFaucetHost('localnet');
 const DEFAULT_FULLNODE_URL = import.meta.env.FULLNODE_URL ?? getFullnodeUrl('localnet');
 
-const SUI_TOOLS_CONTAINER_ID = inject('suiToolsContainerId');
+const RTD_TOOLS_CONTAINER_ID = inject('rtdToolsContainerId');
 
 export const DEFAULT_RECIPIENT =
 	'0x0c567ffdf8162cb6d51af74be0199443b92e823d4ba6ced24de5c6c463797d46';
@@ -80,14 +80,14 @@ class TestPackageRegistry {
 
 export class TestToolbox {
 	keypair: Ed25519Keypair;
-	client: SuiClient;
+	client: RtdClient;
 	registry: TestPackageRegistry;
 	configPath: string;
 
 	constructor(keypair: Ed25519Keypair, url: string = DEFAULT_FULLNODE_URL, configPath: string) {
 		this.keypair = keypair;
-		this.client = new SuiClient({
-			transport: new SuiHTTPTransport({
+		this.client = new RtdClient({
+			transport: new RtdHTTPTransport({
 				url,
 				WebSocketConstructor: WebSocket as never,
 			}),
@@ -97,18 +97,18 @@ export class TestToolbox {
 	}
 
 	address() {
-		return this.keypair.getPublicKey().toSuiAddress();
+		return this.keypair.getPublicKey().toRtdAddress();
 	}
 
 	async getGasObjectsOwnedByAddress() {
 		return await this.client.getCoins({
 			owner: this.address(),
-			coinType: SUI_TYPE_ARG,
+			coinType: RTD_TYPE_ARG,
 		});
 	}
 
 	public async getActiveValidators() {
-		return (await this.client.getLatestSuiSystemState()).activeValidators;
+		return (await this.client.getLatestRtdSystemState()).activeValidators;
 	}
 
 	public async getPackage(path: string) {
@@ -126,9 +126,9 @@ export class TestToolbox {
 	}
 }
 
-export function getClient(url = DEFAULT_FULLNODE_URL): SuiClient {
-	return new SuiClient({
-		transport: new SuiHTTPTransport({
+export function getClient(url = DEFAULT_FULLNODE_URL): RtdClient {
+	return new RtdClient({
+		transport: new RtdHTTPTransport({
 			url,
 			WebSocketConstructor: WebSocket as never,
 		}),
@@ -137,10 +137,10 @@ export function getClient(url = DEFAULT_FULLNODE_URL): SuiClient {
 
 export async function setup(options: { graphQLURL?: string; rpcURL?: string } = {}) {
 	const keypair = Ed25519Keypair.generate();
-	const address = keypair.getPublicKey().toSuiAddress();
+	const address = keypair.getPublicKey().toRtdAddress();
 
 	const configDir = path.join('/test-data', `${Math.random().toString(36).substring(2, 15)}`);
-	await execSuiTools(['mkdir', '-p', configDir]);
+	await execRtdTools(['mkdir', '-p', configDir]);
 	const configPath = path.join(configDir, 'client.yaml');
 	return setupWithFundedAddress(keypair, address, configPath, options);
 }
@@ -153,7 +153,7 @@ export async function setupWithFundedAddress(
 ) {
 	const client = getClient(rpcURL ?? DEFAULT_FULLNODE_URL);
 	await retry(
-		async () => await requestSuiFromFaucetV2({ host: DEFAULT_FAUCET_URL, recipient: address }),
+		async () => await requestRtdFromFaucetV2({ host: DEFAULT_FAUCET_URL, recipient: address }),
 		{
 			backoff: 'EXPONENTIAL',
 			// overall timeout in 60 seconds
@@ -179,7 +179,7 @@ export async function setupWithFundedAddress(
 		},
 	);
 
-	await execSuiTools(['sui', 'client', '--yes', '--client.config', configPath]);
+	await execRtdTools(['rtd', 'client', '--yes', '--client.config', configPath]);
 	return new TestToolbox(keypair, rpcURL, configPath);
 }
 
@@ -192,8 +192,8 @@ export async function publishPackage(packageName: string, toolbox?: TestToolbox)
 	// Retry build with exponential backoff to handle concurrent builds
 	const buildResult = await retry(
 		async () => {
-			const result = await execSuiTools([
-				'sui',
+			const result = await execRtdTools([
+				'rtd',
 				'move',
 				'--client.config',
 				toolbox.configPath,
@@ -265,7 +265,7 @@ export async function publishPackage(packageName: string, toolbox?: TestToolbox)
 
 	const packageId = ((publishTxn.objectChanges?.filter(
 		(a) => a.type === 'published',
-	) as SuiObjectChangePublished[]) ?? [])[0]?.packageId.replace(/^(0x)(0+)/, '0x') as string;
+	) as RtdObjectChangePublished[]) ?? [])[0]?.packageId.replace(/^(0x)(0+)/, '0x') as string;
 
 	expect(packageId).toBeTypeOf('string');
 
@@ -282,8 +282,8 @@ export async function upgradePackage(
 	if (!toolbox) {
 		toolbox = await setup();
 	}
-	const { stdout } = await execSuiTools([
-		'sui',
+	const { stdout } = await execRtdTools([
+		'rtd',
 		'move',
 		'--client.config',
 		toolbox.configPath,
@@ -338,12 +338,12 @@ export function getRandomAddresses(n: number): string[] {
 		.fill(null)
 		.map(() => {
 			const keypair = Ed25519Keypair.generate();
-			return keypair.getPublicKey().toSuiAddress();
+			return keypair.getPublicKey().toRtdAddress();
 		});
 }
 
-export async function paySui(
-	client: SuiClient,
+export async function payRtd(
+	client: RtdClient,
 	signer: Keypair,
 	numRecipients: number = 1,
 	recipients?: string[],
@@ -361,8 +361,8 @@ export async function paySui(
 		coinId ??
 		(
 			await client.getCoins({
-				owner: signer.getPublicKey().toSuiAddress(),
-				coinType: '0x2::sui::SUI',
+				owner: signer.getPublicKey().toRtdAddress(),
+				coinType: '0x2::rtd::RTD',
 			})
 		).data[0].coinObjectId;
 
@@ -387,8 +387,8 @@ export async function paySui(
 	return txn;
 }
 
-export async function executePaySuiNTimes(
-	client: SuiClient,
+export async function executePayRtdNTimes(
+	client: RtdClient,
 	signer: Keypair,
 	nTimes: number,
 	numRecipientsPerTxn: number = 1,
@@ -398,18 +398,18 @@ export async function executePaySuiNTimes(
 	const txns = [];
 	for (let i = 0; i < nTimes; i++) {
 		// must await here to make sure the txns are executed in order
-		txns.push(await paySui(client, signer, numRecipientsPerTxn, recipients, amounts));
+		txns.push(await payRtd(client, signer, numRecipientsPerTxn, recipients, amounts));
 	}
 	return txns;
 }
 
 const client = await getContainerRuntimeClient();
 
-export async function execSuiTools(
+export async function execRtdTools(
 	command: string[],
 	options?: Parameters<ContainerRuntimeClient['container']['exec']>[2],
 ) {
-	const container = client.container.getById(SUI_TOOLS_CONTAINER_ID);
+	const container = client.container.getById(RTD_TOOLS_CONTAINER_ID);
 
 	const result = await client.container.exec(container, command, options);
 

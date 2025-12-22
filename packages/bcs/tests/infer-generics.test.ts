@@ -1,4 +1,4 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 import type { BcsType } from '../src/bcs-type.js';
 import { bcs } from '../src/bcs.js';

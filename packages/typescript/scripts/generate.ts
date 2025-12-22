@@ -1,4 +1,4 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 import * as fs from 'node:fs/promises';
@@ -19,7 +19,7 @@ import type {
 const packageRoot = path.resolve(import.meta.url.slice(5), '../..');
 
 const res = await fetch(
-	'https://raw.githubusercontent.com/MystenLabs/sui/refs/heads/main/crates/sui-open-rpc/spec/openrpc.json',
+	'https://raw.githubusercontent.com/LinkUVerse/rtd/refs/heads/main/crates/rtd-open-rpc/spec/openrpc.json',
 );
 
 if (!res.ok) {
@@ -28,7 +28,7 @@ if (!res.ok) {
 
 const openRpcSpec: OpenRpcSpec = JSON.parse(await res.text());
 export const LICENSE_HEADER = `
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 /**
@@ -37,7 +37,7 @@ export const LICENSE_HEADER = `
  *  ######################################
  *
  * This file is generated from:
- * /crates/sui-open-rpc/spec/openrpc.json
+ * /crates/rtd-open-rpc/spec/openrpc.json
  */
 `.trim();
 
@@ -67,30 +67,30 @@ const options: {
 } = {
 	types: {
 		Coin: { alias: 'CoinStruct' },
-		Data: { alias: 'SuiParsedData' },
-		Event: { alias: 'SuiEvent' },
-		EventFilter: { alias: 'SuiEventFilter' },
+		Data: { alias: 'RtdParsedData' },
+		Event: { alias: 'RtdEvent' },
+		EventFilter: { alias: 'RtdEventFilter' },
 		EventID: { alias: 'EventId' },
-		GasData: { alias: 'SuiGasData' },
-		MoveFunctionArgType: { alias: 'SuiMoveFunctionArgType' },
-		ObjectChange: { alias: 'SuiObjectChange' },
-		ObjectData: { alias: 'SuiObjectData' },
-		ObjectDataOptions: { alias: 'SuiObjectDataOptions' },
-		ObjectRef: { alias: 'SuiObjectRef' },
-		ObjectResponseQuery: { alias: 'SuiObjectResponseQuery' },
+		GasData: { alias: 'RtdGasData' },
+		MoveFunctionArgType: { alias: 'RtdMoveFunctionArgType' },
+		ObjectChange: { alias: 'RtdObjectChange' },
+		ObjectData: { alias: 'RtdObjectData' },
+		ObjectDataOptions: { alias: 'RtdObjectDataOptions' },
+		ObjectRef: { alias: 'RtdObjectRef' },
+		ObjectResponseQuery: { alias: 'RtdObjectResponseQuery' },
 		Owner: { alias: 'ObjectOwner' },
-		PaginatedSuiObjectResponse: { alias: 'PaginatedObjectsResponse' },
+		PaginatedRtdObjectResponse: { alias: 'PaginatedObjectsResponse' },
 		PaginatedTransactionBlockResponse: { alias: 'PaginatedTransactionResponse' },
 		Stake: { alias: 'StakeObject' },
-		SuiCoinMetadata: { alias: 'CoinMetadata' },
-		SuiProgrammableMoveCall: { alias: 'MoveCallSuiTransaction' },
+		RtdCoinMetadata: { alias: 'CoinMetadata' },
+		RtdProgrammableMoveCall: { alias: 'MoveCallRtdTransaction' },
 		Supply: { alias: 'CoinSupply' },
-		TransactionBlock: { alias: 'SuiTransactionBlock' },
+		TransactionBlock: { alias: 'RtdTransactionBlock' },
 		TransactionBlockEffects: { alias: 'TransactionEffects' },
-		TransactionBlockKind: { alias: 'SuiTransactionBlockKind' },
-		TransactionBlockResponse: { alias: 'SuiTransactionBlockResponse' },
-		TransactionBlockResponseOptions: { alias: 'SuiTransactionBlockResponseOptions' },
-		TransactionBlockResponseQuery: { alias: 'SuiTransactionBlockResponseQuery' },
+		TransactionBlockKind: { alias: 'RtdTransactionBlockKind' },
+		TransactionBlockResponse: { alias: 'RtdTransactionBlockResponse' },
+		TransactionBlockResponseOptions: { alias: 'RtdTransactionBlockResponseOptions' },
+		TransactionBlockResponseQuery: { alias: 'RtdTransactionBlockResponseQuery' },
 		ValidatorApys: { alias: 'ValidatorsApy' },
 		GenericSignature: {
 			typeAlias: 'string',
@@ -100,14 +100,14 @@ const options: {
 		},
 	},
 	methods: {
-		sui_getNormalizedMoveModule: {
+		rtd_getNormalizedMoveModule: {
 			params: {
 				module_name: {
 					alias: 'module',
 				},
 			},
 		},
-		sui_getNormalizedMoveFunction: {
+		rtd_getNormalizedMoveFunction: {
 			params: {
 				module_name: {
 					alias: 'module',
@@ -117,7 +117,7 @@ const options: {
 				},
 			},
 		},
-		sui_getNormalizedMoveStruct: {
+		rtd_getNormalizedMoveStruct: {
 			params: {
 				module_name: {
 					alias: 'module',
@@ -127,7 +127,7 @@ const options: {
 				},
 			},
 		},
-		suix_getOwnedObjects: {
+		rtdx_getOwnedObjects: {
 			flattenParams: ['query'],
 			params: {
 				address: {
@@ -135,14 +135,14 @@ const options: {
 				},
 			},
 		},
-		sui_getObject: {
+		rtd_getObject: {
 			params: {
 				object_id: {
 					alias: 'id',
 				},
 			},
 		},
-		sui_tryGetPastObject: {
+		rtd_tryGetPastObject: {
 			params: {
 				object_id: {
 					alias: 'id',
@@ -152,14 +152,14 @@ const options: {
 				},
 			},
 		},
-		sui_multiGetObjects: {
+		rtd_multiGetObjects: {
 			params: {
 				object_ids: {
 					alias: 'ids',
 				},
 			},
 		},
-		suix_queryTransactionBlocks: {
+		rtdx_queryTransactionBlocks: {
 			flattenParams: ['query'],
 			params: {
 				descending_order: {
@@ -168,7 +168,7 @@ const options: {
 				},
 			},
 		},
-		sui_executeTransactionBlock: {
+		rtd_executeTransactionBlock: {
 			params: {
 				tx_bytes: {
 					alias: 'transactionBlock',
@@ -183,7 +183,7 @@ const options: {
 				},
 			},
 		},
-		suix_queryEvents: {
+		rtdx_queryEvents: {
 			params: {
 				descending_order: {
 					alias: 'order',
@@ -191,7 +191,7 @@ const options: {
 				},
 			},
 		},
-		sui_devInspectTransactionBlock: {
+		rtd_devInspectTransactionBlock: {
 			params: {
 				sender_address: {
 					alias: 'sender',
@@ -205,7 +205,7 @@ const options: {
 				},
 			},
 		},
-		sui_dryRunTransactionBlock: {
+		rtd_dryRunTransactionBlock: {
 			params: {
 				tx_bytes: {
 					alias: 'transactionBlock',
@@ -213,14 +213,14 @@ const options: {
 				},
 			},
 		},
-		suix_getDynamicFields: {
+		rtdx_getDynamicFields: {
 			params: {
 				parent_object_id: {
 					alias: 'parentId',
 				},
 			},
 		},
-		suix_getDynamicFieldObject: {
+		rtdx_getDynamicFieldObject: {
 			params: {
 				parent_object_id: {
 					alias: 'parentId',
@@ -786,11 +786,11 @@ function normalizeName(name: string) {
 }
 
 export function normalizeMethodName(name: string): string {
-	if (name.startsWith('sui_')) {
+	if (name.startsWith('rtd_')) {
 		return normalizeMethodName(name.slice(4));
 	}
 
-	if (name.startsWith('suix_')) {
+	if (name.startsWith('rtdx_')) {
 		return normalizeMethodName(name.slice(5));
 	}
 

@@ -1,12 +1,12 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { fromBase64, toBase64 } from '@mysten/bcs';
+import { fromBase64, toBase64 } from '@linku/bcs';
 import { blake2b } from '@noble/hashes/blake2b';
 import { bytesToHex } from '@noble/hashes/utils';
 
 import { bcs } from '../bcs/index.js';
-import { normalizeSuiAddress, SUI_ADDRESS_LENGTH } from '../utils/sui-types.js';
+import { normalizeRtdAddress, RTD_ADDRESS_LENGTH } from '../utils/rtd-types.js';
 import type { IntentScope } from './intent.js';
 import { messageWithIntent } from './intent.js';
 import { SIGNATURE_FLAG_TO_SCHEME, SIGNATURE_SCHEME_TO_SIZE } from './signature-scheme.js';
@@ -56,12 +56,12 @@ export abstract class PublicKey {
 	}
 
 	/**
-	 * Return the Sui representation of the public key encoded in
-	 * base-64. A Sui public key is formed by the concatenation
+	 * Return the Rtd representation of the public key encoded in
+	 * base-64. A Rtd public key is formed by the concatenation
 	 * of the scheme flag with the raw bytes of the public key
 	 */
-	toSuiPublicKey(): string {
-		const bytes = this.toSuiBytes();
+	toRtdPublicKey(): string {
+		const bytes = this.toRtdBytes();
 		return toBase64(bytes);
 	}
 
@@ -98,29 +98,29 @@ export abstract class PublicKey {
 	 * Verifies that the public key is associated with the provided address
 	 */
 	verifyAddress(address: string): boolean {
-		return this.toSuiAddress() === address;
+		return this.toRtdAddress() === address;
 	}
 
 	/**
 	 * Returns the bytes representation of the public key
 	 * prefixed with the signature scheme flag
 	 */
-	toSuiBytes(): Uint8Array<ArrayBuffer> {
+	toRtdBytes(): Uint8Array<ArrayBuffer> {
 		const rawBytes = this.toRawBytes();
-		const suiBytes = new Uint8Array(rawBytes.length + 1);
-		suiBytes.set([this.flag()]);
-		suiBytes.set(rawBytes, 1);
+		const rtdBytes = new Uint8Array(rawBytes.length + 1);
+		rtdBytes.set([this.flag()]);
+		rtdBytes.set(rawBytes, 1);
 
-		return suiBytes;
+		return rtdBytes;
 	}
 
 	/**
-	 * Return the Sui address associated with this Ed25519 public key
+	 * Return the Rtd address associated with this Ed25519 public key
 	 */
-	toSuiAddress(): string {
+	toRtdAddress(): string {
 		// Each hex char represents half a byte, hence hex address doubles the length
-		return normalizeSuiAddress(
-			bytesToHex(blake2b(this.toSuiBytes(), { dkLen: 32 })).slice(0, SUI_ADDRESS_LENGTH * 2),
+		return normalizeRtdAddress(
+			bytesToHex(blake2b(this.toRtdBytes(), { dkLen: 32 })).slice(0, RTD_ADDRESS_LENGTH * 2),
 		);
 	}
 

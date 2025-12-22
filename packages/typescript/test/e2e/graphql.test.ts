@@ -1,8 +1,8 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from 'vitest';
 
-import { SuiGraphQLClient } from '../../src/graphql';
+import { RtdGraphQLClient } from '../../src/graphql';
 import { graphql } from '../../src/graphql/schemas/latest';
 
 const DEFAULT_GRAPHQL_URL = import.meta.env.GRAPHQL_URL ?? 'http://127.0.0.1:9125/graphql';
@@ -32,7 +32,7 @@ const queries = {
 	`),
 };
 
-const client = new SuiGraphQLClient({
+const client = new RtdGraphQLClient({
 	url: DEFAULT_GRAPHQL_URL,
 	queries,
 });

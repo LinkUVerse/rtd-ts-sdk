@@ -1,11 +1,11 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 import { blake2b } from '@noble/hashes/blake2b';
 import { bytesToHex } from '@noble/hashes/utils';
 
 import { SIGNATURE_SCHEME_TO_FLAG } from '../cryptography/signature-scheme.js';
-import { normalizeSuiAddress, SUI_ADDRESS_LENGTH } from '../utils/index.js';
+import { normalizeRtdAddress, RTD_ADDRESS_LENGTH } from '../utils/index.js';
 import { decodeJwt } from './jwt-utils.js';
 import {
 	genAddressSeed,
@@ -32,8 +32,8 @@ export function computeZkLoginAddressFromSeed(
 	tmp.set(addressParamBytes, 2);
 	tmp.set(addressSeedBytesBigEndian, 2 + addressParamBytes.length);
 
-	return normalizeSuiAddress(
-		bytesToHex(blake2b(tmp, { dkLen: 32 })).slice(0, SUI_ADDRESS_LENGTH * 2),
+	return normalizeRtdAddress(
+		bytesToHex(blake2b(tmp, { dkLen: 32 })).slice(0, RTD_ADDRESS_LENGTH * 2),
 	);
 }
 

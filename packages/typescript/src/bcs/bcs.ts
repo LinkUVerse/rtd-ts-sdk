@@ -1,10 +1,10 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import type { BcsType, BcsTypeOptions } from '@mysten/bcs';
-import { bcs, fromBase58, fromBase64, fromHex, toBase58, toBase64, toHex } from '@mysten/bcs';
+import type { BcsType, BcsTypeOptions } from '@linku/bcs';
+import { bcs, fromBase58, fromBase64, fromHex, toBase58, toBase64, toHex } from '@linku/bcs';
 
-import { isValidSuiAddress, normalizeSuiAddress, SUI_ADDRESS_LENGTH } from '../utils/sui-types.js';
+import { isValidRtdAddress, normalizeRtdAddress, RTD_ADDRESS_LENGTH } from '../utils/rtd-types.js';
 import { TypeTagSerializer } from './type-tag-serializer.js';
 import type { TypeTag as TypeTagType } from './types.js';
 
@@ -27,16 +27,16 @@ function optionEnum<T extends BcsType<any, any>>(type: T) {
 	});
 }
 
-export const Address = bcs.bytes(SUI_ADDRESS_LENGTH).transform({
+export const Address = bcs.bytes(RTD_ADDRESS_LENGTH).transform({
 	validate: (val) => {
 		const address = typeof val === 'string' ? val : toHex(val);
-		if (!address || !isValidSuiAddress(normalizeSuiAddress(address))) {
-			throw new Error(`Invalid Sui address ${address}`);
+		if (!address || !isValidRtdAddress(normalizeRtdAddress(address))) {
+			throw new Error(`Invalid Rtd address ${address}`);
 		}
 	},
 	input: (val: string | Uint8Array) =>
-		typeof val === 'string' ? fromHex(normalizeSuiAddress(val)) : val,
-	output: (val) => normalizeSuiAddress(toHex(val)),
+		typeof val === 'string' ? fromHex(normalizeRtdAddress(val)) : val,
+	output: (val) => normalizeRtdAddress(toHex(val)),
 });
 
 export const ObjectDigest = bcs.byteVector().transform({
@@ -50,7 +50,7 @@ export const ObjectDigest = bcs.byteVector().transform({
 	},
 });
 
-export const SuiObjectRef = bcs.struct('SuiObjectRef', {
+export const RtdObjectRef = bcs.struct('RtdObjectRef', {
 	objectId: Address,
 	version: bcs.u64(),
 	digest: ObjectDigest,
@@ -63,9 +63,9 @@ export const SharedObjectRef = bcs.struct('SharedObjectRef', {
 });
 
 export const ObjectArg = bcs.enum('ObjectArg', {
-	ImmOrOwnedObject: SuiObjectRef,
+	ImmOrOwnedObject: RtdObjectRef,
 	SharedObject: SharedObjectRef,
-	Receiving: SuiObjectRef,
+	Receiving: RtdObjectRef,
 });
 
 export const Owner = bcs.enum('Owner', {
@@ -223,7 +223,7 @@ export const StructTag = bcs.struct('StructTag', {
 });
 
 export const GasData = bcs.struct('GasData', {
-	payment: bcs.vector(SuiObjectRef),
+	payment: bcs.vector(RtdObjectRef),
 	owner: Address,
 	price: bcs.u64(),
 	budget: bcs.u64(),
@@ -252,7 +252,7 @@ export const IntentVersion = bcs.enum('IntentVersion', {
 });
 
 export const AppId = bcs.enum('AppId', {
-	Sui: null,
+	Rtd: null,
 });
 
 export const Intent = bcs.struct('Intent', {

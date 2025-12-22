@@ -1,4 +1,4 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 import { secp256r1 } from '@noble/curves/p256';
@@ -62,7 +62,7 @@ export class MockPasskeySigner implements PasskeyProvider {
 					JSON.stringify({
 						type: 'webauthn.create',
 						challenge: '',
-						origin: 'https://www.sui.io',
+						origin: 'https://www.rtd.life',
 						crossOrigin: false,
 					}),
 				)
@@ -104,13 +104,13 @@ export class MockPasskeySigner implements PasskeyProvider {
 			? JSON.stringify({
 					type: 'webauthn.create', // Wrong type for clientDataJson.
 					challenge: btoa(String.fromCharCode(...challenge)),
-					origin: 'https://www.sui.io',
+					origin: 'https://www.rtd.life',
 					crossOrigin: false,
 				})
 			: JSON.stringify({
 					type: 'webauthn.get',
 					challenge: btoa(String.fromCharCode(...challenge)),
-					origin: 'https://www.sui.io',
+					origin: 'https://www.rtd.life',
 					crossOrigin: false,
 				});
 

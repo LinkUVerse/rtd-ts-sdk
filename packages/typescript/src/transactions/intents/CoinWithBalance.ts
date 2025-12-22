@@ -1,12 +1,12 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 import type { InferInput } from 'valibot';
 import { bigint, object, parse, string } from 'valibot';
 
 import { bcs } from '../../bcs/index.js';
-import type { CoinStruct, SuiClient } from '../../client/index.js';
-import { normalizeStructTag } from '../../utils/sui-types.js';
+import type { CoinStruct, RtdClient } from '../../client/index.js';
+import { normalizeStructTag } from '../../utils/rtd-types.js';
 import { Commands } from '../Commands.js';
 import type { Argument } from '../data/internal.js';
 import { Inputs } from '../Inputs.js';
@@ -16,10 +16,10 @@ import type { Transaction, TransactionResult } from '../Transaction.js';
 import type { TransactionDataBuilder } from '../TransactionData.js';
 
 const COIN_WITH_BALANCE = 'CoinWithBalance';
-const SUI_TYPE = normalizeStructTag('0x2::sui::SUI');
+const RTD_TYPE = normalizeStructTag('0x2::rtd::RTD');
 
 export function coinWithBalance({
-	type = SUI_TYPE,
+	type = RTD_TYPE,
 	balance,
 	useGasCoin = true,
 }: {
@@ -42,7 +42,7 @@ export function coinWithBalance({
 				name: COIN_WITH_BALANCE,
 				inputs: {},
 				data: {
-					type: coinType === SUI_TYPE && useGasCoin ? 'gas' : coinType,
+					type: coinType === RTD_TYPE && useGasCoin ? 'gas' : coinType,
 					balance: BigInt(balance),
 				} satisfies InferInput<typeof CoinWithBalanceData>,
 			}),
@@ -92,7 +92,7 @@ async function resolveCoinBalance(
 	}
 
 	const coinsByType = new Map<string, CoinStruct[]>();
-	const client = getSuiClient(buildOptions);
+	const client = getRtdClient(buildOptions);
 	await Promise.all(
 		[...coinTypes].map(async (coinType) => {
 			coinsByType.set(
@@ -183,7 +183,7 @@ async function getCoinsOfType({
 }: {
 	coinType: string;
 	balance: bigint;
-	client: SuiClient;
+	client: RtdClient;
 	owner: string;
 	usedIds: Set<string>;
 }): Promise<CoinStruct[]> {
@@ -220,10 +220,10 @@ async function getCoinsOfType({
 	}
 }
 
-export function getSuiClient(options: BuildTransactionOptions): SuiClient {
-	const client = getClient(options) as SuiClient;
+export function getRtdClient(options: BuildTransactionOptions): RtdClient {
+	const client = getClient(options) as RtdClient;
 	if (!client.jsonRpc) {
-		throw new Error(`CoinWithBalance intent currently only works with SuiClient`);
+		throw new Error(`CoinWithBalance intent currently only works with RtdClient`);
 	}
 
 	return client;

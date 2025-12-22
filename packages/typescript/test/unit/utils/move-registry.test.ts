@@ -1,4 +1,4 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from 'vitest';
@@ -14,8 +14,8 @@ describe('isValidNamedPackage', () => {
 		expect(isValidNamedPackage('@org/1app/1')).toBe(true);
 		expect(isValidNamedPackage('@org/1-app/1')).toBe(true);
 		expect(isValidNamedPackage('test@o-rg/1')).toBe(true);
-		expect(isValidNamedPackage('org.sui/app')).toBe(true);
-		expect(isValidNamedPackage('org.sui/app/1')).toBe(true);
+		expect(isValidNamedPackage('org.rtd/app')).toBe(true);
+		expect(isValidNamedPackage('org.rtd/app/1')).toBe(true);
 
 		// failed scenarios.
 		expect(isValidNamedPackage('@org/app.test/123')).toBe(false);

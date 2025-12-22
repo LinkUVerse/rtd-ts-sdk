@@ -1,48 +1,48 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 import type {
 	Experimental_CoreClientOptions,
-	Experimental_SuiClientTypes,
+	Experimental_RtdClientTypes,
 } from '../experimental/index.js';
 import { Experimental_CoreClient } from '../experimental/index.js';
-import type { SuiGrpcClient } from './client.js';
-import type { Owner } from './proto/sui/rpc/v2/owner.js';
-import { Owner_OwnerKind } from './proto/sui/rpc/v2/owner.js';
-import { chunk, fromBase64, toBase64 } from '@mysten/utils';
-import type { ExecutedTransaction } from './proto/sui/rpc/v2/executed_transaction.js';
-import type { TransactionEffects } from './proto/sui/rpc/v2/effects.js';
-import { UnchangedConsensusObject_UnchangedConsensusObjectKind } from './proto/sui/rpc/v2/effects.js';
+import type { RtdGrpcClient } from './client.js';
+import type { Owner } from './proto/rtd/rpc/v2/owner.js';
+import { Owner_OwnerKind } from './proto/rtd/rpc/v2/owner.js';
+import { chunk, fromBase64, toBase64 } from '@linku/utils';
+import type { ExecutedTransaction } from './proto/rtd/rpc/v2/executed_transaction.js';
+import type { TransactionEffects } from './proto/rtd/rpc/v2/effects.js';
+import { UnchangedConsensusObject_UnchangedConsensusObjectKind } from './proto/rtd/rpc/v2/effects.js';
 import {
 	ChangedObject_IdOperation,
 	ChangedObject_InputObjectState,
 	ChangedObject_OutputObjectState,
-} from './proto/sui/rpc/v2/effects.js';
+} from './proto/rtd/rpc/v2/effects.js';
 import type { BuildTransactionOptions } from '../transactions/index.js';
 import { TransactionDataBuilder } from '../transactions/index.js';
 import { bcs } from '../bcs/index.js';
-import type { OpenSignature, OpenSignatureBody } from './proto/sui/rpc/v2/move_package.js';
+import type { OpenSignature, OpenSignatureBody } from './proto/rtd/rpc/v2/move_package.js';
 import {
 	Ability,
 	FunctionDescriptor_Visibility,
 	OpenSignature_Reference,
 	OpenSignatureBody_Type,
-} from './proto/sui/rpc/v2/move_package.js';
+} from './proto/rtd/rpc/v2/move_package.js';
 export interface GrpcCoreClientOptions extends Experimental_CoreClientOptions {
-	client: SuiGrpcClient;
+	client: RtdGrpcClient;
 }
 export class GrpcCoreClient extends Experimental_CoreClient {
-	#client: SuiGrpcClient;
+	#client: RtdGrpcClient;
 	constructor({ client, ...options }: GrpcCoreClientOptions) {
 		super(options);
 		this.#client = client;
 	}
 
 	async getObjects(
-		options: Experimental_SuiClientTypes.GetObjectsOptions,
-	): Promise<Experimental_SuiClientTypes.GetObjectsResponse> {
+		options: Experimental_RtdClientTypes.GetObjectsOptions,
+	): Promise<Experimental_RtdClientTypes.GetObjectsResponse> {
 		const batches = chunk(options.objectIds, 50);
-		const results: Experimental_SuiClientTypes.GetObjectsResponse['objects'] = [];
+		const results: Experimental_RtdClientTypes.GetObjectsResponse['objects'] = [];
 
 		for (const batch of batches) {
 			const response = await this.#client.ledgerService.batchGetObjects({
@@ -62,7 +62,7 @@ export class GrpcCoreClient extends Experimental_CoreClient {
 
 			results.push(
 				...response.response.objects.map(
-					(object): Experimental_SuiClientTypes.ObjectResponse | Error => {
+					(object): Experimental_RtdClientTypes.ObjectResponse | Error => {
 						if (object.result.oneofKind === 'error') {
 							// TODO: improve error handling
 							return new Error(object.result.error.message);
@@ -92,8 +92,8 @@ export class GrpcCoreClient extends Experimental_CoreClient {
 		};
 	}
 	async getOwnedObjects(
-		options: Experimental_SuiClientTypes.GetOwnedObjectsOptions,
-	): Promise<Experimental_SuiClientTypes.GetOwnedObjectsResponse> {
+		options: Experimental_RtdClientTypes.GetOwnedObjectsOptions,
+	): Promise<Experimental_RtdClientTypes.GetOwnedObjectsResponse> {
 		const response = await this.#client.stateService.listOwnedObjects({
 			owner: options.address,
 			objectType: options.type
@@ -114,7 +114,7 @@ export class GrpcCoreClient extends Experimental_CoreClient {
 		});
 
 		const objects = response.response.objects.map(
-			(object): Experimental_SuiClientTypes.ObjectResponse => ({
+			(object): Experimental_RtdClientTypes.ObjectResponse => ({
 				id: object.objectId!,
 				version: object.version?.toString()!,
 				digest: object.digest!,
@@ -139,8 +139,8 @@ export class GrpcCoreClient extends Experimental_CoreClient {
 		};
 	}
 	async getCoins(
-		options: Experimental_SuiClientTypes.GetCoinsOptions,
-	): Promise<Experimental_SuiClientTypes.GetCoinsResponse> {
+		options: Experimental_RtdClientTypes.GetCoinsOptions,
+	): Promise<Experimental_RtdClientTypes.GetCoinsResponse> {
 		const response = await this.#client.stateService.listOwnedObjects({
 			owner: options.address,
 			objectType: `0x2::coin::Coin<${(await this.mvr.resolveType({ type: options.coinType })).type}>`,
@@ -161,7 +161,7 @@ export class GrpcCoreClient extends Experimental_CoreClient {
 
 		return {
 			objects: response.response.objects.map(
-				(object): Experimental_SuiClientTypes.CoinResponse => ({
+				(object): Experimental_RtdClientTypes.CoinResponse => ({
 					id: object.objectId!,
 					version: object.version?.toString()!,
 					digest: object.digest!,
@@ -185,8 +185,8 @@ export class GrpcCoreClient extends Experimental_CoreClient {
 	}
 
 	async getBalance(
-		options: Experimental_SuiClientTypes.GetBalanceOptions,
-	): Promise<Experimental_SuiClientTypes.GetBalanceResponse> {
+		options: Experimental_RtdClientTypes.GetBalanceOptions,
+	): Promise<Experimental_RtdClientTypes.GetBalanceResponse> {
 		const result = await this.#client.stateService.getBalance({
 			owner: options.address,
 			coinType: (await this.mvr.resolveType({ type: options.coinType })).type,
@@ -201,8 +201,8 @@ export class GrpcCoreClient extends Experimental_CoreClient {
 	}
 
 	async getAllBalances(
-		options: Experimental_SuiClientTypes.GetAllBalancesOptions,
-	): Promise<Experimental_SuiClientTypes.GetAllBalancesResponse> {
+		options: Experimental_RtdClientTypes.GetAllBalancesOptions,
+	): Promise<Experimental_RtdClientTypes.GetAllBalancesResponse> {
 		const result = await this.#client.stateService.listBalances({
 			owner: options.address,
 			pageToken: options.cursor ? fromBase64(options.cursor) : undefined,
@@ -219,8 +219,8 @@ export class GrpcCoreClient extends Experimental_CoreClient {
 		};
 	}
 	async getTransaction(
-		options: Experimental_SuiClientTypes.GetTransactionOptions,
-	): Promise<Experimental_SuiClientTypes.GetTransactionResponse> {
+		options: Experimental_RtdClientTypes.GetTransactionOptions,
+	): Promise<Experimental_RtdClientTypes.GetTransactionResponse> {
 		const { response } = await this.#client.ledgerService.getTransaction({
 			digest: options.digest,
 			readMask: {
@@ -233,8 +233,8 @@ export class GrpcCoreClient extends Experimental_CoreClient {
 		};
 	}
 	async executeTransaction(
-		options: Experimental_SuiClientTypes.ExecuteTransactionOptions,
-	): Promise<Experimental_SuiClientTypes.ExecuteTransactionResponse> {
+		options: Experimental_RtdClientTypes.ExecuteTransactionOptions,
+	): Promise<Experimental_RtdClientTypes.ExecuteTransactionResponse> {
 		const { response } = await this.#client.transactionExecutionService.executeTransaction({
 			transaction: {
 				bcs: {
@@ -264,8 +264,8 @@ export class GrpcCoreClient extends Experimental_CoreClient {
 		};
 	}
 	async dryRunTransaction(
-		options: Experimental_SuiClientTypes.DryRunTransactionOptions,
-	): Promise<Experimental_SuiClientTypes.DryRunTransactionResponse> {
+		options: Experimental_RtdClientTypes.DryRunTransactionOptions,
+	): Promise<Experimental_RtdClientTypes.DryRunTransactionResponse> {
 		const { response } = await this.#client.transactionExecutionService.simulateTransaction({
 			transaction: {
 				bcs: {
@@ -287,7 +287,7 @@ export class GrpcCoreClient extends Experimental_CoreClient {
 			transaction: parseTransaction(response.transaction!),
 		};
 	}
-	async getReferenceGasPrice(): Promise<Experimental_SuiClientTypes.GetReferenceGasPriceResponse> {
+	async getReferenceGasPrice(): Promise<Experimental_RtdClientTypes.GetReferenceGasPriceResponse> {
 		const response = await this.#client.ledgerService.getEpoch({});
 
 		return {
@@ -296,8 +296,8 @@ export class GrpcCoreClient extends Experimental_CoreClient {
 	}
 
 	async getDynamicFields(
-		options: Experimental_SuiClientTypes.GetDynamicFieldsOptions,
-	): Promise<Experimental_SuiClientTypes.GetDynamicFieldsResponse> {
+		options: Experimental_RtdClientTypes.GetDynamicFieldsOptions,
+	): Promise<Experimental_RtdClientTypes.GetDynamicFieldsResponse> {
 		const response = await this.#client.stateService.listDynamicFields({
 			parent: options.parentId,
 			pageToken: options.cursor ? fromBase64(options.cursor) : undefined,
@@ -320,8 +320,8 @@ export class GrpcCoreClient extends Experimental_CoreClient {
 	}
 
 	async verifyZkLoginSignature(
-		options: Experimental_SuiClientTypes.VerifyZkLoginSignatureOptions,
-	): Promise<Experimental_SuiClientTypes.ZkLoginVerifyResponse> {
+		options: Experimental_RtdClientTypes.VerifyZkLoginSignatureOptions,
+	): Promise<Experimental_RtdClientTypes.ZkLoginVerifyResponse> {
 		const { response } = await this.#client.signatureVerificationService.verifySignature({
 			message: {
 				name: options.intentScope,
@@ -345,8 +345,8 @@ export class GrpcCoreClient extends Experimental_CoreClient {
 	}
 
 	async defaultNameServiceName(
-		options: Experimental_SuiClientTypes.DefaultNameServiceNameOptions,
-	): Promise<Experimental_SuiClientTypes.DefaultNameServiceNameResponse> {
+		options: Experimental_RtdClientTypes.DefaultNameServiceNameOptions,
+	): Promise<Experimental_RtdClientTypes.DefaultNameServiceNameResponse> {
 		const name =
 			(
 				await this.#client.nameService.reverseLookupName({
@@ -361,8 +361,8 @@ export class GrpcCoreClient extends Experimental_CoreClient {
 	}
 
 	async getMoveFunction(
-		options: Experimental_SuiClientTypes.GetMoveFunctionOptions,
-	): Promise<Experimental_SuiClientTypes.GetMoveFunctionResponse> {
+		options: Experimental_RtdClientTypes.GetMoveFunctionOptions,
+	): Promise<Experimental_RtdClientTypes.GetMoveFunctionResponse> {
 		const { response } = await this.#client.movePackageService.getFunction({
 			packageId: (await this.mvr.resolvePackage({ package: options.packageId })).package,
 			moduleName: options.moduleName,
@@ -410,8 +410,8 @@ export class GrpcCoreClient extends Experimental_CoreClient {
 							}) ?? [],
 					})) ?? [],
 				parameters:
-					response.function?.parameters?.map((param) => parseNormalizedSuiMoveType(param)) ?? [],
-				returns: response.function?.returns?.map((ret) => parseNormalizedSuiMoveType(ret)) ?? [],
+					response.function?.parameters?.map((param) => parseNormalizedRtdMoveType(param)) ?? [],
+				returns: response.function?.returns?.map((ret) => parseNormalizedRtdMoveType(ret)) ?? [],
 			},
 		};
 	}
@@ -436,7 +436,7 @@ export class GrpcCoreClient extends Experimental_CoreClient {
 	}
 }
 
-function mapOwner(owner: Owner | null | undefined): Experimental_SuiClientTypes.ObjectOwner | null {
+function mapOwner(owner: Owner | null | undefined): Experimental_RtdClientTypes.ObjectOwner | null {
 	if (!owner) {
 		return null;
 	}
@@ -542,7 +542,7 @@ function mapOutputObjectState(
 
 function mapUnchangedConsensusObjectKind(
 	kind: UnchangedConsensusObject_UnchangedConsensusObjectKind | undefined,
-): null | Experimental_SuiClientTypes.UnchangedConsensusObject['kind'] {
+): null | Experimental_RtdClientTypes.UnchangedConsensusObject['kind'] {
 	if (kind == null) {
 		return null;
 	}
@@ -569,13 +569,13 @@ export function parseTransactionEffects({
 	effects,
 }: {
 	effects: TransactionEffects | undefined;
-}): Experimental_SuiClientTypes.TransactionEffects | null {
+}): Experimental_RtdClientTypes.TransactionEffects | null {
 	if (!effects) {
 		return null;
 	}
 
 	const changedObjects = effects.changedObjects.map(
-		(change): Experimental_SuiClientTypes.ChangedObject => {
+		(change): Experimental_RtdClientTypes.ChangedObject => {
 			return {
 				id: change.objectId!,
 				inputState: mapInputObjectState(change.inputState)!,
@@ -629,7 +629,7 @@ export function parseTransactionEffects({
 		lamportVersion: effects.lamportVersion?.toString() ?? null,
 		changedObjects,
 		unchangedConsensusObjects: effects.unchangedConsensusObjects.map(
-			(object): Experimental_SuiClientTypes.UnchangedConsensusObject => {
+			(object): Experimental_RtdClientTypes.UnchangedConsensusObject => {
 				return {
 					kind: mapUnchangedConsensusObjectKind(object.kind)!,
 					// TODO: we are inconsistent about id vs objectId
@@ -645,7 +645,7 @@ export function parseTransactionEffects({
 
 function parseTransaction(
 	transaction: ExecutedTransaction,
-): Experimental_SuiClientTypes.TransactionResponse {
+): Experimental_RtdClientTypes.TransactionResponse {
 	const parsedTx = bcs.SenderSignedData.parse(transaction.transaction?.bcs?.value!)[0];
 	const bytes = bcs.TransactionData.serialize(parsedTx.intentMessage.value).toBytes();
 	const data = TransactionDataBuilder.restore({
@@ -692,9 +692,9 @@ function parseTransaction(
 	};
 }
 
-function parseNormalizedSuiMoveType(
+function parseNormalizedRtdMoveType(
 	type: OpenSignature,
-): Experimental_SuiClientTypes.OpenSignature {
+): Experimental_RtdClientTypes.OpenSignature {
 	let reference: 'mutable' | 'immutable' | null = null;
 
 	if (type.reference === OpenSignature_Reference.IMMUTABLE) {
@@ -705,13 +705,13 @@ function parseNormalizedSuiMoveType(
 
 	return {
 		reference,
-		body: parseNormalizedSuiMoveTypeBody(type.body!),
+		body: parseNormalizedRtdMoveTypeBody(type.body!),
 	};
 }
 
-function parseNormalizedSuiMoveTypeBody(
+function parseNormalizedRtdMoveTypeBody(
 	type: OpenSignatureBody,
-): Experimental_SuiClientTypes.OpenSignatureBody {
+): Experimental_RtdClientTypes.OpenSignatureBody {
 	switch (type.type) {
 		case OpenSignatureBody_Type.TYPE_UNKNOWN:
 			return { $kind: 'unknown' };
@@ -734,7 +734,7 @@ function parseNormalizedSuiMoveTypeBody(
 		case OpenSignatureBody_Type.VECTOR:
 			return {
 				$kind: 'vector',
-				vector: parseNormalizedSuiMoveTypeBody(type.typeParameterInstantiation[0]),
+				vector: parseNormalizedRtdMoveTypeBody(type.typeParameterInstantiation[0]),
 			};
 		case OpenSignatureBody_Type.DATATYPE:
 			return {
@@ -742,7 +742,7 @@ function parseNormalizedSuiMoveTypeBody(
 				datatype: {
 					typeName: type.typeName!,
 					typeParameters: type.typeParameterInstantiation.map((t) =>
-						parseNormalizedSuiMoveTypeBody(t),
+						parseNormalizedRtdMoveTypeBody(t),
 					),
 				},
 			};

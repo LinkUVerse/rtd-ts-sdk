@@ -1,4 +1,4 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 /*
@@ -11,7 +11,7 @@
  * @property {BcsReader}
  */
 
-import { toBase58, fromBase58, toBase64, fromBase64, toHex, fromHex } from '@mysten/utils';
+import { toBase58, fromBase58, toBase64, fromBase64, toHex, fromHex } from '@linku/utils';
 import type { BcsTypeOptions } from './bcs-type.js';
 import {
 	BcsType,

@@ -1,4 +1,4 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -7,10 +7,10 @@ import { Transaction, TransactionResult } from '../../src/transactions';
 import { Commands } from '../../src/transactions/Commands';
 import type { TransactionDataBuilder } from '../../src/transactions/TransactionData';
 import type { BuildTransactionOptions } from '../../src/transactions/resolve';
-import { normalizeSuiObjectId } from '../../src/utils';
+import { normalizeRtdObjectId } from '../../src/utils';
 import { publishPackage, setup, TestToolbox } from './utils/setup';
 
-export const SUI_CLOCK_OBJECT_ID = normalizeSuiObjectId('0x6');
+export const RTD_CLOCK_OBJECT_ID = normalizeRtdObjectId('0x6');
 
 describe('TransactionData.insertTransaction', () => {
 	let toolbox: TestToolbox;
@@ -67,14 +67,14 @@ describe('TransactionData.insertTransaction', () => {
 		// Call use_clock in main transaction
 		mainTx.moveCall({
 			target: `${packageId}::serializer_tests::use_clock`,
-			arguments: [mainTx.object(SUI_CLOCK_OBJECT_ID)],
+			arguments: [mainTx.object(RTD_CLOCK_OBJECT_ID)],
 		});
 
 		// Create replacement transaction that ALSO uses the same clock
 		const replacementTx = new Transaction();
 		replacementTx.moveCall({
 			target: `${packageId}::serializer_tests::use_clock`,
-			arguments: [replacementTx.object(SUI_CLOCK_OBJECT_ID)],
+			arguments: [replacementTx.object(RTD_CLOCK_OBJECT_ID)],
 		});
 
 		await replacementTx.prepareForSerialization({});
@@ -92,7 +92,7 @@ describe('TransactionData.insertTransaction', () => {
 		// Add another call after the merge that uses clock again
 		mainTx.moveCall({
 			target: `${packageId}::serializer_tests::use_clock`,
-			arguments: [mainTx.object(SUI_CLOCK_OBJECT_ID)],
+			arguments: [mainTx.object(RTD_CLOCK_OBJECT_ID)],
 		});
 
 		// Execute the merged transaction - should work with deduplicated clock input

@@ -1,4 +1,4 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -21,6 +21,6 @@ describe('Test Coin Metadata', () => {
 		expect(coinMetadata.decimals).to.equal(2);
 		expect(coinMetadata.name).to.equal('Test Coin');
 		expect(coinMetadata.description).to.equal('Test coin metadata');
-		expect(coinMetadata.iconUrl).to.equal('http://sui.io');
+		expect(coinMetadata.iconUrl).to.equal('http://rtd.life');
 	});
 });

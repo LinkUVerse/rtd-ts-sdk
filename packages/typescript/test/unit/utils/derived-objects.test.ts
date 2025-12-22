@@ -1,4 +1,4 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from 'vitest';
@@ -7,7 +7,7 @@ import { bcs, TypeTagSerializer } from '../../../src/bcs';
 import { deriveObjectID } from '../../../src/utils/derived-objects';
 
 // Snapshots are recreated from `derived_object_tests.move` file,
-// as well as `sui-types/derived-object.rs` file.
+// as well as `rtd-types/derived-object.rs` file.
 describe('derived object test utils', () => {
 	test('deriveObjectID with primitive type', () => {
 		const key = bcs.byteVector().serialize(new TextEncoder().encode('foo')).toBytes();

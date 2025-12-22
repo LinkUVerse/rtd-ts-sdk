@@ -1,4 +1,4 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 export { PasskeyKeypair, BrowserPasskeyProvider, findCommonPublicKey } from './keypair.js';
 export type { PasskeyProvider, BrowserPasswordProviderOptions } from './keypair.js';

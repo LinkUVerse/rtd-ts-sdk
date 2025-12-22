@@ -1,10 +1,10 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 export {
-	requestSuiFromFaucetV0,
-	requestSuiFromFaucetV1,
-	requestSuiFromFaucetV2,
+	requestRtdFromFaucetV0,
+	requestRtdFromFaucetV1,
+	requestRtdFromFaucetV2,
 	getFaucetRequestStatus,
 	getFaucetHost,
 	FaucetRateLimitError,

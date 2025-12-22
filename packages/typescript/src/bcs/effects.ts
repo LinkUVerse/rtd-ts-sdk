@@ -1,9 +1,9 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { bcs } from '@mysten/bcs';
+import { bcs } from '@linku/bcs';
 
-import { Address, ObjectDigest, Owner, SuiObjectRef } from './bcs.js';
+import { Address, ObjectDigest, Owner, RtdObjectRef } from './bcs.js';
 
 const PackageUpgradeError = bcs.enum('PackageUpgradeError', {
 	UnableToFetchPackage: bcs.struct('UnableToFetchPackage', { packageId: Address }),
@@ -68,7 +68,7 @@ const ExecutionFailureStatus = bcs.enum('ExecutionFailureStatus', {
 	InsufficientCoinBalance: null,
 	CoinBalanceOverflow: null,
 	PublishErrorNonZeroAddress: null,
-	SuiMoveVerificationError: null,
+	RtdMoveVerificationError: null,
 	MovePrimitiveRuntimeError: bcs.option(MoveLocation),
 	MoveAbort: bcs.tuple([MoveLocation, bcs.u64()]),
 	VMVerificationOrDeserializationError: null,
@@ -102,7 +102,7 @@ const ExecutionFailureStatus = bcs.enum('ExecutionFailureStatus', {
 		maxSize: bcs.u64(),
 	}),
 	CertificateDenied: null,
-	SuiMoveVerificationTimedout: null,
+	RtdMoveVerificationTimedout: null,
 	SharedObjectOperationNotAllowed: null,
 	InputObjectDeleted: null,
 	ExecutionCancelledDueToSharedObjectCongestion: bcs.struct(
@@ -139,15 +139,15 @@ const TransactionEffectsV1 = bcs.struct('TransactionEffectsV1', {
 	executedEpoch: bcs.u64(),
 	gasUsed: GasCostSummary,
 	modifiedAtVersions: bcs.vector(bcs.tuple([Address, bcs.u64()])),
-	sharedObjects: bcs.vector(SuiObjectRef),
+	sharedObjects: bcs.vector(RtdObjectRef),
 	transactionDigest: ObjectDigest,
-	created: bcs.vector(bcs.tuple([SuiObjectRef, Owner])),
-	mutated: bcs.vector(bcs.tuple([SuiObjectRef, Owner])),
-	unwrapped: bcs.vector(bcs.tuple([SuiObjectRef, Owner])),
-	deleted: bcs.vector(SuiObjectRef),
-	unwrappedThenDeleted: bcs.vector(SuiObjectRef),
-	wrapped: bcs.vector(SuiObjectRef),
-	gasObject: bcs.tuple([SuiObjectRef, Owner]),
+	created: bcs.vector(bcs.tuple([RtdObjectRef, Owner])),
+	mutated: bcs.vector(bcs.tuple([RtdObjectRef, Owner])),
+	unwrapped: bcs.vector(bcs.tuple([RtdObjectRef, Owner])),
+	deleted: bcs.vector(RtdObjectRef),
+	unwrappedThenDeleted: bcs.vector(RtdObjectRef),
+	wrapped: bcs.vector(RtdObjectRef),
+	gasObject: bcs.tuple([RtdObjectRef, Owner]),
 	eventsDigest: bcs.option(ObjectDigest),
 	dependencies: bcs.vector(ObjectDigest),
 });

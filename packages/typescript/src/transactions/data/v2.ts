@@ -1,7 +1,7 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import type { EnumInputShape } from '@mysten/bcs';
+import type { EnumInputShape } from '@linku/bcs';
 import type { GenericSchema, InferInput, InferOutput } from 'valibot';
 import {
 	array,
@@ -21,8 +21,8 @@ import {
 	unknown,
 } from 'valibot';
 
-import { BCSBytes, JsonU64, ObjectID, ObjectRefSchema, SuiAddress } from './internal.js';
-import type { Simplify } from '@mysten/utils';
+import { BCSBytes, JsonU64, ObjectID, ObjectRefSchema, RtdAddress } from './internal.js';
+import type { Simplify } from '@linku/utils';
 
 function enumUnion<T extends Record<string, GenericSchema<any>>>(options: T) {
 	return union(
@@ -36,7 +36,7 @@ function enumUnion<T extends Record<string, GenericSchema<any>>>(options: T) {
 	>;
 }
 
-// https://github.com/MystenLabs/sui/blob/df41d5fa8127634ff4285671a01ead00e519f806/crates/sui-types/src/transaction.rs#L690-L702
+// https://github.com/LinkUVerse/rtd/blob/df41d5fa8127634ff4285671a01ead00e519f806/crates/rtd-types/src/transaction.rs#L690-L702
 const Argument = enumUnion({
 	GasCoin: literal(true),
 	Input: pipe(number(), integer()),
@@ -44,15 +44,15 @@ const Argument = enumUnion({
 	NestedResult: tuple([pipe(number(), integer()), pipe(number(), integer())]),
 });
 
-// https://github.com/MystenLabs/sui/blob/df41d5fa8127634ff4285671a01ead00e519f806/crates/sui-types/src/transaction.rs#L1387-L1392
+// https://github.com/LinkUVerse/rtd/blob/df41d5fa8127634ff4285671a01ead00e519f806/crates/rtd-types/src/transaction.rs#L1387-L1392
 const GasData = object({
 	budget: nullable(JsonU64),
 	price: nullable(JsonU64),
-	owner: nullable(SuiAddress),
+	owner: nullable(RtdAddress),
 	payment: nullable(array(ObjectRefSchema)),
 });
 
-// https://github.com/MystenLabs/sui/blob/df41d5fa8127634ff4285671a01ead00e519f806/crates/sui-types/src/transaction.rs#L707-L718
+// https://github.com/LinkUVerse/rtd/blob/df41d5fa8127634ff4285671a01ead00e519f806/crates/rtd-types/src/transaction.rs#L707-L718
 const ProgrammableMoveCall = object({
 	package: ObjectID,
 	module: string(),
@@ -68,7 +68,7 @@ const $Intent = object({
 	data: record(string(), unknown()),
 });
 
-// https://github.com/MystenLabs/sui/blob/df41d5fa8127634ff4285671a01ead00e519f806/crates/sui-types/src/transaction.rs#L657-L685
+// https://github.com/LinkUVerse/rtd/blob/df41d5fa8127634ff4285671a01ead00e519f806/crates/rtd-types/src/transaction.rs#L657-L685
 const Command = enumUnion({
 	MoveCall: ProgrammableMoveCall,
 	TransferObjects: object({
@@ -100,7 +100,7 @@ const Command = enumUnion({
 	$Intent,
 });
 
-// https://github.com/MystenLabs/sui/blob/df41d5fa8127634ff4285671a01ead00e519f806/crates/sui-types/src/transaction.rs#L102-L114
+// https://github.com/LinkUVerse/rtd/blob/df41d5fa8127634ff4285671a01ead00e519f806/crates/rtd-types/src/transaction.rs#L102-L114
 const ObjectArg = enumUnion({
 	ImmOrOwnedObject: ObjectRefSchema,
 	SharedObject: object({
@@ -112,7 +112,7 @@ const ObjectArg = enumUnion({
 	Receiving: ObjectRefSchema,
 });
 
-// https://github.com/MystenLabs/sui/blob/df41d5fa8127634ff4285671a01ead00e519f806/crates/sui-types/src/transaction.rs#L75-L80
+// https://github.com/LinkUVerse/rtd/blob/df41d5fa8127634ff4285671a01ead00e519f806/crates/rtd-types/src/transaction.rs#L75-L80
 const CallArg = enumUnion({
 	Object: ObjectArg,
 	Pure: object({
@@ -137,7 +137,7 @@ const TransactionExpiration = enumUnion({
 
 export const SerializedTransactionDataV2Schema = object({
 	version: literal(2),
-	sender: nullish(SuiAddress),
+	sender: nullish(RtdAddress),
 	expiration: nullish(TransactionExpiration),
 	gasData: GasData,
 	inputs: array(CallArg),

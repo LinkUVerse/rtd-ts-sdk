@@ -1,14 +1,14 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 import type {
 	Checkpoint,
 	DynamicFieldInfo,
-	SuiCallArg,
-	SuiMoveNormalizedModule,
-	SuiParsedData,
-	SuiTransaction,
-	SuiValidatorSummary,
+	RtdCallArg,
+	RtdMoveNormalizedModule,
+	RtdParsedData,
+	RtdTransaction,
+	RtdValidatorSummary,
 } from './generated.js';
 
 export type ResolvedNameServiceNames = {
@@ -19,7 +19,7 @@ export type ResolvedNameServiceNames = {
 
 export type EpochInfo = {
 	epoch: string;
-	validators: SuiValidatorSummary[];
+	validators: RtdValidatorSummary[];
 	epochTotalTransactions: string;
 	firstCheckpointId: string;
 	epochStartTimestamp: string;
@@ -111,12 +111,12 @@ export type DynamicFieldPage = {
 	hasNextPage: boolean;
 };
 
-export type SuiMoveNormalizedModules = Record<string, SuiMoveNormalizedModule>;
+export type RtdMoveNormalizedModules = Record<string, RtdMoveNormalizedModule>;
 
-export type SuiMoveObject = Extract<SuiParsedData, { dataType: 'moveObject' }>;
-export type SuiMovePackage = Extract<SuiParsedData, { dataType: 'package' }>;
+export type RtdMoveObject = Extract<RtdParsedData, { dataType: 'moveObject' }>;
+export type RtdMovePackage = Extract<RtdParsedData, { dataType: 'package' }>;
 
 export type ProgrammableTransaction = {
-	transactions: SuiTransaction[];
-	inputs: SuiCallArg[];
+	transactions: RtdTransaction[];
+	inputs: RtdCallArg[];
 };

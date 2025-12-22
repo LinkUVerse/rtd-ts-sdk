@@ -1,7 +1,7 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { bcs } from '@mysten/bcs';
+import { bcs } from '@linku/bcs';
 import { describe, expect, test } from 'vitest';
 
 import { Transaction } from '../../../src/transactions';

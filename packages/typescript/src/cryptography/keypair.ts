@@ -1,7 +1,7 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { bcs, toBase64 } from '@mysten/bcs';
+import { bcs, toBase64 } from '@linku/bcs';
 import { blake2b } from '@noble/hashes/blake2b';
 import { bech32 } from '@scure/base';
 
@@ -12,11 +12,11 @@ import { SIGNATURE_FLAG_TO_SCHEME, SIGNATURE_SCHEME_TO_FLAG } from './signature-
 import type { SignatureScheme } from './signature-scheme.js';
 import { toSerializedSignature } from './signature.js';
 import type { Transaction } from '../transactions/Transaction.js';
-import type { ClientWithCoreApi, Experimental_SuiClientTypes } from '../experimental/index.js';
+import type { ClientWithCoreApi, Experimental_RtdClientTypes } from '../experimental/index.js';
 
 export const PRIVATE_KEY_SIZE = 32;
 export const LEGACY_PRIVATE_KEY_SIZE = 64;
-export const SUI_PRIVATE_KEY_PREFIX = 'suiprivkey';
+export const RTD_PRIVATE_KEY_PREFIX = 'rtdprivkey';
 
 export type ParsedKeypair = {
 	scheme: SignatureScheme;
@@ -84,7 +84,7 @@ export abstract class Signer {
 		transaction,
 		client,
 	}: SignAndExecuteOptions): Promise<
-		Omit<Experimental_SuiClientTypes.TransactionResponse, 'balanceChanges'>
+		Omit<Experimental_RtdClientTypes.TransactionResponse, 'balanceChanges'>
 	> {
 		const bytes = await transaction.build({ client });
 		const { signature } = await this.signTransaction(bytes);
@@ -96,8 +96,8 @@ export abstract class Signer {
 		return response.transaction;
 	}
 
-	toSuiAddress(): string {
-		return this.getPublicKey().toSuiAddress();
+	toRtdAddress(): string {
+		return this.getPublicKey().toRtdAddress();
 	}
 
 	/**
@@ -120,12 +120,12 @@ export abstract class Keypair extends Signer {
 
 /**
  * This returns an ParsedKeypair object based by validating the
- * 33-byte Bech32 encoded string starting with `suiprivkey`, and
+ * 33-byte Bech32 encoded string starting with `rtdprivkey`, and
  * parse out the signature scheme and the private key in bytes.
  */
-export function decodeSuiPrivateKey(value: string): ParsedKeypair {
+export function decodeRtdPrivateKey(value: string): ParsedKeypair {
 	const { prefix, words } = bech32.decode(value as `${string}1${string}`);
-	if (prefix !== SUI_PRIVATE_KEY_PREFIX) {
+	if (prefix !== RTD_PRIVATE_KEY_PREFIX) {
 		throw new Error('invalid private key prefix');
 	}
 	const extendedSecretKey = new Uint8Array(bech32.fromWords(words));
@@ -141,11 +141,11 @@ export function decodeSuiPrivateKey(value: string): ParsedKeypair {
 }
 
 /**
- * This returns a Bech32 encoded string starting with `suiprivkey`,
+ * This returns a Bech32 encoded string starting with `rtdprivkey`,
  * encoding 33-byte `flag || bytes` for the given the 32-byte private
  * key and its signature scheme.
  */
-export function encodeSuiPrivateKey(bytes: Uint8Array, scheme: SignatureScheme): string {
+export function encodeRtdPrivateKey(bytes: Uint8Array, scheme: SignatureScheme): string {
 	if (bytes.length !== PRIVATE_KEY_SIZE) {
 		throw new Error('Invalid bytes length');
 	}
@@ -153,5 +153,5 @@ export function encodeSuiPrivateKey(bytes: Uint8Array, scheme: SignatureScheme):
 	const privKeyBytes = new Uint8Array(bytes.length + 1);
 	privKeyBytes.set([flag]);
 	privKeyBytes.set(bytes, 1);
-	return bech32.encode(SUI_PRIVATE_KEY_PREFIX, bech32.toWords(privKeyBytes));
+	return bech32.encode(RTD_PRIVATE_KEY_PREFIX, bech32.toWords(privKeyBytes));
 }

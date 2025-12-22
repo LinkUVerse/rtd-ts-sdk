@@ -1,35 +1,35 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 import type { GrpcWebOptions } from '@protobuf-ts/grpcweb-transport';
 import { GrpcWebFetchTransport } from '@protobuf-ts/grpcweb-transport';
-import { TransactionExecutionServiceClient } from './proto/sui/rpc/v2/transaction_execution_service.client.js';
-import { LedgerServiceClient } from './proto/sui/rpc/v2/ledger_service.client.js';
-import { MovePackageServiceClient } from './proto/sui/rpc/v2/move_package_service.client.js';
-import { SignatureVerificationServiceClient } from './proto/sui/rpc/v2/signature_verification_service.client.js';
+import { TransactionExecutionServiceClient } from './proto/rtd/rpc/v2/transaction_execution_service.client.js';
+import { LedgerServiceClient } from './proto/rtd/rpc/v2/ledger_service.client.js';
+import { MovePackageServiceClient } from './proto/rtd/rpc/v2/move_package_service.client.js';
+import { SignatureVerificationServiceClient } from './proto/rtd/rpc/v2/signature_verification_service.client.js';
 import type { RpcTransport } from '@protobuf-ts/runtime-rpc';
-import { StateServiceClient } from './proto/sui/rpc/v2/state_service.client.js';
-import { SubscriptionServiceClient } from './proto/sui/rpc/v2/subscription_service.client.js';
+import { StateServiceClient } from './proto/rtd/rpc/v2/state_service.client.js';
+import { SubscriptionServiceClient } from './proto/rtd/rpc/v2/subscription_service.client.js';
 import { GrpcCoreClient } from './core.js';
-import type { Experimental_SuiClientTypes } from '../experimental/index.js';
+import type { Experimental_RtdClientTypes } from '../experimental/index.js';
 import { Experimental_BaseClient } from '../experimental/index.js';
-import { NameServiceClient } from './proto/sui/rpc/v2/name_service.client.js';
+import { NameServiceClient } from './proto/rtd/rpc/v2/name_service.client.js';
 
-interface SuiGrpcTransportOptions extends GrpcWebOptions {
+interface RtdGrpcTransportOptions extends GrpcWebOptions {
 	transport?: never;
 }
 
-export type SuiGrpcClientOptions = {
-	network: Experimental_SuiClientTypes.Network;
-	mvr?: Experimental_SuiClientTypes.MvrOptions;
+export type RtdGrpcClientOptions = {
+	network: Experimental_RtdClientTypes.Network;
+	mvr?: Experimental_RtdClientTypes.MvrOptions;
 } & (
 	| {
 			transport: RpcTransport;
 	  }
-	| SuiGrpcTransportOptions
+	| RtdGrpcTransportOptions
 );
 
-export class SuiGrpcClient extends Experimental_BaseClient {
+export class RtdGrpcClient extends Experimental_BaseClient {
 	core: GrpcCoreClient;
 	transactionExecutionService: TransactionExecutionServiceClient;
 	ledgerService: LedgerServiceClient;
@@ -39,7 +39,7 @@ export class SuiGrpcClient extends Experimental_BaseClient {
 	signatureVerificationService: SignatureVerificationServiceClient;
 	nameService: NameServiceClient;
 
-	constructor(options: SuiGrpcClientOptions) {
+	constructor(options: RtdGrpcClientOptions) {
 		super({ network: options.network });
 		const transport =
 			options.transport ??

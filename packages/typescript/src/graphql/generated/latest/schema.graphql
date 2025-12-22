@@ -78,7 +78,7 @@ type Address implements IAddressable {
 	"""
 	asObject: Object
 	"""
-	Fetch the total balance for coins with marker type `coinType` (e.g. `0x2::sui::SUI`), owned by this address.
+	Fetch the total balance for coins with marker type `coinType` (e.g. `0x2::rtd::RTD`), owned by this address.
 	
 	Returns `None` when no checkpoint is set in scope (e.g. execution scope).
 	If the address does not own any coins of that type, a balance of zero is returned.
@@ -111,7 +111,7 @@ type Address implements IAddressable {
 	"""
 	dynamicObjectField(name: DynamicFieldName!): DynamicField
 	"""
-	Fetch the total balances keyed by coin types (e.g. `0x2::sui::SUI`) owned by this address.
+	Fetch the total balances keyed by coin types (e.g. `0x2::rtd::RTD`) owned by this address.
 	
 	Returns `None` when no checkpoint is set in scope (e.g. execution scope).
 	If the address does not own any coins of a given type, a balance of zero is returned for that type.
@@ -213,7 +213,7 @@ The total balance for a particular coin type.
 """
 type Balance {
 	"""
-	Coin type for the balance, such as `0x2::sui::SUI`.
+	Coin type for the balance, such as `0x2::rtd::RTD`.
 	"""
 	coinType: MoveType
 	"""
@@ -231,7 +231,7 @@ type BalanceChange {
 	"""
 	amount: BigInt
 	"""
-	The inner type of the coin whose balance has changed (e.g. `0x2::sui::SUI`).
+	The inner type of the coin whose balance has changed (e.g. `0x2::rtd::RTD`).
 	"""
 	coinType: MoveType
 	"""
@@ -500,7 +500,7 @@ type CoinMetadata implements IAddressable & IMoveObject & IObject {
 	"""
 	allowGlobalPause: Boolean
 	"""
-	Fetch the total balance for coins with marker type `coinType` (e.g. `0x2::sui::SUI`), owned by this address.
+	Fetch the total balance for coins with marker type `coinType` (e.g. `0x2::rtd::RTD`), owned by this address.
 	
 	If the address does not own any coins of that type, a balance of zero is returned.
 	"""
@@ -566,7 +566,7 @@ type CoinMetadata implements IAddressable & IMoveObject & IObject {
 	"""
 	moveObjectBcs: Base64
 	"""
-	Fetch the total balances keyed by coin types (e.g. `0x2::sui::SUI`) owned by this address.
+	Fetch the total balances keyed by coin types (e.g. `0x2::rtd::RTD`) owned by this address.
 	
 	If the address does not own any coins of a given type, a balance of zero is returned for that type.
 	"""
@@ -853,7 +853,7 @@ type DynamicField implements IAddressable & IMoveObject & IObject {
 	"""
 	address: SuiAddress!
 	"""
-	Fetch the total balance for coins with marker type `coinType` (e.g. `0x2::sui::SUI`), owned by this address.
+	Fetch the total balance for coins with marker type `coinType` (e.g. `0x2::rtd::RTD`), owned by this address.
 	
 	If the address does not own any coins of that type, a balance of zero is returned.
 	"""
@@ -903,7 +903,7 @@ type DynamicField implements IAddressable & IMoveObject & IObject {
 	"""
 	moveObjectBcs: Base64
 	"""
-	Fetch the total balances keyed by coin types (e.g. `0x2::sui::SUI`) owned by this address.
+	Fetch the total balances keyed by coin types (e.g. `0x2::rtd::RTD`) owned by this address.
 	
 	If the address does not own any coins of a given type, a balance of zero is returned for that type.
 	"""
@@ -1146,7 +1146,7 @@ type Epoch {
 	"""
 	systemStakeSubsidy: StakeSubsidy
 	"""
-	The value of the `version` field of `0x5`, the `0x3::sui::SuiSystemState` object.
+	The value of the `version` field of `0x5`, the `0x3::rtd::SuiSystemState` object.
 	This version changes whenever the fields contained in the system state object (held in a dynamic field attached to `0x5`) change.
 	"""
 	systemStateVersion: UInt53
@@ -1303,7 +1303,7 @@ input EventFilter {
 	
 	Events can be filtered by their type's package, package::module, or their fully qualified type name.
 	
-	Generic types can be queried by either the generic type name, e.g. `0x2::coin::Coin`, or by the full type name, such as `0x2::coin::Coin<0x2::sui::SUI>`.
+	Generic types can be queried by either the generic type name, e.g. `0x2::coin::Coin`, or by the full type name, such as `0x2::coin::Coin<0x2::rtd::RTD>`.
 	"""
 	type: String
 }
@@ -1483,7 +1483,7 @@ An address uniquely represents either the public key of an account, or an object
 interface IAddressable {
 	address: SuiAddress!
 	"""
-	Fetch the total balance for coins with marker type `coinType` (e.g. `0x2::sui::SUI`), owned by this address.
+	Fetch the total balance for coins with marker type `coinType` (e.g. `0x2::rtd::RTD`), owned by this address.
 	
 	If the address does not own any coins of that type, a balance of zero is returned.
 	"""
@@ -1497,7 +1497,7 @@ interface IAddressable {
 	"""
 	defaultSuinsName: String
 	"""
-	Fetch the total balances keyed by coin types (e.g. `0x2::sui::SUI`) owned by this address.
+	Fetch the total balances keyed by coin types (e.g. `0x2::rtd::RTD`) owned by this address.
 	
 	Returns `null` when no checkpoint is set in scope (e.g. execution scope). If the address does not own any coins of a given type, a balance of zero is returned for that type.
 	"""
@@ -2077,7 +2077,7 @@ type MoveObject implements IAddressable & IMoveObject & IObject {
 	"""
 	asDynamicField: DynamicField
 	"""
-	Fetch the total balance for coins with marker type `coinType` (e.g. `0x2::sui::SUI`), owned by this address.
+	Fetch the total balance for coins with marker type `coinType` (e.g. `0x2::rtd::RTD`), owned by this address.
 	
 	If the address does not own any coins of that type, a balance of zero is returned.
 	"""
@@ -2127,7 +2127,7 @@ type MoveObject implements IAddressable & IMoveObject & IObject {
 	"""
 	moveObjectBcs: Base64
 	"""
-	Fetch the total balances keyed by coin types (e.g. `0x2::sui::SUI`) owned by this address.
+	Fetch the total balances keyed by coin types (e.g. `0x2::rtd::RTD`) owned by this address.
 	
 	If the address does not own any coins of a given type, a balance of zero is returned for that type.
 	"""
@@ -2226,7 +2226,7 @@ type MovePackage implements IAddressable & IObject {
 	"""
 	address: SuiAddress!
 	"""
-	Fetch the total balance for coins with marker type `coinType` (e.g. `0x2::sui::SUI`), owned by this address.
+	Fetch the total balance for coins with marker type `coinType` (e.g. `0x2::rtd::RTD`), owned by this address.
 	
 	If the address does not own any coins of that type, a balance of zero is returned.
 	"""
@@ -2260,7 +2260,7 @@ type MovePackage implements IAddressable & IObject {
 	"""
 	modules(first: Int, after: String, last: Int, before: String): MoveModuleConnection
 	"""
-	Fetch the total balances keyed by coin types (e.g. `0x2::sui::SUI`) owned by this address.
+	Fetch the total balances keyed by coin types (e.g. `0x2::rtd::RTD`) owned by this address.
 	
 	If the address does not own any coins of a given type, a balance of zero is returned for that type.
 	"""
@@ -2587,7 +2587,7 @@ type Object implements IAddressable & IObject {
 	"""
 	asMovePackage: MovePackage
 	"""
-	Fetch the total balance for coins with marker type `coinType` (e.g. `0x2::sui::SUI`), owned by this address.
+	Fetch the total balance for coins with marker type `coinType` (e.g. `0x2::rtd::RTD`), owned by this address.
 	
 	If the address does not own any coins of that type, a balance of zero is returned.
 	"""
@@ -2621,7 +2621,7 @@ type Object implements IAddressable & IObject {
 	"""
 	dynamicObjectField(name: DynamicFieldName!): DynamicField
 	"""
-	Fetch the total balances keyed by coin types (e.g. `0x2::sui::SUI`) owned by this address.
+	Fetch the total balances keyed by coin types (e.g. `0x2::rtd::RTD`) owned by this address.
 	
 	Returns `None` when no checkpoint is set in scope (e.g. execution scope).
 	If the address does not own any coins of a given type, a balance of zero is returned for that type.
@@ -2793,7 +2793,7 @@ input ObjectFilter {
 	- A package address: `0x2`,
 	- A module: `0x2::coin`,
 	- A fully-qualified name: `0x2::coin::Coin`,
-	- A type instantiation: `0x2::coin::Coin<0x2::sui::SUI>`.
+	- A type instantiation: `0x2::coin::Coin<0x2::rtd::RTD>`.
 	"""
 	type: String
 }
@@ -4029,7 +4029,7 @@ type Validator implements IAddressable {
 	"""
 	atRisk: UInt53
 	"""
-	Fetch the total balance for coins with marker type `coinType` (e.g. `0x2::sui::SUI`), owned by this address.
+	Fetch the total balance for coins with marker type `coinType` (e.g. `0x2::rtd::RTD`), owned by this address.
 	
 	If the address does not own any coins of that type, a balance of zero is returned.
 	"""
@@ -4072,7 +4072,7 @@ type Validator implements IAddressable {
 	"""
 	imageUrl: String
 	"""
-	Fetch the total balances keyed by coin types (e.g. `0x2::sui::SUI`) owned by this address.
+	Fetch the total balances keyed by coin types (e.g. `0x2::rtd::RTD`) owned by this address.
 	
 	Returns `None` when no checkpoint is set in scope (e.g. execution scope).
 	If the address does not own any coins of a given type, a balance of zero is returned for that type.

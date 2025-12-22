@@ -1,7 +1,7 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { toBase64 } from '@mysten/bcs';
+import { toBase64 } from '@linku/bcs';
 import { secp256r1 } from '@noble/curves/p256';
 import { blake2b } from '@noble/hashes/blake2b';
 import { sha256 } from '@noble/hashes/sha256';
@@ -67,7 +67,7 @@ export class BrowserPasskeyProvider implements PasskeyProvider {
 					...this.#options.user,
 					id: randomBytes(10) as BufferSource,
 				},
-				challenge: new TextEncoder().encode('Create passkey wallet on Sui'),
+				challenge: new TextEncoder().encode('Create passkey wallet on Rtd'),
 				pubKeyCredParams: [{ alg: -7, type: 'public-key' }],
 				authenticatorSelection: {
 					authenticatorAttachment: 'cross-platform',
@@ -93,7 +93,7 @@ export class BrowserPasskeyProvider implements PasskeyProvider {
 
 /**
  * @experimental
- * A passkey signer used for signing transactions. This is a client side implementation for [SIP-9](https://github.com/sui-foundation/sips/blob/main/sips/sip-9.md).
+ * A passkey signer used for signing transactions. This is a client side implementation for [SIP-9](https://github.com/rtd-foundation/sips/blob/main/sips/sip-9.md).
  */
 export class PasskeyKeypair extends Signer {
 	private publicKey: Uint8Array;
@@ -110,8 +110,8 @@ export class PasskeyKeypair extends Signer {
 	 * Creates an instance of Passkey signer. If no passkey wallet had created before,
 	 * use `getPasskeyInstance`. For example:
 	 * ```
-	 * let provider = new BrowserPasskeyProvider('Sui Passkey Example',{
-	 * 	  rpName: 'Sui Passkey Example',
+	 * let provider = new BrowserPasskeyProvider('Rtd Passkey Example',{
+	 * 	  rpName: 'Rtd Passkey Example',
 	 * 	  rpId: window.location.hostname,
 	 * } as BrowserPasswordProviderOptions);
 	 * const signer = await PasskeyKeypair.getPasskeyInstance(provider);
@@ -187,7 +187,7 @@ export class PasskeyKeypair extends Signer {
 		arr.set(normalized, 1);
 		arr.set(this.publicKey, 1 + normalized.length);
 
-		// serialize all fields into a passkey signature according to https://github.com/sui-foundation/sips/blob/main/sips/sip-9.md#signature-encoding
+		// serialize all fields into a passkey signature according to https://github.com/rtd-foundation/sips/blob/main/sips/sip-9.md#signature-encoding
 		return PasskeyAuthenticator.serialize({
 			authenticatorData: authenticatorData,
 			clientDataJson: clientDataJSONString,
@@ -233,8 +233,8 @@ export class PasskeyKeypair extends Signer {
 	 *
 	 * Example usage to recover wallet with two signing calls:
 	 * ```
-	 * let provider = new BrowserPasskeyProvider('Sui Passkey Example',{
-	 *     rpName: 'Sui Passkey Example',
+	 * let provider = new BrowserPasskeyProvider('Rtd Passkey Example',{
+	 *     rpName: 'Rtd Passkey Example',
 	 * 	   rpId: window.location.hostname,
 	 * } as BrowserPasswordProviderOptions);
 	 * const testMessage = new TextEncoder().encode('Hello world!');

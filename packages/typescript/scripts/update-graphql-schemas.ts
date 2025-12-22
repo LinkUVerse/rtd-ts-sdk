@@ -1,4 +1,4 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 import { execSync } from 'child_process';
@@ -6,13 +6,13 @@ import { readFile } from 'fs/promises';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
-const result = execSync(`git ls-remote -h git@github.com:MystenLabs/sui.git`)
+const result = execSync(`git ls-remote -h git@github.com:LinkUVerse/rtd.git`)
 	.toString()
 	.trim()
 	.split('\n')
 	.map((ref) => {
 		const branch = ref.trim().split('refs/heads/')[1];
-		const match = branch?.match(/^releases\/sui-graphql-rpc-v([\d.]+)-release$/);
+		const match = branch?.match(/^releases\/rtd-graphql-rpc-v([\d.]+)-release$/);
 
 		if (!match) {
 			return null;
@@ -29,7 +29,7 @@ const result = execSync(`git ls-remote -h git@github.com:MystenLabs/sui.git`)
 					minor,
 					patch,
 					branch,
-					schema: `https://raw.githubusercontent.com/MystenLabs/sui/${branch}/crates/sui-graphql-rpc/schema/current_progress_schema.graphql`,
+					schema: `https://raw.githubusercontent.com/LinkUVerse/rtd/${branch}/crates/rtd-graphql-rpc/schema/current_progress_schema.graphql`,
 				}
 			: null;
 	})
@@ -50,7 +50,7 @@ for (const { minorVersion, schema } of releasesByVersion.values()) {
 
 await addSchemaVersion(
 	'latest',
-	'https://raw.githubusercontent.com/MystenLabs/sui/refs/heads/main/crates/sui-indexer-alt-graphql/schema.graphql',
+	'https://raw.githubusercontent.com/LinkUVerse/rtd/refs/heads/main/crates/rtd-indexer-alt-graphql/schema.graphql',
 );
 
 await addExportsToPackageJson([...releasesByVersion.keys(), 'latest']);
@@ -110,7 +110,7 @@ async function addSchemaVersion(versionName: string, schema: string) {
 	await writeFile(
 		resolve(filePath, `../../../schemas/${versionName}/index.ts`),
 		`
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 import { initGraphQLTada } from 'gql.tada';

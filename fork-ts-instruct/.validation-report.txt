@@ -1,0 +1,15 @@
+RTD SDK Fork Validation Report
+Generated: Mon Dec 22 01:16:53 CST 2025
+========================================
+OK: No @mysten references found
+
+New brand references:
+  @linku: 106
+  RtdClient: 213
+  RTD_TYPE_ARG: 11
+
+========================================
+Summary:
+  Errors: 0
+  Warnings: 1
+========================================

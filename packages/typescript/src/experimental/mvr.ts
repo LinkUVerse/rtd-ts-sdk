@@ -1,23 +1,23 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { chunk, DataLoader } from '@mysten/utils';
+import { chunk, DataLoader } from '@linku/utils';
 import { isValidNamedPackage, isValidNamedType } from '../utils/move-registry.js';
-import type { StructTag } from '../utils/sui-types.js';
+import type { StructTag } from '../utils/rtd-types.js';
 import {
-	isValidSuiAddress,
+	isValidRtdAddress,
 	normalizeStructTag,
-	normalizeSuiAddress,
+	normalizeRtdAddress,
 	parseStructTag,
-} from '../utils/sui-types.js';
+} from '../utils/rtd-types.js';
 import type { ClientCache } from './cache.js';
 import type { TransactionDataBuilder } from '../transactions/TransactionData.js';
 import { PACKAGE_VERSION } from '../version.js';
-import type { Experimental_SuiClientTypes } from './types.js';
+import type { Experimental_RtdClientTypes } from './types.js';
 
 const NAME_SEPARATOR = '/';
 const MVR_API_HEADER = {
-	'Mvr-Source': `@mysten/sui@${PACKAGE_VERSION}`,
+	'Mvr-Source': `@linku/rtd@${PACKAGE_VERSION}`,
 };
 
 export interface MvrClientOptions {
@@ -30,7 +30,7 @@ export interface MvrClientOptions {
 	};
 }
 
-export class MvrClient implements Experimental_SuiClientTypes.MvrMethods {
+export class MvrClient implements Experimental_RtdClientTypes.MvrMethods {
 	#cache: ClientCache;
 	#url?: string;
 	#pageSize: number;
@@ -185,7 +185,7 @@ export class MvrClient implements Experimental_SuiClientTypes.MvrMethods {
 
 	async resolvePackage({
 		package: name,
-	}: Experimental_SuiClientTypes.MvrResolvePackageOptions): Promise<Experimental_SuiClientTypes.MvrResolvePackageResponse> {
+	}: Experimental_RtdClientTypes.MvrResolvePackageOptions): Promise<Experimental_RtdClientTypes.MvrResolvePackageResponse> {
 		if (!hasMvrName(name)) {
 			return {
 				package: name,
@@ -199,7 +199,7 @@ export class MvrClient implements Experimental_SuiClientTypes.MvrMethods {
 
 	async resolveType({
 		type,
-	}: Experimental_SuiClientTypes.MvrResolveTypeOptions): Promise<Experimental_SuiClientTypes.MvrResolveTypeResponse> {
+	}: Experimental_RtdClientTypes.MvrResolveTypeOptions): Promise<Experimental_RtdClientTypes.MvrResolveTypeResponse> {
 		if (!hasMvrName(type)) {
 			return {
 				type,
@@ -227,7 +227,7 @@ export class MvrClient implements Experimental_SuiClientTypes.MvrMethods {
 	async resolve({
 		types = [],
 		packages = [],
-	}: Experimental_SuiClientTypes.MvrResolveOptions): Promise<Experimental_SuiClientTypes.MvrResolveResponse> {
+	}: Experimental_RtdClientTypes.MvrResolveOptions): Promise<Experimental_RtdClientTypes.MvrResolveResponse> {
 		const mvrTypes = new Set<string>();
 
 		for (const type of types ?? []) {
@@ -302,7 +302,7 @@ function validateOverrides(overrides?: {
 			if (!isValidNamedPackage(pkg)) {
 				throw new Error(`Invalid package name: ${pkg}`);
 			}
-			if (!isValidSuiAddress(normalizeSuiAddress(id))) {
+			if (!isValidRtdAddress(normalizeRtdAddress(id))) {
 				throw new Error(`Invalid package ID: ${id}`);
 			}
 		}
@@ -319,7 +319,7 @@ function validateOverrides(overrides?: {
 
 			const parsedValue = parseStructTag(val);
 
-			if (!isValidSuiAddress(parsedValue.address)) {
+			if (!isValidRtdAddress(parsedValue.address)) {
 				throw new Error(`Invalid type: ${val}`);
 			}
 		}
@@ -362,7 +362,7 @@ function replaceMvrNames(tag: string | StructTag, typeCache: Record<string, stri
 
 export function hasMvrName(nameOrType: string) {
 	return (
-		nameOrType.includes(NAME_SEPARATOR) || nameOrType.includes('@') || nameOrType.includes('.sui')
+		nameOrType.includes(NAME_SEPARATOR) || nameOrType.includes('@') || nameOrType.includes('.rtd')
 	);
 }
 
@@ -432,7 +432,7 @@ export function findNamesInTransaction(builder: TransactionDataBuilder): {
  */
 export function replaceNames(
 	builder: TransactionDataBuilder,
-	resolved: Experimental_SuiClientTypes.MvrResolveResponse,
+	resolved: Experimental_RtdClientTypes.MvrResolveResponse,
 ) {
 	for (const command of builder.commands) {
 		// Replacements for `MakeMoveVec` commands (that can include types)

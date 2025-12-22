@@ -1,8 +1,8 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { bcs } from '@mysten/bcs';
-import type { BcsType } from '@mysten/bcs';
+import { bcs } from '@linku/bcs';
+import type { BcsType } from '@linku/bcs';
 
 import { Address } from './bcs.js';
 

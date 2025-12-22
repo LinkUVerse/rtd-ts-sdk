@@ -1,4 +1,4 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 import { beforeAll, describe, expect, it } from 'vitest';
 import { setup, TestToolbox } from './utils/setup';
@@ -24,7 +24,7 @@ describe('Party Objects', () => {
 
 		createPartyTxn.moveCall({
 			target: '0x2::transfer::public_party_transfer',
-			typeArguments: ['0x2::coin::Coin<0x2::sui::SUI>'],
+			typeArguments: ['0x2::coin::Coin<0x2::rtd::RTD>'],
 			arguments: [coinWithBalance({ balance: 1 }), party],
 		});
 
@@ -52,7 +52,7 @@ describe('Party Objects', () => {
 
 		returnTx.moveCall({
 			target: '0x2::transfer::public_transfer',
-			typeArguments: ['0x2::coin::Coin<0x2::sui::SUI>'],
+			typeArguments: ['0x2::coin::Coin<0x2::rtd::RTD>'],
 			arguments: [returnTx.object(partyCoin), returnTx.pure.address(toolbox.address())],
 		});
 
@@ -82,7 +82,7 @@ describe('Party Objects', () => {
 
 		createPartyTxn.moveCall({
 			target: '0x2::transfer::public_party_transfer',
-			typeArguments: ['0x2::coin::Coin<0x2::sui::SUI>'],
+			typeArguments: ['0x2::coin::Coin<0x2::rtd::RTD>'],
 			arguments: [coinWithBalance({ balance: 1 }), party],
 		});
 
@@ -115,7 +115,7 @@ describe('Party Objects', () => {
 					initialSharedVersion: partyCoin.version,
 				}),
 			],
-			toolbox.keypair.getPublicKey().toSuiAddress(),
+			toolbox.keypair.getPublicKey().toRtdAddress(),
 		);
 
 		const { digest: returnDigest } = await toolbox.client.signAndExecuteTransaction({

@@ -1,4 +1,4 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 import { resolve } from 'path';
@@ -10,12 +10,12 @@ declare module 'vitest' {
 		localnetPort: number;
 		graphqlPort: number;
 		faucetPort: number;
-		suiToolsContainerId: string;
+		rtdToolsContainerId: string;
 	}
 }
 
-const SUI_TOOLS_TAG =
-	process.env.SUI_TOOLS_TAG ||
+const RTD_TOOLS_TAG =
+	process.env.RTD_TOOLS_TAG ||
 	(process.arch === 'arm64'
 		? '06204e155ea3b35fe4c949321d70091ad0ed8437-arm64'
 		: '06204e155ea3b35fe4c949321d70091ad0ed8437');
@@ -28,7 +28,7 @@ export default async function setup(project: TestProject) {
 		.withEnvironment({
 			POSTGRES_USER: 'postgres',
 			POSTGRES_PASSWORD: 'postgrespw',
-			POSTGRES_DB: 'sui_indexer_v2',
+			POSTGRES_DB: 'rtd_indexer_v2',
 		})
 		.withCommand(['-c', 'max_connections=500'])
 		.withExposedPorts(5432)
@@ -36,15 +36,15 @@ export default async function setup(project: TestProject) {
 		.withPullPolicy(PullPolicy.alwaysPull())
 		.start();
 
-	const localnet = await new GenericContainer(`mysten/sui-tools:${SUI_TOOLS_TAG}`)
+	const localnet = await new GenericContainer(`mysten/rtd-tools:${RTD_TOOLS_TAG}`)
 		// .withPullPolicy(PullPolicy.alwaysPull())
 		.withCommand([
-			'sui',
+			'rtd',
 			'start',
 			'--with-faucet',
 			'--force-regenesis',
 			'--with-graphql',
-			`--with-indexer=postgres://postgres:postgrespw@${pg.getIpAddress(network.getName())}:5432/sui_indexer_v2`,
+			`--with-indexer=postgres://postgres:postgrespw@${pg.getIpAddress(network.getName())}:5432/rtd_indexer_v2`,
 		])
 		.withCopyDirectoriesToContainer([
 			{ source: resolve(__dirname, '../data'), target: '/test-data' },
@@ -61,5 +61,5 @@ export default async function setup(project: TestProject) {
 	project.provide('faucetPort', localnet.getMappedPort(9123));
 	project.provide('localnetPort', localnet.getMappedPort(9000));
 	project.provide('graphqlPort', localnet.getMappedPort(9125));
-	project.provide('suiToolsContainerId', localnet.getId());
+	project.provide('rtdToolsContainerId', localnet.getId());
 }

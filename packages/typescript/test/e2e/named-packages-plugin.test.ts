@@ -1,15 +1,15 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from 'vitest';
 
-import { getFullnodeUrl, SuiClient } from '../../src/client';
+import { getFullnodeUrl, RtdClient } from '../../src/client';
 import { namedPackagesPlugin, Transaction } from '../../src/transactions';
-import { normalizeSuiAddress } from '../../src/utils';
+import { normalizeRtdAddress } from '../../src/utils';
 import { extractMvrTypes } from '../../src/experimental/mvr';
 
-const MAINNET_URL = 'https://mainnet.mvr.mystenlabs.com';
-const TESTNET_URL = 'https://testnet.mvr.mystenlabs.com';
+const MAINNET_URL = 'https://mainnet.mvr.linkuverse.com';
+const TESTNET_URL = 'https://testnet.mvr.linkuverse.com';
 
 const mainnetPlugin = namedPackagesPlugin({
 	url: MAINNET_URL,
@@ -46,12 +46,12 @@ const localCachePlugin = namedPackagesPlugin({
 	overrides: {
 		packages: {
 			'@framework/std': '0x1',
-			'@framework/sui': '0x2',
+			'@framework/rtd': '0x2',
 		},
 		types: {
-			'@framework/sui::vec_set::VecSet': '0x2::vec_set::VecSet',
+			'@framework/rtd::vec_set::VecSet': '0x2::vec_set::VecSet',
 			'@framework/std::string::String': '0x1::string::String',
-			'@framework/sui::sui::SUI': '0x2::sui::SUI',
+			'@framework/rtd::rtd::RTD': '0x2::rtd::RTD',
 		},
 	},
 });
@@ -59,12 +59,12 @@ const localCachePlugin = namedPackagesPlugin({
 const localMvrOverrides = {
 	packages: {
 		'@framework/std': '0x1',
-		'@framework/sui': '0x2',
+		'@framework/rtd': '0x2',
 	},
 	types: {
-		'@framework/sui::vec_set::VecSet': '0x2::vec_set::VecSet',
+		'@framework/rtd::vec_set::VecSet': '0x2::vec_set::VecSet',
 		'@framework/std::string::String': '0x1::string::String',
-		'@framework/sui::sui::SUI': '0x2::sui::SUI',
+		'@framework/rtd::rtd::RTD': '0x2::rtd::RTD',
 	},
 };
 
@@ -98,12 +98,12 @@ describe.concurrent('Name Resolution Plugin', () => {
 		});
 
 		const json = JSON.parse(
-			await transaction.toJSON({ client: new SuiClient({ url: getFullnodeUrl('testnet') }) }),
+			await transaction.toJSON({ client: new RtdClient({ url: getFullnodeUrl('testnet') }) }),
 		);
 
-		expect(json.commands[0].MoveCall.package).toBe(normalizeSuiAddress('0x1'));
+		expect(json.commands[0].MoveCall.package).toBe(normalizeRtdAddress('0x1'));
 		expect(json.commands[1].MoveCall.typeArguments[0]).toBe(`0x1::string::String`);
-		expect(json.commands[2].MoveCall.package).toBe(normalizeSuiAddress('0x1'));
+		expect(json.commands[2].MoveCall.package).toBe(normalizeRtdAddress('0x1'));
 		expect(json.commands[2].MoveCall.typeArguments[0]).toBe(
 			`0x1::vector::empty<0x1::string::String>`,
 		);
@@ -135,17 +135,17 @@ describe.concurrent('Name Resolution Plugin (With client overrides)', () => {
 		const transaction = new Transaction();
 
 		const zeroCoin = transaction.moveCall({
-			target: '@framework/sui::coin::zero',
-			typeArguments: ['@framework/sui::sui::SUI'],
+			target: '@framework/rtd::coin::zero',
+			typeArguments: ['@framework/rtd::rtd::RTD'],
 		});
 
-		transaction.transferObjects([zeroCoin], normalizeSuiAddress('0x2'));
+		transaction.transferObjects([zeroCoin], normalizeRtdAddress('0x2'));
 
 		// Types are composed here, without needing any API calls, even if we do not have the
 		// full type in the cache.
 		transaction.moveCall({
 			target: '@framework/std::vector::empty',
-			typeArguments: ['@framework/sui::vec_set::VecSet<@framework/std::string::String>'],
+			typeArguments: ['@framework/rtd::vec_set::VecSet<@framework/std::string::String>'],
 		});
 
 		const res = await dryRun(transaction, 'testnet', true);
@@ -156,17 +156,17 @@ describe.concurrent('Name Resolution Plugin (With client overrides)', () => {
 		const transaction = new Transaction();
 
 		const zeroCoin = transaction.moveCall({
-			target: '@framework/sui::coin::zero',
-			typeArguments: ['@framework/sui::sui::SUI'],
+			target: '@framework/rtd::coin::zero',
+			typeArguments: ['@framework/rtd::rtd::RTD'],
 		});
 
-		transaction.transferObjects([zeroCoin], normalizeSuiAddress('0x2'));
+		transaction.transferObjects([zeroCoin], normalizeRtdAddress('0x2'));
 
 		// Types are composed here, without needing any API calls, even if we do not have the
 		// full type in the cache.
 		transaction.moveCall({
 			target: '@framework/std::vector::empty',
-			typeArguments: ['@framework/sui::vec_set::VecSet<@framework/std::string::String>'],
+			typeArguments: ['@framework/rtd::vec_set::VecSet<@framework/std::string::String>'],
 		});
 
 		const res = await dryRun(transaction, 'testnet', true);
@@ -180,17 +180,17 @@ describe.concurrent('Name Resolution Plugin (Local Cache)', () => {
 		transaction.addSerializationPlugin(localCachePlugin);
 
 		const zeroCoin = transaction.moveCall({
-			target: '@framework/sui::coin::zero',
-			typeArguments: ['@framework/sui::sui::SUI'],
+			target: '@framework/rtd::coin::zero',
+			typeArguments: ['@framework/rtd::rtd::RTD'],
 		});
 
-		transaction.transferObjects([zeroCoin], normalizeSuiAddress('0x2'));
+		transaction.transferObjects([zeroCoin], normalizeRtdAddress('0x2'));
 
 		// Types are composed here, without needing any API calls, even if we do not have the
 		// full type in the cache.
 		transaction.moveCall({
 			target: '@framework/std::vector::empty',
-			typeArguments: ['@framework/sui::vec_set::VecSet<@framework/std::string::String>'],
+			typeArguments: ['@framework/rtd::vec_set::VecSet<@framework/std::string::String>'],
 		});
 
 		const res = await dryRun(transaction, 'testnet');
@@ -202,17 +202,17 @@ describe.concurrent('Name Resolution Plugin (Local Cache)', () => {
 		transaction.addSerializationPlugin(localCachePlugin);
 
 		const zeroCoin = transaction.moveCall({
-			target: '@framework/sui::coin::zero',
-			typeArguments: ['@framework/sui::sui::SUI'],
+			target: '@framework/rtd::coin::zero',
+			typeArguments: ['@framework/rtd::rtd::RTD'],
 		});
 
-		transaction.transferObjects([zeroCoin], normalizeSuiAddress('0x2'));
+		transaction.transferObjects([zeroCoin], normalizeRtdAddress('0x2'));
 
 		// Types are composed here, without needing any API calls, even if we do not have the
 		// full type in the cache.
 		transaction.moveCall({
 			target: '@framework/std::vector::empty',
-			typeArguments: ['@framework/sui::vec_set::VecSet<@framework/std::string::String>'],
+			typeArguments: ['@framework/rtd::vec_set::VecSet<@framework/std::string::String>'],
 		});
 
 		const res = await dryRun(transaction, 'testnet');
@@ -248,7 +248,7 @@ describe.concurrent('Utility functions', () => {
 				],
 			},
 			{
-				input: ['u64', '0x2::balance::Balance<0x2::sui::SUI>'],
+				input: ['u64', '0x2::balance::Balance<0x2::rtd::RTD>'],
 				output: [],
 			},
 		];
@@ -312,10 +312,10 @@ const simplePtb = async (network: 'mainnet' | 'testnet') => {
 	// a mix of addresses & names work too (in the same PTB).
 	const coin = transaction.moveCall({
 		target: '0x2::coin::zero',
-		typeArguments: ['0x2::sui::SUI'],
+		typeArguments: ['0x2::rtd::RTD'],
 	});
 
-	transaction.transferObjects([coin], normalizeSuiAddress('0x2'));
+	transaction.transferObjects([coin], normalizeRtdAddress('0x2'));
 
 	const res = await dryRun(transaction, network);
 	expect(res.effects.status.status).toEqual('success');
@@ -346,7 +346,7 @@ const dryRun = async (
 	network: 'mainnet' | 'testnet',
 	withOverrides = false,
 ) => {
-	const client = new SuiClient({
+	const client = new RtdClient({
 		url: getFullnodeUrl(network),
 		mvr: withOverrides
 			? {
@@ -355,7 +355,7 @@ const dryRun = async (
 			: undefined,
 	});
 
-	transaction.setSender(normalizeSuiAddress('0x2'));
+	transaction.setSender(normalizeRtdAddress('0x2'));
 
 	return client.dryRunTransactionBlock({ transactionBlock: await transaction.build({ client }) });
 };

@@ -1,4 +1,4 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 /**
@@ -7,7 +7,7 @@
  *  ######################################
  *
  * This file is generated from:
- * /crates/sui-open-rpc/spec/openrpc.json
+ * /crates/rtd-open-rpc/spec/openrpc.json
  */
 
 export interface Balance {
@@ -106,7 +106,7 @@ export type ConsensusDeterminedVersionAssignments =
 	| {
 			CancelledTransactionsV2: [string, [[string, string], string][]][];
 	  };
-export type SuiParsedData =
+export type RtdParsedData =
 	| {
 			dataType: 'moveObject';
 			fields: MoveStruct;
@@ -150,13 +150,13 @@ export interface DevInspectResults {
 	/** Execution error from executing the transactions */
 	error?: string | null;
 	/** Events that likely would be generated if the transaction is actually run. */
-	events: SuiEvent[];
+	events: RtdEvent[];
 	/** The raw effects of the transaction that was dev inspected. */
 	rawEffects?: number[];
 	/** The raw transaction data that was dev inspected. */
 	rawTxnData?: number[];
 	/** Execution results (including return values) from executing the transactions */
-	results?: SuiExecutionResult[] | null;
+	results?: RtdExecutionResult[] | null;
 }
 export interface DisplayFieldsResponse {
 	data?: {
@@ -167,10 +167,10 @@ export interface DisplayFieldsResponse {
 export interface DryRunTransactionBlockResponse {
 	balanceChanges: BalanceChange[];
 	effects: TransactionEffects;
-	events: SuiEvent[];
+	events: RtdEvent[];
 	executionErrorSource?: string | null;
 	input: TransactionBlockData;
-	objectChanges: SuiObjectChange[];
+	objectChanges: RtdObjectChange[];
 	suggestedGasPrice?: string | null;
 }
 export type DynamicFieldInfo =
@@ -221,7 +221,7 @@ export interface EndOfEpochData {
 	 */
 	nextEpochProtocolVersion: string;
 }
-export type SuiEvent =
+export type RtdEvent =
 	| {
 			/**
 			 * Sequential event ID, ie (transaction seq number, event seq number). 1) Serves as a unique event ID
@@ -233,7 +233,7 @@ export type SuiEvent =
 			packageId: string;
 			/** Parsed json value of the event */
 			parsedJson: unknown;
-			/** Sender's Sui address. */
+			/** Sender's Rtd address. */
 			sender: string;
 			/** UTC timestamp in milliseconds since epoch (1/1/1970) */
 			timestampMs?: string | null;
@@ -255,7 +255,7 @@ export type SuiEvent =
 			packageId: string;
 			/** Parsed json value of the event */
 			parsedJson: unknown;
-			/** Sender's Sui address. */
+			/** Sender's Rtd address. */
 			sender: string;
 			/** UTC timestamp in milliseconds since epoch (1/1/1970) */
 			timestampMs?: string | null;
@@ -266,13 +266,13 @@ export type SuiEvent =
 			bcs: string;
 			bcsEncoding: 'base58';
 	  };
-export type SuiEventFilter =
+export type RtdEventFilter =
 	/** Return all events. */
 	| {
 			All: [];
 	  } /** Return events that match any of the given filters. Only supported on event subscriptions. */
 	| {
-			Any: SuiEventFilter[];
+			Any: RtdEventFilter[];
 	  } /** Query by sender address. */
 	| {
 			Sender: string;
@@ -318,7 +318,7 @@ export type SuiEventFilter =
 				startTime: string;
 			};
 	  };
-/** Unique ID of a Sui Event, the ID is a combination of transaction digest and event seq number. */
+/** Unique ID of a Rtd Event, the ID is a combination of transaction digest and event seq number. */
 export interface EventId {
 	eventSeq: string;
 	txDigest: string;
@@ -360,10 +360,10 @@ export interface GasCostSummary {
 	 */
 	storageRebate: string;
 }
-export interface SuiGasData {
+export interface RtdGasData {
 	budget: string;
 	owner: string;
-	payment: SuiObjectRef[];
+	payment: RtdObjectRef[];
 	price: string;
 }
 export interface GetPastObjectRequest {
@@ -377,7 +377,7 @@ export type InputObjectKind =
 			MovePackage: string;
 	  }
 	| {
-			ImmOrOwnedMoveObject: SuiObjectRef;
+			ImmOrOwnedMoveObject: RtdObjectRef;
 	  }
 	| {
 			SharedMoveObject: {
@@ -393,7 +393,7 @@ export interface MoveCallParams {
 	packageObjectId: string;
 	typeArguments?: string[];
 }
-export type SuiMoveFunctionArgType =
+export type RtdMoveFunctionArgType =
 	| 'Pure'
 	| {
 			Object: ObjectValueKind;
@@ -482,7 +482,7 @@ export interface MultiSigPublicKeyLegacy {
  * ObjectChange are derived from the object mutations in the TransactionEffect to provide richer object
  * information.
  */
-export type SuiObjectChange =
+export type RtdObjectChange =
 	/** Module published */
 	| {
 			digest: string;
@@ -533,44 +533,44 @@ export type SuiObjectChange =
 			type: 'created';
 			version: string;
 	  };
-export interface SuiObjectData {
+export interface RtdObjectData {
 	/**
 	 * Move object content or package content in BCS, default to be None unless
-	 * SuiObjectDataOptions.showBcs is set to true
+	 * RtdObjectDataOptions.showBcs is set to true
 	 */
 	bcs?: RawData | null;
 	/**
-	 * Move object content or package content, default to be None unless SuiObjectDataOptions.showContent
+	 * Move object content or package content, default to be None unless RtdObjectDataOptions.showContent
 	 * is set to true
 	 */
-	content?: SuiParsedData | null;
+	content?: RtdParsedData | null;
 	/** Base64 string representing the object digest */
 	digest: string;
 	/**
 	 * The Display metadata for frontend UI rendering, default to be None unless
-	 * SuiObjectDataOptions.showContent is set to true This can also be None if the struct type does not
-	 * have Display defined See more details in <https://forums.sui.io/t/nft-object-display-proposal/4872>
+	 * RtdObjectDataOptions.showContent is set to true This can also be None if the struct type does not
+	 * have Display defined See more details in <https://forums.rtd.life/t/nft-object-display-proposal/4872>
 	 */
 	display?: DisplayFieldsResponse | null;
 	objectId: string;
-	/** The owner of this object. Default to be None unless SuiObjectDataOptions.showOwner is set to true */
+	/** The owner of this object. Default to be None unless RtdObjectDataOptions.showOwner is set to true */
 	owner?: ObjectOwner | null;
 	/**
 	 * The digest of the transaction that created or last mutated this object. Default to be None unless
-	 * SuiObjectDataOptions.showPreviousTransaction is set to true
+	 * RtdObjectDataOptions.showPreviousTransaction is set to true
 	 */
 	previousTransaction?: string | null;
 	/**
-	 * The amount of SUI we would rebate if this object gets deleted. This number is re-calculated each
+	 * The amount of RTD we would rebate if this object gets deleted. This number is re-calculated each
 	 * time the object is mutated based on the present storage gas price.
 	 */
 	storageRebate?: string | null;
-	/** The type of the object. Default to be None unless SuiObjectDataOptions.showType is set to true */
+	/** The type of the object. Default to be None unless RtdObjectDataOptions.showType is set to true */
 	type?: string | null;
 	/** Object version. */
 	version: string;
 }
-export interface SuiObjectDataOptions {
+export interface RtdObjectDataOptions {
 	/** Whether to show the content in BCS format. Default to be False */
 	showBcs?: boolean;
 	/**
@@ -592,7 +592,7 @@ export interface SuiObjectDataOptions {
 export type ObjectRead =
 	/** The object exists and is found with this version */
 	| {
-			details: SuiObjectData;
+			details: RtdObjectData;
 			status: 'VersionFound';
 	  } /** The object does not exist */
 	| {
@@ -600,7 +600,7 @@ export type ObjectRead =
 			status: 'ObjectNotExists';
 	  } /** The object is found to be deleted with this version */
 	| {
-			details: SuiObjectRef;
+			details: RtdObjectRef;
 			status: 'ObjectDeleted';
 	  } /** The object exists but not found with this version */
 	| {
@@ -615,7 +615,7 @@ export type ObjectRead =
 			};
 			status: 'VersionTooHigh';
 	  };
-export interface SuiObjectRef {
+export interface RtdObjectRef {
 	/** Base64 string representing the object digest */
 	digest: string;
 	/** Hex code as string representing the object id */
@@ -647,16 +647,16 @@ export type ObjectResponseError =
 			code: 'displayError';
 			error: string;
 	  };
-export interface SuiObjectResponseQuery {
+export interface RtdObjectResponseQuery {
 	/** If None, no filter will be applied */
-	filter?: SuiObjectDataFilter | null;
+	filter?: RtdObjectDataFilter | null;
 	/** config which fields to include in the response, by default only digest is included */
-	options?: SuiObjectDataOptions | null;
+	options?: RtdObjectDataOptions | null;
 }
 export type ObjectValueKind = 'ByImmutableReference' | 'ByMutableReference' | 'ByValue';
 export interface OwnedObjectRef {
 	owner: ObjectOwner;
-	reference: SuiObjectRef;
+	reference: RtdObjectRef;
 }
 export type ObjectOwner =
 	/** Object is exclusively owned by a single address, and is mutable. */
@@ -664,7 +664,7 @@ export type ObjectOwner =
 			AddressOwner: string;
 	  } /**
 	 * Object is exclusively owned by a single object, and is mutable. The object ID is converted to
-	 * SuiAddress as SuiAddress is universal.
+	 * RtdAddress as RtdAddress is universal.
 	 */
 	| {
 			ObjectOwner: string;
@@ -722,7 +722,7 @@ export interface PaginatedDynamicFieldInfos {
  * item.
  */
 export interface PaginatedEvents {
-	data: SuiEvent[];
+	data: RtdEvent[];
 	hasNextPage: boolean;
 	nextCursor?: EventId | null;
 }
@@ -742,7 +742,7 @@ export interface PaginatedStrings {
  * item.
  */
 export interface PaginatedObjectsResponse {
-	data: SuiObjectResponse[];
+	data: RtdObjectResponse[];
 	hasNextPage: boolean;
 	nextCursor?: string | null;
 }
@@ -752,7 +752,7 @@ export interface PaginatedObjectsResponse {
  * item.
  */
 export interface PaginatedTransactionResponse {
-	data: SuiTransactionBlockResponse[];
+	data: RtdTransactionBlockResponse[];
 	hasNextPage: boolean;
 	nextCursor?: string | null;
 }
@@ -846,29 +846,29 @@ export type RawData =
 	  };
 export type Signature =
 	| {
-			Ed25519SuiSignature: string;
+			Ed25519RtdSignature: string;
 	  }
 	| {
-			Secp256k1SuiSignature: string;
+			Secp256k1RtdSignature: string;
 	  }
 	| {
-			Secp256r1SuiSignature: string;
+			Secp256r1RtdSignature: string;
 	  };
 export type StakeObject =
 	| {
 			principal: string;
 			stakeActiveEpoch: string;
 			stakeRequestEpoch: string;
-			/** ID of the StakedSui receipt object. */
-			stakedSuiId: string;
+			/** ID of the StakedRtd receipt object. */
+			stakedRtdId: string;
 			status: 'Pending';
 	  }
 	| {
 			principal: string;
 			stakeActiveEpoch: string;
 			stakeRequestEpoch: string;
-			/** ID of the StakedSui receipt object. */
-			stakedSuiId: string;
+			/** ID of the StakedRtd receipt object. */
+			stakedRtdId: string;
 			estimatedReward: string;
 			status: 'Active';
 	  }
@@ -876,17 +876,17 @@ export type StakeObject =
 			principal: string;
 			stakeActiveEpoch: string;
 			stakeRequestEpoch: string;
-			/** ID of the StakedSui receipt object. */
-			stakedSuiId: string;
+			/** ID of the StakedRtd receipt object. */
+			stakedRtdId: string;
 			status: 'Unstaked';
 	  };
-export interface SuiActiveJwk {
+export interface RtdActiveJwk {
 	epoch: string;
-	jwk: SuiJWK;
-	jwk_id: SuiJwkId;
+	jwk: RtdJWK;
+	jwk_id: RtdJwkId;
 }
 /** An argument to a transaction in a programmable transaction block */
-export type SuiArgument =
+export type RtdArgument =
 	| 'GasCoin' /** One of the input objects or primitive values (from `ProgrammableTransactionBlock` inputs) */
 	| {
 			Input: number;
@@ -900,10 +900,10 @@ export type SuiArgument =
 	| {
 			NestedResult: [number, number];
 	  };
-export interface SuiAuthenticatorStateExpire {
+export interface RtdAuthenticatorStateExpire {
 	min_epoch: string;
 }
-export type SuiCallArg =
+export type RtdCallArg =
 	| {
 			type: 'object';
 			digest: string;
@@ -930,7 +930,7 @@ export type SuiCallArg =
 			value: unknown;
 			valueType?: string | null;
 	  };
-export interface SuiChangeEpoch {
+export interface RtdChangeEpoch {
 	computation_charge: string;
 	epoch: string;
 	epoch_start_timestamp_ms: string;
@@ -951,17 +951,17 @@ export interface CoinMetadata {
 	/** Symbol for the token */
 	symbol: string;
 }
-export type SuiEndOfEpochTransactionKind =
+export type RtdEndOfEpochTransactionKind =
 	| 'AuthenticatorStateCreate'
 	| 'RandomnessStateCreate'
 	| 'CoinDenyListStateCreate'
 	| 'StoreExecutionTimeObservations'
 	| 'AccumulatorRootCreate'
 	| {
-			ChangeEpoch: SuiChangeEpoch;
+			ChangeEpoch: RtdChangeEpoch;
 	  }
 	| {
-			AuthenticatorStateExpire: SuiAuthenticatorStateExpire;
+			AuthenticatorStateExpire: RtdAuthenticatorStateExpire;
 	  }
 	| {
 			BridgeStateCreate: string;
@@ -969,76 +969,76 @@ export type SuiEndOfEpochTransactionKind =
 	| {
 			BridgeCommitteeUpdate: string;
 	  };
-export interface SuiExecutionResult {
+export interface RtdExecutionResult {
 	/** The value of any arguments that were mutably borrowed. Non-mut borrowed values are not included */
-	mutableReferenceOutputs?: [SuiArgument, number[], string][];
+	mutableReferenceOutputs?: [RtdArgument, number[], string][];
 	/** The return values from the transaction */
 	returnValues?: [number[], string][];
 }
-export interface SuiJWK {
+export interface RtdJWK {
 	alg: string;
 	e: string;
 	kty: string;
 	n: string;
 }
-export interface SuiJwkId {
+export interface RtdJwkId {
 	iss: string;
 	kid: string;
 }
-export type SuiMoveAbility = 'Copy' | 'Drop' | 'Store' | 'Key';
-export interface SuiMoveAbilitySet {
-	abilities: SuiMoveAbility[];
+export type RtdMoveAbility = 'Copy' | 'Drop' | 'Store' | 'Key';
+export interface RtdMoveAbilitySet {
+	abilities: RtdMoveAbility[];
 }
-export interface SuiMoveAbort {
+export interface RtdMoveAbort {
 	error_code?: string | null;
 	function?: string | null;
 	line?: number | null;
 	module_id?: string | null;
 }
-export interface SuiMoveModuleId {
+export interface RtdMoveModuleId {
 	address: string;
 	name: string;
 }
-export interface SuiMoveNormalizedEnum {
-	abilities: SuiMoveAbilitySet;
-	typeParameters: SuiMoveStructTypeParameter[];
+export interface RtdMoveNormalizedEnum {
+	abilities: RtdMoveAbilitySet;
+	typeParameters: RtdMoveStructTypeParameter[];
 	variantDeclarationOrder?: string[] | null;
 	variants: {
-		[key: string]: SuiMoveNormalizedField[];
+		[key: string]: RtdMoveNormalizedField[];
 	};
 }
-export interface SuiMoveNormalizedField {
+export interface RtdMoveNormalizedField {
 	name: string;
-	type: SuiMoveNormalizedType;
+	type: RtdMoveNormalizedType;
 }
-export interface SuiMoveNormalizedFunction {
+export interface RtdMoveNormalizedFunction {
 	isEntry: boolean;
-	parameters: SuiMoveNormalizedType[];
-	return: SuiMoveNormalizedType[];
-	typeParameters: SuiMoveAbilitySet[];
-	visibility: SuiMoveVisibility;
+	parameters: RtdMoveNormalizedType[];
+	return: RtdMoveNormalizedType[];
+	typeParameters: RtdMoveAbilitySet[];
+	visibility: RtdMoveVisibility;
 }
-export interface SuiMoveNormalizedModule {
+export interface RtdMoveNormalizedModule {
 	address: string;
 	enums?: {
-		[key: string]: SuiMoveNormalizedEnum;
+		[key: string]: RtdMoveNormalizedEnum;
 	};
 	exposedFunctions: {
-		[key: string]: SuiMoveNormalizedFunction;
+		[key: string]: RtdMoveNormalizedFunction;
 	};
 	fileFormatVersion: number;
-	friends: SuiMoveModuleId[];
+	friends: RtdMoveModuleId[];
 	name: string;
 	structs: {
-		[key: string]: SuiMoveNormalizedStruct;
+		[key: string]: RtdMoveNormalizedStruct;
 	};
 }
-export interface SuiMoveNormalizedStruct {
-	abilities: SuiMoveAbilitySet;
-	fields: SuiMoveNormalizedField[];
-	typeParameters: SuiMoveStructTypeParameter[];
+export interface RtdMoveNormalizedStruct {
+	abilities: RtdMoveAbilitySet;
+	fields: RtdMoveNormalizedField[];
+	typeParameters: RtdMoveStructTypeParameter[];
 }
-export type SuiMoveNormalizedType =
+export type RtdMoveNormalizedType =
 	| 'Bool'
 	| 'U8'
 	| 'U16'
@@ -1053,35 +1053,35 @@ export type SuiMoveNormalizedType =
 				address: string;
 				module: string;
 				name: string;
-				typeArguments: SuiMoveNormalizedType[];
+				typeArguments: RtdMoveNormalizedType[];
 			};
 	  }
 	| {
-			Vector: SuiMoveNormalizedType;
+			Vector: RtdMoveNormalizedType;
 	  }
 	| {
 			TypeParameter: number;
 	  }
 	| {
-			Reference: SuiMoveNormalizedType;
+			Reference: RtdMoveNormalizedType;
 	  }
 	| {
-			MutableReference: SuiMoveNormalizedType;
+			MutableReference: RtdMoveNormalizedType;
 	  };
-export interface SuiMoveStructTypeParameter {
-	constraints: SuiMoveAbilitySet;
+export interface RtdMoveStructTypeParameter {
+	constraints: RtdMoveAbilitySet;
 	isPhantom: boolean;
 }
-export type SuiMoveVisibility = 'Private' | 'Public' | 'Friend';
-export type SuiObjectDataFilter =
+export type RtdMoveVisibility = 'Private' | 'Public' | 'Friend';
+export type RtdObjectDataFilter =
 	| {
-			MatchAll: SuiObjectDataFilter[];
+			MatchAll: RtdObjectDataFilter[];
 	  }
 	| {
-			MatchAny: SuiObjectDataFilter[];
+			MatchAny: RtdObjectDataFilter[];
 	  }
 	| {
-			MatchNone: SuiObjectDataFilter[];
+			MatchNone: RtdObjectDataFilter[];
 	  } /** Query by type a specified Package. */
 	| {
 			Package: string;
@@ -1112,17 +1112,17 @@ export type SuiObjectDataFilter =
 	| {
 			Version: string;
 	  };
-export interface SuiObjectResponse {
-	data?: SuiObjectData | null;
+export interface RtdObjectResponse {
+	data?: RtdObjectData | null;
 	error?: ObjectResponseError | null;
 }
 /**
  * The transaction for calling a Move function, either an entry function or a public function (which
  * cannot return references).
  */
-export interface MoveCallSuiTransaction {
+export interface MoveCallRtdTransaction {
 	/** The arguments to the function. */
-	arguments?: SuiArgument[];
+	arguments?: RtdArgument[];
 	/** The function to be called. */
 	function: string;
 	/** The specific module in the package containing the function. */
@@ -1133,13 +1133,13 @@ export interface MoveCallSuiTransaction {
 	type_arguments?: string[];
 }
 /**
- * This is the JSON-RPC type for the SUI system state object. It flattens all fields to make them
- * top-level fields such that it as minimum dependencies to the internal data structures of the SUI
+ * This is the JSON-RPC type for the RTD system state object. It flattens all fields to make them
+ * top-level fields such that it as minimum dependencies to the internal data structures of the RTD
  * system state type.
  */
-export interface SuiSystemStateSummary {
+export interface RtdSystemStateSummary {
 	/** The list of active validators in the current epoch. */
-	activeValidators: SuiValidatorSummary[];
+	activeValidators: RtdValidatorSummary[];
 	/** Map storing the number of epochs for which each validator has been below the low stake threshold. */
 	atRiskValidators: [string, string][];
 	/** The current epoch ID, starting from 0. */
@@ -1186,7 +1186,7 @@ export interface SuiSystemStateSummary {
 	safeModeStorageRebates: string;
 	/** Amount of storage rewards accumulated (and not yet distributed) during safe mode. */
 	safeModeStorageRewards: string;
-	/** Balance of SUI set aside for stake subsidies that will be drawn down over time. */
+	/** Balance of RTD set aside for stake subsidies that will be drawn down over time. */
 	stakeSubsidyBalance: string;
 	/** The amount of stake subsidy to be drawn down per epoch. This amount decays and decreases over time. */
 	stakeSubsidyCurrentDistributionAmount: string;
@@ -1204,7 +1204,7 @@ export interface SuiSystemStateSummary {
 	stakeSubsidyPeriodLength: string;
 	/** The starting epoch in which stake subsidies start being paid out */
 	stakeSubsidyStartEpoch: string;
-	/** ID of the object that maps from staking pool's ID to the sui address of a validator. */
+	/** ID of the object that maps from staking pool's ID to the rtd address of a validator. */
 	stakingPoolMappingsId: string;
 	/** Number of staking pool mappings. */
 	stakingPoolMappingsSize: string;
@@ -1246,26 +1246,26 @@ export interface SuiSystemStateSummary {
 	validatorVeryLowStakeThreshold: string;
 }
 /** A single transaction in a programmable transaction block. */
-export type SuiTransaction =
+export type RtdTransaction =
 	/** A call to either an entry or a public Move function */
 	| {
-			MoveCall: MoveCallSuiTransaction;
+			MoveCall: MoveCallRtdTransaction;
 	  } /**
 	 * `(Vec<forall T:key+store. T>, address)` It sends n-objects to the specified address. These objects
 	 * must have store (public transfer) and either the previous owner must be an address or the object
 	 * must be newly created.
 	 */
 	| {
-			TransferObjects: [SuiArgument[], SuiArgument];
+			TransferObjects: [RtdArgument[], RtdArgument];
 	  } /**
 	 * `(&mut Coin<T>, Vec<u64>)` -> `Vec<Coin<T>>` It splits off some amounts into a new coins with those
 	 * amounts
 	 */
 	| {
-			SplitCoins: [SuiArgument, SuiArgument[]];
+			SplitCoins: [RtdArgument, RtdArgument[]];
 	  } /** `(&mut Coin<T>, Vec<Coin<T>>)` It merges n-coins into the first coin */
 	| {
-			MergeCoins: [SuiArgument, SuiArgument[]];
+			MergeCoins: [RtdArgument, RtdArgument[]];
 	  } /**
 	 * Publishes a Move package. It takes the package bytes and a list of the package's transitive
 	 * dependencies to link against on-chain.
@@ -1274,20 +1274,20 @@ export type SuiTransaction =
 			Publish: string[];
 	  } /** Upgrades a Move package */
 	| {
-			Upgrade: [string[], string, SuiArgument];
+			Upgrade: [string[], string, RtdArgument];
 	  } /**
 	 * `forall T: Vec<T> -> vector<T>` Given n-values of the same type, it constructs a vector. For non
 	 * objects or an empty vector, the type tag must be specified.
 	 */
 	| {
-			MakeMoveVec: [string | null, SuiArgument[]];
+			MakeMoveVec: [string | null, RtdArgument[]];
 	  };
-export type SuiTransactionBlockBuilderMode = 'Commit' | 'DevInspect';
+export type RtdTransactionBlockBuilderMode = 'Commit' | 'DevInspect';
 /**
- * This is the JSON-RPC type for the SUI validator. It flattens all inner structures to top-level
+ * This is the JSON-RPC type for the RTD validator. It flattens all inner structures to top-level
  * fields so that they are decoupled from the internal definitions.
  */
-export interface SuiValidatorSummary {
+export interface RtdValidatorSummary {
 	commissionRate: string;
 	description: string;
 	/** ID of the exchange rate table object. */
@@ -1317,7 +1317,7 @@ export interface SuiValidatorSummary {
 	/** Pending stake amount for this epoch. */
 	pendingStake: string;
 	/** Pending stake withdrawn during the current epoch, emptied at epoch boundaries. */
-	pendingTotalSuiWithdraw: string;
+	pendingTotalRtdWithdraw: string;
 	/** Total number of pool tokens issued by the pool. */
 	poolTokenBalance: string;
 	primaryAddress: string;
@@ -1332,9 +1332,9 @@ export interface SuiValidatorSummary {
 	stakingPoolDeactivationEpoch?: string | null;
 	/** ID of the staking pool object. */
 	stakingPoolId: string;
-	/** The total number of SUI tokens in this pool. */
-	stakingPoolSuiBalance: string;
-	suiAddress: string;
+	/** The total number of RTD tokens in this pool. */
+	stakingPoolRtdBalance: string;
+	rtdAddress: string;
 	votingPower: string;
 	workerAddress: string;
 	workerPubkeyBytes: string;
@@ -1342,33 +1342,33 @@ export interface SuiValidatorSummary {
 export interface CoinSupply {
 	value: string;
 }
-export interface SuiTransactionBlock {
+export interface RtdTransactionBlock {
 	data: TransactionBlockData;
 	txSignatures: string[];
 }
 export interface TransactionBlockBytes {
 	/** the gas objects to be used */
-	gas: SuiObjectRef[];
+	gas: RtdObjectRef[];
 	/** objects to be used in this transaction */
 	inputObjects: InputObjectKind[];
 	/** BCS serialized transaction data bytes without its type tag, as base-64 encoded string. */
 	txBytes: string;
 }
 export type TransactionBlockData = {
-	gasData: SuiGasData;
+	gasData: RtdGasData;
 	messageVersion: 'v1';
 	sender: string;
-	transaction: SuiTransactionBlockKind;
+	transaction: RtdTransactionBlockKind;
 };
 export type TransactionEffects =
 	/** The response from processing a transaction or a certified transaction */
 	{
 		/** The abort error populated if the transaction failed with an abort code. */
-		abortError?: SuiMoveAbort | null;
+		abortError?: RtdMoveAbort | null;
 		/** ObjectRef and owner of new objects created. */
 		created?: OwnedObjectRef[];
 		/** Object Refs of objects now deleted (the old refs). */
-		deleted?: SuiObjectRef[];
+		deleted?: RtdObjectRef[];
 		/** The set of transaction digests this transaction depends on. */
 		dependencies?: string[];
 		/**
@@ -1396,7 +1396,7 @@ export type TransactionEffects =
 		 * The object references of the shared objects used in this transaction. Empty if no shared objects
 		 * were used.
 		 */
-		sharedObjects?: SuiObjectRef[];
+		sharedObjects?: RtdObjectRef[];
 		/** The status of the execution */
 		status: ExecutionStatus;
 		/** The transaction digest */
@@ -1407,15 +1407,15 @@ export type TransactionEffects =
 		 */
 		unwrapped?: OwnedObjectRef[];
 		/** Object refs of objects previously wrapped in other objects but now deleted. */
-		unwrappedThenDeleted?: SuiObjectRef[];
+		unwrappedThenDeleted?: RtdObjectRef[];
 		/** Object refs of objects now wrapped in other objects. */
-		wrapped?: SuiObjectRef[];
+		wrapped?: RtdObjectRef[];
 	};
 export interface TransactionBlockEffectsModifiedAtVersions {
 	objectId: string;
 	sequenceNumber: string;
 }
-export type SuiTransactionBlockKind =
+export type RtdTransactionBlockKind =
 	/** A system transaction that will update epoch information on-chain. */
 	| {
 			computation_charge: string;
@@ -1437,18 +1437,18 @@ export type SuiTransactionBlockKind =
 	  } /** A series of transactions where the results of one transaction can be used in future transactions */
 	| {
 			/** Input objects or primitive values */
-			inputs: SuiCallArg[];
+			inputs: RtdCallArg[];
 			kind: 'ProgrammableTransaction';
 			/**
 			 * The transactions to be executed sequentially. A failure in any transaction will result in the
 			 * failure of the entire programmable transaction block.
 			 */
-			transactions: SuiTransaction[];
+			transactions: RtdTransaction[];
 	  } /** A transaction which updates global authenticator state */
 	| {
 			epoch: string;
 			kind: 'AuthenticatorStateUpdate';
-			new_active_jwks: SuiActiveJwk[];
+			new_active_jwks: RtdActiveJwk[];
 			round: string;
 	  } /** A transaction which updates global randomness state */
 	| {
@@ -1459,7 +1459,7 @@ export type SuiTransactionBlockKind =
 	  } /** The transaction which occurs only at the end of the epoch */
 	| {
 			kind: 'EndOfEpochTransaction';
-			transactions: SuiEndOfEpochTransactionKind[];
+			transactions: RtdEndOfEpochTransactionKind[];
 	  }
 	| {
 			commit_timestamp_ms: string;
@@ -1489,15 +1489,15 @@ export type SuiTransactionBlockKind =
 	  } /** A series of commands where the results of one command can be used in future commands */
 	| {
 			/** Input objects or primitive values */
-			inputs: SuiCallArg[];
+			inputs: RtdCallArg[];
 			kind: 'ProgrammableSystemTransaction';
 			/**
 			 * The transactions to be executed sequentially. A failure in any transaction will result in the
 			 * failure of the entire programmable transaction block.
 			 */
-			transactions: SuiTransaction[];
+			transactions: RtdTransaction[];
 	  };
-export interface SuiTransactionBlockResponse {
+export interface RtdTransactionBlockResponse {
 	balanceChanges?: BalanceChange[] | null;
 	/**
 	 * The checkpoint number when this transaction was included and hence finalized. This is only returned
@@ -1508,8 +1508,8 @@ export interface SuiTransactionBlockResponse {
 	digest: string;
 	effects?: TransactionEffects | null;
 	errors?: string[];
-	events?: SuiEvent[] | null;
-	objectChanges?: SuiObjectChange[] | null;
+	events?: RtdEvent[] | null;
+	objectChanges?: RtdObjectChange[] | null;
 	rawEffects?: number[];
 	/**
 	 * BCS encoded [SenderSignedData] that includes input object references returns empty array if
@@ -1518,9 +1518,9 @@ export interface SuiTransactionBlockResponse {
 	rawTransaction?: string;
 	timestampMs?: string | null;
 	/** Transaction input data */
-	transaction?: SuiTransactionBlock | null;
+	transaction?: RtdTransactionBlock | null;
 }
-export interface SuiTransactionBlockResponseOptions {
+export interface RtdTransactionBlockResponseOptions {
 	/** Whether to show balance_changes. Default to be False */
 	showBalanceChanges?: boolean;
 	/** Whether to show transaction effects. Default to be False */
@@ -1536,11 +1536,11 @@ export interface SuiTransactionBlockResponseOptions {
 	/** Whether to show bcs-encoded transaction input data */
 	showRawInput?: boolean;
 }
-export interface SuiTransactionBlockResponseQuery {
+export interface RtdTransactionBlockResponseQuery {
 	/** If None, no filter will be applied */
 	filter?: TransactionFilter | null;
 	/** config which fields to include in the response, by default only digest is included */
-	options?: SuiTransactionBlockResponseOptions | null;
+	options?: RtdTransactionBlockResponseOptions | null;
 }
 export type TransactionFilter =
 	/** CURRENTLY NOT SUPPORTED. Query by checkpoint. */
