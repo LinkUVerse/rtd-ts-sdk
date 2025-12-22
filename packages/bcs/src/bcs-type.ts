@@ -1,7 +1,7 @@
 // Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { fromBase58, fromBase64, toBase58, toBase64, fromHex, toHex } from '@linku/utils';
+import { fromBase58, fromBase64, toBase58, toBase64, fromHex, toHex } from 'rtd-utils';
 import { BcsReader } from './reader.js';
 import { ulebEncode } from './uleb.js';
 import type { BcsWriterOptions } from './writer.js';
@@ -102,7 +102,7 @@ export class BcsType<T, Input = T, const Name extends string = string> {
 	}
 }
 
-const SERIALIZED_BCS_BRAND = Symbol.for('@linku/serialized-bcs') as never;
+const SERIALIZED_BCS_BRAND = Symbol.for('rtd-serialized-bcs') as never;
 export function isSerializedBcs(obj: unknown): obj is SerializedBcs<unknown> {
 	return !!obj && typeof obj === 'object' && (obj as any)[SERIALIZED_BCS_BRAND] === true;
 }
@@ -112,7 +112,7 @@ export class SerializedBcs<T, Input = T> {
 	#bytes: Uint8Array<ArrayBuffer>;
 
 	// Used to brand SerializedBcs so that they can be identified, even between multiple copies
-	// of the @linku/bcs package are installed
+	// of the rtd-bcs package are installed
 	get [SERIALIZED_BCS_BRAND]() {
 		return true;
 	}

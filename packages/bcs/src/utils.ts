@@ -1,7 +1,7 @@
 // Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { fromBase58, fromBase64, fromHex, toBase58, toBase64, toHex } from '@linku/utils';
+import { fromBase58, fromBase64, fromHex, toBase58, toBase64, toHex } from 'rtd-utils';
 import type { Encoding } from './types.js';
 
 /**

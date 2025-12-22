@@ -1,8 +1,8 @@
 // Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { toBase64 } from '@linku/bcs';
-import { promiseWithResolvers } from '@linku/utils';
+import { toBase64 } from 'rtd-bcs';
+import { promiseWithResolvers } from 'rtd-utils';
 import { bcs } from '../../bcs/index.js';
 import type { RtdObjectRef } from '../../bcs/types.js';
 import type {

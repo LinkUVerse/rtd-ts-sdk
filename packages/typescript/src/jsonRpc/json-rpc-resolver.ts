@@ -13,7 +13,7 @@ import {
 	normalizedTypeToMoveTypeSignature,
 } from '../transactions/serializer.js';
 import type { TransactionDataBuilder } from '../transactions/TransactionData.js';
-import { chunk } from '@linku/utils';
+import { chunk } from 'rtd-utils';
 import type { BuildTransactionOptions } from '../transactions/index.js';
 import type { RtdJsonRpcClient } from './client.js';
 

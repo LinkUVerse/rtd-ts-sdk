@@ -529,7 +529,7 @@ export namespace Experimental_RtdClientTypes {
 		inputVersion: string | null;
 		inputDigest: string | null;
 		inputOwner: ObjectOwner | null;
-		outputState: 'Unknown' | 'DoesNotExist' | 'ObjectWrite' | 'PackageWrite';
+		outputState: 'Unknown' | 'DoesNotExist' | 'ObjectWrite' | 'PackageWrite' | 'AccumulatorWrite';
 		outputVersion: string | null;
 		outputDigest: string | null;
 		outputOwner: ObjectOwner | null;

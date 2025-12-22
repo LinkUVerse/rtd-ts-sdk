@@ -24,7 +24,7 @@ export {
 	toBase64,
 	fromBase58,
 	toBase58,
-} from '@linku/bcs';
+} from 'rtd-bcs';
 export { isValidRtdNSName, normalizeRtdNSName } from './rtdns.js';
 
 export {

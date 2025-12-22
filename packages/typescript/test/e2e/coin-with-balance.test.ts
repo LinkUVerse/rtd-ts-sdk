@@ -1,7 +1,7 @@
 // Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { fromHex, toBase64 } from '@linku/bcs';
+import { fromHex, toBase64 } from 'rtd-bcs';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { bcs } from '../../src/bcs';

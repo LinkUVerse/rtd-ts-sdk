@@ -1,7 +1,7 @@
-# Copyright (c) Mysten Labs, Inc.
+# Copyright (c) Wenchuan Tech, Inc.
 # SPDX-License-Identifier: Apache-2.0
 
-query getOwnedObjects($owner: SuiAddress!, $limit: Int, $cursor: String, $filter: ObjectFilter) {
+query getOwnedObjects($owner: RtdAddress!, $limit: Int, $cursor: String, $filter: ObjectFilter) {
 	address(address: $owner) {
 		objects(first: $limit, after: $cursor, filter: $filter) {
 			pageInfo {

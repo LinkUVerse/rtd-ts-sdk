@@ -1,7 +1,7 @@
 // Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { toBase64, toHex } from '@linku/bcs';
+import { toBase64, toHex } from 'rtd-bcs';
 import { describe, expect, it } from 'vitest';
 
 import { Secp256k1PublicKey } from '../../../src/keypairs/secp256k1/publickey';

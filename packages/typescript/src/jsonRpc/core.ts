@@ -1,7 +1,7 @@
 // Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { fromBase64 } from '@linku/bcs';
+import { fromBase64 } from 'rtd-bcs';
 
 import { bcs } from '../bcs/index.js';
 import type {
@@ -17,7 +17,7 @@ import type {
 import { Transaction } from '../transactions/Transaction.js';
 import { jsonRpcClientResolveTransactionPlugin } from './json-rpc-resolver.js';
 import { TransactionDataBuilder } from '../transactions/TransactionData.js';
-import { chunk } from '@linku/utils';
+import { chunk } from 'rtd-utils';
 import { normalizeRtdAddress } from '../utils/rtd-types.js';
 import { Experimental_CoreClient } from '../experimental/core.js';
 import type { Experimental_RtdClientTypes } from '../experimental/types.js';

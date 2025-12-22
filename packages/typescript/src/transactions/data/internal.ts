@@ -1,7 +1,7 @@
 // Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import type { EnumInputShape, EnumOutputShape } from '@linku/bcs';
+import type { EnumInputShape, EnumOutputShape } from 'rtd-bcs';
 import type { GenericSchema, InferInput, InferOutput } from 'valibot';
 import {
 	array,
@@ -25,7 +25,7 @@ import {
 } from 'valibot';
 
 import { isValidRtdAddress, normalizeRtdAddress } from '../../utils/rtd-types.js';
-import type { Simplify } from '@linku/utils';
+import type { Simplify } from 'rtd-utils';
 
 type EnumSchemaInput<T extends Record<string, GenericSchema<any>>> = EnumInputShape<
 	Simplify<{

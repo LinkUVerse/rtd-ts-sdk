@@ -2,7 +2,7 @@ query verifyZkLoginSignature(
 	$bytes: Base64!
 	$signature: Base64!
 	$intentScope: ZkLoginIntentScope!
-	$author: SuiAddress!
+	$author: RtdAddress!
 ) {
 	verifyZkLoginSignature(
 		bytes: $bytes

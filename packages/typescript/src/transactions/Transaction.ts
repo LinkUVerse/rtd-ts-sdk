@@ -1,8 +1,8 @@
 // Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import type { SerializedBcs } from '@linku/bcs';
-import { fromBase64, isSerializedBcs } from '@linku/bcs';
+import type { SerializedBcs } from 'rtd-bcs';
+import { fromBase64, isSerializedBcs } from 'rtd-bcs';
 import type { InferInput } from 'valibot';
 import { is, parse } from 'valibot';
 
@@ -114,7 +114,7 @@ function createTransactionResult(
 	}) as TransactionResult;
 }
 
-const TRANSACTION_BRAND = Symbol.for('@linku/transaction') as never;
+const TRANSACTION_BRAND = Symbol.for('rtd-transaction') as never;
 
 interface SignOptions extends BuildTransactionOptions {
 	signer: Signer;
@@ -138,7 +138,7 @@ const modulePluginRegistry: TransactionPluginRegistry = {
 	serializationPlugins: new Map(),
 };
 
-const TRANSACTION_REGISTRY_KEY = Symbol.for('@linku/transaction/registry');
+const TRANSACTION_REGISTRY_KEY = Symbol.for('rtd-transaction/registry');
 function getGlobalPluginRegistry() {
 	try {
 		const target = globalThis as {

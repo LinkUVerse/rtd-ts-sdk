@@ -1,7 +1,7 @@
 // Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { bcs, toBase64 } from '@linku/bcs';
+import { bcs, toBase64 } from 'rtd-bcs';
 import { blake2b } from '@noble/hashes/blake2b';
 import { bech32 } from '@scure/base';
 

@@ -3,7 +3,7 @@
 
 import { tmpdir } from 'os';
 import path from 'path';
-import { fromBase64 } from '@linku/bcs';
+import { fromBase64 } from 'rtd-bcs';
 import { describe, expect, it } from 'vitest';
 
 import { decodeRtdPrivateKey } from '../../src/cryptography';

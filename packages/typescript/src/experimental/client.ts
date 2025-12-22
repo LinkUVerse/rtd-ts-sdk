@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /* eslint-disable @typescript-eslint/ban-types */
 
-import type { Simplify, UnionToIntersection } from '@linku/utils';
+import type { Simplify, UnionToIntersection } from 'rtd-utils';
 import { ClientCache } from './cache.js';
 import type { Experimental_CoreClient } from './core.js';
 import type {

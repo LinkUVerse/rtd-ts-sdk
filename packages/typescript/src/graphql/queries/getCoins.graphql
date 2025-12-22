@@ -1,8 +1,8 @@
-# Copyright (c) Mysten Labs, Inc.
+# Copyright (c) Wenchuan Tech, Inc.
 # SPDX-License-Identifier: Apache-2.0
 
 query getCoins(
-	$owner: SuiAddress!
+	$owner: RtdAddress!
 	$first: Int
 	$cursor: String
 	$type: String! = "0x2::coin::Coin<0x2::rtd::RTD>"

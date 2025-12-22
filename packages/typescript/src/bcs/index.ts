@@ -1,7 +1,7 @@
 // Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { bcs } from '@linku/bcs';
+import { bcs } from 'rtd-bcs';
 
 import {
 	Address,
@@ -41,7 +41,7 @@ import { TransactionEffects } from './effects.js';
 export type { TypeTag } from './types.js';
 
 export { TypeTagSerializer } from './type-tag-serializer.js';
-export { BcsType, BcsStruct, BcsEnum, BcsTuple, type BcsTypeOptions } from '@linku/bcs';
+export { BcsType, BcsStruct, BcsEnum, BcsTuple, type BcsTypeOptions } from 'rtd-bcs';
 
 const rtdBcs = {
 	...bcs,

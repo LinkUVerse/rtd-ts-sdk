@@ -1,7 +1,7 @@
 // Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import type { BcsType } from '@linku/bcs';
+import type { BcsType } from 'rtd-bcs';
 
 import { bcs } from '../bcs/index.js';
 import type { RtdMoveNormalizedType } from '../client/index.js';

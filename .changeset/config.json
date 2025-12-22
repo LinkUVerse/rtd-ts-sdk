@@ -9,7 +9,7 @@
 	"updateInternalDependencies": "minor",
 	"privatePackages": false,
 	"ignore": [
-		"@linku/sdk-docs"
+		"rtd-sdk-docs"
 	],
 	"___experimentalUnsafeOptions_WILL_CHANGE_IN_PATCH": {
 		"onlyUpdatePeerDependentsWhenOutOfRange": true

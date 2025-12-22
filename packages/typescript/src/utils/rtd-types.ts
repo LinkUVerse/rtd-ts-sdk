@@ -1,7 +1,7 @@
 // Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { fromBase58, splitGenericParameters } from '@linku/bcs';
+import { fromBase58, splitGenericParameters } from 'rtd-bcs';
 
 import { isValidNamedPackage } from './move-registry.js';
 

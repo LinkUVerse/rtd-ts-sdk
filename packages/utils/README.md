@@ -1,5 +1,5 @@
 # SDK Utils
 
-This is package contains utils shared across `@linku/*` sdks. It is not intended to be consumed
+This is package contains utils shared across `rtd-*` sdks. It is not intended to be consumed
 directly. Changes in this package will be undocumented, and may contain breaking changes at any
 time.

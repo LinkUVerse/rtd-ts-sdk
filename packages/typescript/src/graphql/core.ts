@@ -25,7 +25,7 @@ import {
 	ZkLoginIntentScope,
 } from './generated/queries.js';
 import { ObjectError } from '../experimental/errors.js';
-import { chunk, fromBase64, toBase64 } from '@linku/utils';
+import { chunk, fromBase64, toBase64 } from 'rtd-utils';
 import { normalizeStructTag, normalizeRtdAddress } from '../utils/rtd-types.js';
 import { deriveDynamicFieldID } from '../utils/dynamic-fields.js';
 import {

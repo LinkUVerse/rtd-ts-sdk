@@ -1,6 +1,6 @@
 // Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-import { fromBase58, toBase64, toHex } from '@linku/bcs';
+import { fromBase58, toBase64, toHex } from 'rtd-bcs';
 
 import type { Signer } from '../cryptography/index.js';
 import { Experimental_BaseClient } from '../experimental/client.js';
@@ -131,7 +131,7 @@ type NetworkOrTransport =
 			url?: never;
 	  };
 
-const RTD_CLIENT_BRAND = Symbol.for('@linku/RtdClient') as never;
+const RTD_CLIENT_BRAND = Symbol.for('rtd-RtdClient') as never;
 
 export function isRtdJsonRpcClient(client: unknown): client is RtdJsonRpcClient {
 	return (

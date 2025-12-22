@@ -1,7 +1,7 @@
 {
-	"name": "@linku/utils",
+	"name": "rtd-utils",
 	"version": "0.2.0",
-	"description": "Shared utilities for @linku/* packages",
+	"description": "Shared utilities for rtd-* packages",
 	"license": "Apache-2.0",
 	"author": "LinkU Labs <build@linkuverse.com>",
 	"sideEffects": false,
@@ -43,7 +43,7 @@
 	},
 	"homepage": "https://github.com/LinkUVerse/ts-sdks/tree/main/packages/utils#readme",
 	"devDependencies": {
-		"@linku/build-scripts": "workspace:*",
+		"rtd-build-scripts": "workspace:*",
 		"typescript": "^5.9.3",
 		"vitest": "^4.0.15"
 	},

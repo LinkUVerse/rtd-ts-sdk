@@ -1,8 +1,8 @@
 // Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { isSerializedBcs } from '@linku/bcs';
-import type { SerializedBcs } from '@linku/bcs';
+import { isSerializedBcs } from 'rtd-bcs';
+import type { SerializedBcs } from 'rtd-bcs';
 
 import { bcs } from '../bcs/index.js';
 import { pureBcsSchemaFromTypeName } from '../bcs/pure.js';

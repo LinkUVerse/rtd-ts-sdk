@@ -1,6 +1,6 @@
 // Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-import { toHex } from '@linku/bcs';
+import { toHex } from 'rtd-bcs';
 import { mnemonicToSeedSync as bip39MnemonicToSeedSync } from '@scure/bip39';
 
 /**

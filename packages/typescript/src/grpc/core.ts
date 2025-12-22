@@ -9,7 +9,7 @@ import { Experimental_CoreClient } from '../experimental/index.js';
 import type { RtdGrpcClient } from './client.js';
 import type { Owner } from './proto/rtd/rpc/v2/owner.js';
 import { Owner_OwnerKind } from './proto/rtd/rpc/v2/owner.js';
-import { chunk, fromBase64, toBase64 } from '@linku/utils';
+import { chunk, fromBase64, toBase64 } from 'rtd-utils';
 import type { ExecutedTransaction } from './proto/rtd/rpc/v2/executed_transaction.js';
 import type { TransactionEffects } from './proto/rtd/rpc/v2/effects.js';
 import { UnchangedConsensusObject_UnchangedConsensusObjectKind } from './proto/rtd/rpc/v2/effects.js';
@@ -521,7 +521,7 @@ function mapInputObjectState(
 
 function mapOutputObjectState(
 	state: ChangedObject_OutputObjectState | undefined,
-): null | 'ObjectWrite' | 'PackageWrite' | 'DoesNotExist' | 'Unknown' {
+): null | 'ObjectWrite' | 'PackageWrite' | 'DoesNotExist' | 'AccumulatorWrite' | 'Unknown' {
 	if (state == null) {
 		return null;
 	}
@@ -532,6 +532,8 @@ function mapOutputObjectState(
 			return 'PackageWrite';
 		case ChangedObject_OutputObjectState.DOES_NOT_EXIST:
 			return 'DoesNotExist';
+		case ChangedObject_OutputObjectState.ACCUMULATOR_WRITE:
+			return 'AccumulatorWrite';
 		case ChangedObject_OutputObjectState.UNKNOWN:
 			return 'Unknown';
 		default:

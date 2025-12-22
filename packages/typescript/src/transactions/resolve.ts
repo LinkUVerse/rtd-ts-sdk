@@ -5,7 +5,7 @@ import type { Argument } from './data/internal.js';
 
 import type { ClientWithCoreApi } from '../experimental/index.js';
 import type { TransactionDataBuilder } from './TransactionData.js';
-import type { BcsType } from '@linku/bcs';
+import type { BcsType } from 'rtd-bcs';
 import { Inputs } from './Inputs.js';
 import { bcs } from '../bcs/index.js';
 import { jsonRpcClientResolveTransactionPlugin } from '../jsonRpc/json-rpc-resolver.js';

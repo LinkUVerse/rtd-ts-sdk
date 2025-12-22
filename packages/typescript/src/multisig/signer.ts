@@ -1,6 +1,6 @@
 // Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-import { toBase64 } from '@linku/bcs';
+import { toBase64 } from 'rtd-bcs';
 
 import type { SignatureScheme } from '../cryptography/index.js';
 import { Signer } from '../cryptography/index.js';

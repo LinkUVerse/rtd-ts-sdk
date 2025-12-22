@@ -1,7 +1,7 @@
 // Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { bcs } from '@linku/bcs';
+import { bcs } from 'rtd-bcs';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { Transaction } from '../../src/transactions';

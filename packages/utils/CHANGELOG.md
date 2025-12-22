@@ -1,4 +1,4 @@
-# @linku/utils
+# rtd-utils
 
 ## 0.2.0
 

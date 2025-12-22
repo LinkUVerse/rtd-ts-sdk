@@ -1,6 +1,6 @@
 // Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
-import { fromBase64 } from '@linku/bcs';
+import { fromBase64 } from 'rtd-bcs';
 import { describe, expect, it } from 'vitest';
 
 import { RtdGraphQLClient } from '../../src/graphql';

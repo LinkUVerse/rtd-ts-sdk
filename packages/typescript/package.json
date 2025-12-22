@@ -1,5 +1,5 @@
 {
-	"name": "@linku/rtd",
+	"name": "rtd-typescript",
 	"author": "LinkU Labs <build@linkuverse.com>",
 	"description": "Rtd TypeScript API",
 	"homepage": "https://sdk.linkuverse.com",
@@ -120,8 +120,8 @@
 		"codegen:graphql": "graphql-codegen --config graphql-codegen.ts",
 		"codegen:version": "node genversion.mjs",
 		"codegen:grpc": "rm -rf src/grpc/proto && mkdir src/grpc/proto && pnpm codegen:grpc-protoc && pnpm codegen:grpc-header",
-		"codegen:grpc-protoc": "protoc --ts_out ./src/grpc/proto --ts_opt force_server_none --ts_opt optimize_code_size --ts_opt ts_nocheck -I ../../../rtd-apis/proto -I ../../../rtd-apis/proto ../../../rtd-apis/proto/sui/rpc/v2/*.proto ../../../rtd-apis/proto/google/*/*.proto",
-		"codegen:grpc-header": "find src/grpc/proto -type f -exec sh -c 'echo \"// Copyright (c) LinkU Labs, Inc.\\n// SPDX-License-Identifier: Apache-2.0\\n\" | cat - {} > temp && mv temp {}' \\;",
+		"codegen:grpc-protoc": "protoc --ts_out ./src/grpc/proto --ts_opt force_server_none --ts_opt optimize_code_size --ts_opt ts_nocheck -I ../../../../rtd-apis/proto -I ../../../../rtd-apis/proto ../../../../rtd-apis/proto/rtd/rpc/v2/*.proto ../../../../rtd-apis/proto/google/*/*.proto",
+		"codegen:grpc-header": "find src/grpc/proto -type f -exec sh -c 'echo \"// Copyright (c) Wenchuan Tech, Inc.\\n// SPDX-License-Identifier: Apache-2.0\\n\" | cat - {} > temp && mv temp {}' \\;",
 		"build": "node genversion.mjs && pnpm build:package",
 		"build:package": "build-package",
 		"vitest": "vitest",
@@ -159,14 +159,15 @@
 		"@graphql-codegen/typescript-document-nodes": "5.0.6",
 		"@graphql-codegen/typescript-operations": "^5.0.6",
 		"@iarna/toml": "^2.2.5",
-		"@linku/build-scripts": "workspace:^",
 		"@parcel/watcher": "^2.5.1",
+		"@protobuf-ts/plugin": "^2.11.1",
 		"@types/node": "^24.10.1",
 		"@types/tmp": "^0.2.6",
 		"@types/ws": "^8.18.1",
 		"cross-env": "^10.1.0",
 		"graphql-config": "^5.1.5",
 		"msw": "^2.12.3",
+		"rtd-build-scripts": "workspace:^",
 		"tmp": "^0.2.5",
 		"ts-retry-promise": "^0.8.1",
 		"typescript": "^5.9.3",
@@ -178,8 +179,6 @@
 	},
 	"dependencies": {
 		"@graphql-typed-document-node/core": "^3.2.0",
-		"@linku/bcs": "workspace:*",
-		"@linku/utils": "workspace:*",
 		"@noble/curves": "=1.9.4",
 		"@noble/hashes": "^1.8.0",
 		"@protobuf-ts/grpcweb-transport": "^2.11.1",
@@ -191,6 +190,8 @@
 		"gql.tada": "^1.9.0",
 		"graphql": "^16.12.0",
 		"poseidon-lite": "0.2.1",
+		"rtd-bcs": "workspace:*",
+		"rtd-utils": "workspace:*",
 		"valibot": "^1.2.0"
 	}
 }

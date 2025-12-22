@@ -1,4 +1,4 @@
-# Copyright (c) Mysten Labs, Inc.
+# Copyright (c) Wenchuan Tech, Inc.
 # SPDX-License-Identifier: Apache-2.0
 
 query simulateTransaction($transaction: JSON!) {

@@ -1,7 +1,7 @@
 // Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { fromBase64, toBase64 } from '@linku/bcs';
+import { fromBase64, toBase64 } from 'rtd-bcs';
 import type { GenericSchema, InferInput, InferOutput } from 'valibot';
 import {
 	array,

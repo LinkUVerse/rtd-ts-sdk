@@ -1,4 +1,4 @@
-query getMoveFunction($package: SuiAddress!, $module: String!, $function: String!) {
+query getMoveFunction($package: RtdAddress!, $module: String!, $function: String!) {
 	package(address: $package) {
 		module(name: $module) {
 			function(name: $function) {

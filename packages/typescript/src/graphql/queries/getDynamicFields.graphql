@@ -1,7 +1,7 @@
-# Copyright (c) Mysten Labs, Inc.
+# Copyright (c) Wenchuan Tech, Inc.
 # SPDX-License-Identifier: Apache-2.0
 
-query getDynamicFields($parentId: SuiAddress!, $first: Int, $cursor: String) {
+query getDynamicFields($parentId: RtdAddress!, $first: Int, $cursor: String) {
 	address(address: $parentId) {
 		dynamicFields(first: $first, after: $cursor) {
 			pageInfo {

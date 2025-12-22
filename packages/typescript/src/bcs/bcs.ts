@@ -1,8 +1,8 @@
 // Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import type { BcsType, BcsTypeOptions } from '@linku/bcs';
-import { bcs, fromBase58, fromBase64, fromHex, toBase58, toBase64, toHex } from '@linku/bcs';
+import type { BcsType, BcsTypeOptions } from 'rtd-bcs';
+import { bcs, fromBase58, fromBase64, fromHex, toBase58, toBase64, toHex } from 'rtd-bcs';
 
 import { isValidRtdAddress, normalizeRtdAddress, RTD_ADDRESS_LENGTH } from '../utils/rtd-types.js';
 import { TypeTagSerializer } from './type-tag-serializer.js';

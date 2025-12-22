@@ -1,7 +1,7 @@
 // Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { toBase64 } from '@linku/bcs';
+import { toBase64 } from 'rtd-bcs';
 
 import type { bcs } from '../../bcs/index.js';
 import type { RtdClient, RtdTransactionBlockResponseOptions } from '../../client/index.js';

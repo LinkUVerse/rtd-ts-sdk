@@ -1,7 +1,7 @@
 // Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { chunk, DataLoader } from '@linku/utils';
+import { chunk, DataLoader } from 'rtd-utils';
 import { isValidNamedPackage, isValidNamedType } from '../utils/move-registry.js';
 import type { StructTag } from '../utils/rtd-types.js';
 import {
@@ -17,7 +17,7 @@ import type { Experimental_RtdClientTypes } from './types.js';
 
 const NAME_SEPARATOR = '/';
 const MVR_API_HEADER = {
-	'Mvr-Source': `@linku/rtd@${PACKAGE_VERSION}`,
+	'Mvr-Source': `rtd-typescript@${PACKAGE_VERSION}`,
 };
 
 export interface MvrClientOptions {

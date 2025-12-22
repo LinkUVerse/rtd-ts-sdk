@@ -1,7 +1,7 @@
 // Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { splitGenericParameters } from '@linku/bcs';
+import { splitGenericParameters } from 'rtd-bcs';
 
 import { normalizeRtdAddress } from '../utils/rtd-types.js';
 import type { TypeTag } from './types.js';

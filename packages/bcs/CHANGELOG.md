@@ -35,7 +35,7 @@
 ### Patch Changes
 
 - Updated dependencies [ea1ac70]
-  - @linku/utils@0.2.0
+  - rtd-utils@0.2.0
 
 ## 1.7.0
 
@@ -52,14 +52,14 @@
 
 - 1c4a82d: update links in package.json
 - Updated dependencies [1c4a82d]
-  - @linku/utils@0.1.1
+  - rtd-utils@0.1.1
 
 ## 1.6.3
 
 ### Patch Changes
 
 - Updated dependencies [a00522b]
-  - @linku/utils@0.1.0
+  - rtd-utils@0.1.0
 
 ## 1.6.2
 
@@ -67,7 +67,7 @@
 
 - bb7c03a: Update dependencies
 - Updated dependencies [bb7c03a]
-  - @linku/utils@0.0.1
+  - rtd-utils@0.0.1
 
 ## 1.6.1
 
@@ -166,7 +166,7 @@
 
 ### Major Changes
 
-- a92b03de42: The Typescript SDK has been renamed to `@linku/rtd` and includes many new features
+- a92b03de42: The Typescript SDK has been renamed to `rtd-typescript` and includes many new features
   and breaking changes. See the
   [full migration guide](https://sdk.linkuverse.com/typescript/migrations/sui-1.0) for details on
   how to upgrade.
