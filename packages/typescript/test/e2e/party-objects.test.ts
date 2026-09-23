@@ -1,8 +1,9 @@
 // Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 import { beforeAll, describe, expect, it } from 'vitest';
-import { setup, TestToolbox } from './utils/setup';
-import { coinWithBalance, Transaction } from '../../src/transactions';
+import { setup, TestToolbox } from './utils/setup.js';
+import { Transaction } from '../../src/transactions/index.js';
+import { RtdClientTypes } from '../../src/client/index.js';
 
 describe('Party Objects', () => {
 	let toolbox: TestToolbox;
@@ -25,27 +26,25 @@ describe('Party Objects', () => {
 		createPartyTxn.moveCall({
 			target: '0x2::transfer::public_party_transfer',
 			typeArguments: ['0x2::coin::Coin<0x2::rtd::RTD>'],
-			arguments: [coinWithBalance({ balance: 1 }), party],
+			arguments: [createPartyTxn.coin({ balance: 1 }), party],
 		});
 
-		const { digest } = await toolbox.client.signAndExecuteTransaction({
-			transaction: await createPartyTxn.build({
-				client: toolbox.client,
-			}),
-			signer: toolbox.keypair,
-			options: {
-				showEffects: true,
+		const result = await toolbox.keypair.signAndExecuteTransaction({
+			transaction: createPartyTxn,
+			client: toolbox.jsonRpcClient,
+		});
+
+		const waitResult = await toolbox.jsonRpcClient.core.waitForTransaction({
+			result,
+			include: {
+				effects: true,
 			},
 		});
+		const effects = waitResult.Transaction!.effects;
 
-		const { effects } = await toolbox.client.waitForTransaction({
-			digest,
-			options: {
-				showEffects: true,
-			},
-		});
-
-		const partyCoin = effects!.created![0].reference.objectId;
+		const partyCoin = effects!.changedObjects.filter(
+			(o: RtdClientTypes.ChangedObject) => o.idOperation === 'Created',
+		)[0].objectId;
 
 		const returnTx = new Transaction();
 		returnTx.setSender(toolbox.address());
@@ -56,19 +55,27 @@ describe('Party Objects', () => {
 			arguments: [returnTx.object(partyCoin), returnTx.pure.address(toolbox.address())],
 		});
 
-		const { digest: returnDigest } = await toolbox.client.signAndExecuteTransaction({
-			transaction: await returnTx.build({ client: toolbox.client }),
-			signer: toolbox.keypair,
+		await returnTx.build({
+			client: toolbox.jsonRpcClient,
 		});
 
-		const { effects: returnEffects } = await toolbox.client.waitForTransaction({
-			digest: returnDigest,
-			options: {
-				showEffects: true,
+		const returnResult = await toolbox.keypair.signAndExecuteTransaction({
+			transaction: returnTx,
+			client: toolbox.jsonRpcClient,
+		});
+
+		const returnWaitResult = await toolbox.jsonRpcClient.core.waitForTransaction({
+			result: returnResult,
+			include: {
+				effects: true,
 			},
 		});
+		const returnEffects = returnWaitResult.Transaction!.effects;
 
-		expect(returnEffects!.status.status).toBe('success');
+		expect(returnEffects!.status).toEqual({
+			error: null,
+			success: true,
+		});
 	});
 
 	it('should correctly handle party objects only used in ptb commands', async () => {
@@ -83,27 +90,27 @@ describe('Party Objects', () => {
 		createPartyTxn.moveCall({
 			target: '0x2::transfer::public_party_transfer',
 			typeArguments: ['0x2::coin::Coin<0x2::rtd::RTD>'],
-			arguments: [coinWithBalance({ balance: 1 }), party],
+			arguments: [createPartyTxn.coin({ balance: 1 }), party],
 		});
 
-		const { digest } = await toolbox.client.signAndExecuteTransaction({
-			transaction: await createPartyTxn.build({
-				client: toolbox.client,
-			}),
-			signer: toolbox.keypair,
-			options: {
-				showEffects: true,
+		const result = await toolbox.keypair.signAndExecuteTransaction({
+			transaction: createPartyTxn,
+			client: toolbox.jsonRpcClient,
+		});
+
+		const waitResult = await toolbox.jsonRpcClient.core.waitForTransaction({
+			result,
+			include: {
+				effects: true,
 			},
 		});
+		const effects = waitResult.Transaction!.effects;
 
-		const { effects } = await toolbox.client.waitForTransaction({
-			digest,
-			options: {
-				showEffects: true,
-			},
-		});
+		await new Promise((resolve) => setTimeout(resolve, 3000));
 
-		const partyCoin = effects!.created![0].reference;
+		const partyCoin = effects!.changedObjects.filter(
+			(o: RtdClientTypes.ChangedObject) => o.idOperation === 'Created',
+		)[0];
 
 		const returnTx = new Transaction();
 		returnTx.setSender(toolbox.address());
@@ -112,24 +119,28 @@ describe('Party Objects', () => {
 				returnTx.sharedObjectRef({
 					objectId: partyCoin.objectId,
 					mutable: true,
-					initialSharedVersion: partyCoin.version,
+					initialSharedVersion: partyCoin.outputVersion!,
 				}),
 			],
 			toolbox.keypair.getPublicKey().toRtdAddress(),
 		);
 
-		const { digest: returnDigest } = await toolbox.client.signAndExecuteTransaction({
-			transaction: await returnTx.build({ client: toolbox.client }),
-			signer: toolbox.keypair,
+		const returnResult = await toolbox.keypair.signAndExecuteTransaction({
+			transaction: returnTx,
+			client: toolbox.jsonRpcClient,
 		});
 
-		const { effects: returnEffects } = await toolbox.client.waitForTransaction({
-			digest: returnDigest,
-			options: {
-				showEffects: true,
+		const returnWaitResult = await toolbox.jsonRpcClient.core.waitForTransaction({
+			result: returnResult,
+			include: {
+				effects: true,
 			},
 		});
+		const returnEffects = returnWaitResult.Transaction!.effects;
 
-		expect(returnEffects!.status.status).toBe('success');
+		expect(returnEffects!.status).toEqual({
+			error: null,
+			success: true,
+		});
 	});
 });

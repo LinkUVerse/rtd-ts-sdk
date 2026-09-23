@@ -9,7 +9,7 @@ import { is, parse } from 'valibot';
 import type { SignatureWithBytes, Signer } from '../cryptography/index.js';
 import { normalizeRtdAddress } from '../utils/rtd-types.js';
 import type { TransactionArgument } from './Commands.js';
-import { Commands } from './Commands.js';
+import { TransactionCommands } from './Commands.js';
 import type { CallArg, Command, Argument, ObjectRef } from './data/internal.js';
 import {
 	ArgumentSchema,
@@ -31,7 +31,20 @@ import { createPure } from './pure.js';
 import { TransactionDataBuilder } from './TransactionData.js';
 import { getIdFromCallArg } from './utils.js';
 import { namedPackagesPlugin } from './plugins/NamedPackagesPlugin.js';
-import type { ClientWithCoreApi } from '../experimental/core.js';
+import { ALLOWANCE_BALANCE, allowanceBalance } from './intents/AllowanceBalance.js';
+import { resolveBalances } from './intents/ResolveBalances.js';
+import type { BalanceOptions } from './intents/BalanceOptions.js';
+import { normalizeBalance } from './intents/BalanceOptions.js';
+import { COIN_WITH_BALANCE, coinWithBalance, createBalance } from './intents/CoinWithBalance.js';
+
+export type WithdrawalOptions = {
+	amount: number | bigint | string;
+	type?: string | null;
+} & (
+	| { from?: 'sender'; allowance?: never; funder?: never }
+	| { from: 'sponsor'; allowance?: never; funder?: never }
+	| { from: 'allowance'; allowance: string; funder: string }
+);
 
 export type TransactionObjectArgument =
 	| Exclude<InferInput<typeof ArgumentSchema>, { Input: unknown; type?: 'pure' }>
@@ -44,8 +57,7 @@ export type TransactionResult = Extract<Argument, { Result: unknown }> &
 	Extract<Argument, { NestedResult: unknown }>[];
 
 export type TransactionResultArgument =
-	| Extract<Argument, { Result: unknown }>
-	| readonly Extract<Argument, { NestedResult: unknown }>[];
+	Extract<Argument, { Result: unknown }> | readonly Extract<Argument, { NestedResult: unknown }>[];
 
 export type AsyncTransactionThunk<
 	T extends TransactionResultArgument | void = TransactionResultArgument | void,
@@ -126,41 +138,23 @@ export function isTransaction(obj: unknown): obj is TransactionLike {
 
 export type TransactionObjectInput = string | CallArg | TransactionObjectArgument;
 
-interface TransactionPluginRegistry {
-	// eslint-disable-next-line @typescript-eslint/ban-types
-	buildPlugins: Map<string | Function, TransactionPlugin>;
-	// eslint-disable-next-line @typescript-eslint/ban-types
-	serializationPlugins: Map<string | Function, TransactionPlugin>;
-}
-
-const modulePluginRegistry: TransactionPluginRegistry = {
-	buildPlugins: new Map(),
-	serializationPlugins: new Map(),
-};
-
-const TRANSACTION_REGISTRY_KEY = Symbol.for('rtd-transaction/registry');
-function getGlobalPluginRegistry() {
-	try {
-		const target = globalThis as {
-			[TRANSACTION_REGISTRY_KEY]?: TransactionPluginRegistry;
-		};
-
-		if (!target[TRANSACTION_REGISTRY_KEY]) {
-			target[TRANSACTION_REGISTRY_KEY] = modulePluginRegistry;
-		}
-
-		return target[TRANSACTION_REGISTRY_KEY];
-	} catch {
-		return modulePluginRegistry;
-	}
-}
-
 type InputSection = (CallArg | InputSection)[];
 type CommandSection = (Command | CommandSection)[];
 
 type TransactionLike = {
 	getData(): unknown;
 };
+
+export interface TransactionCopyOptions {
+	/**
+	 * A map of intent names to resolvers for any custom intents used in the transaction being copied.
+	 *
+	 * Built-in intents (such as `CoinWithBalance`) are handled automatically. Providing resolvers for
+	 * custom intents lets `Transaction.from` copy a transaction synchronously even when it still
+	 * contains unresolved intents, without first awaiting `prepareForSerialization`.
+	 */
+	intentResolvers?: Record<string, TransactionPlugin>;
+}
 
 /**
  * Transaction Builder
@@ -198,8 +192,15 @@ export class Transaction {
 	 * There are two supported serialized formats:
 	 * - A string returned from `Transaction#serialize`. The serialized format must be compatible, or it will throw an error.
 	 * - A byte array (or base64-encoded bytes) containing BCS transaction data.
+	 *
+	 * When copying an in-memory transaction that uses custom intents, pass resolvers for those intents
+	 * via `options.intentResolvers` so the copy can be created synchronously without first awaiting
+	 * `prepareForSerialization`. Built-in intents (such as `CoinWithBalance`) are handled automatically.
 	 */
-	static from(transaction: string | Uint8Array | TransactionLike) {
+	static from(
+		transaction: string | Uint8Array | TransactionLike,
+		options: TransactionCopyOptions = {},
+	) {
 		const newTransaction = new Transaction();
 
 		if (isTransaction(transaction)) {
@@ -218,41 +219,31 @@ export class Transaction {
 		newTransaction.#commandSection = newTransaction.#data.commands.slice();
 		newTransaction.#availableResults = new Set(newTransaction.#commandSection.map((_, i) => i));
 
+		// Built-in intents are resolvable by default. Caller-supplied resolvers cover custom intents,
+		// and take precedence so a built-in resolver can be overridden if needed.
+		const intentResolvers = new Map<string, TransactionPlugin>([
+			[COIN_WITH_BALANCE, resolveBalances],
+			[ALLOWANCE_BALANCE, resolveBalances],
+			...Object.entries(options.intentResolvers ?? {}),
+		]);
+
+		if (
+			!newTransaction.isPreparedForSerialization({
+				supportedIntents: [...intentResolvers.keys()],
+			})
+		) {
+			throw new Error(
+				'Transaction has unresolved intents or async thunks. Provide resolvers for any custom intents via the `intentResolvers` option, or call `prepareForSerialization` before copying.',
+			);
+		}
+
+		// Register every resolver so the copy can resolve its intents on build. Resolvers for intents
+		// that aren't present are harmless — a resolver only runs when its intent appears in the data.
+		for (const [intent, resolver] of intentResolvers) {
+			newTransaction.addIntentResolver(intent, resolver);
+		}
+
 		return newTransaction;
-	}
-
-	/** @deprecated global plugins should be registered with a name */
-	static registerGlobalSerializationPlugin(step: TransactionPlugin): void;
-	static registerGlobalSerializationPlugin(name: string, step: TransactionPlugin): void;
-	static registerGlobalSerializationPlugin(
-		stepOrStep: TransactionPlugin | string,
-		step?: TransactionPlugin,
-	) {
-		getGlobalPluginRegistry().serializationPlugins.set(
-			stepOrStep,
-			step ?? (stepOrStep as TransactionPlugin),
-		);
-	}
-
-	static unregisterGlobalSerializationPlugin(name: string) {
-		getGlobalPluginRegistry().serializationPlugins.delete(name);
-	}
-
-	/** @deprecated global plugins should be registered with a name */
-	static registerGlobalBuildPlugin(step: TransactionPlugin): void;
-	static registerGlobalBuildPlugin(name: string, step: TransactionPlugin): void;
-	static registerGlobalBuildPlugin(
-		stepOrStep: TransactionPlugin | string,
-		step?: TransactionPlugin,
-	) {
-		getGlobalPluginRegistry().buildPlugins.set(
-			stepOrStep,
-			step ?? (stepOrStep as TransactionPlugin),
-		);
-	}
-
-	static unregisterGlobalBuildPlugin(name: string) {
-		getGlobalPluginRegistry().buildPlugins.delete(name);
 	}
 
 	addSerializationPlugin(step: TransactionPlugin) {
@@ -286,32 +277,27 @@ export class Transaction {
 	setExpiration(expiration?: InferInput<typeof TransactionExpiration> | null) {
 		this.#data.expiration = expiration ? parse(TransactionExpiration, expiration) : null;
 	}
-	setGasPrice(price: number | bigint) {
-		this.#data.gasConfig.price = String(price);
+	setGasPrice(price: number | bigint | string) {
+		this.#data.gasData.price = String(price);
 	}
-	setGasBudget(budget: number | bigint) {
-		this.#data.gasConfig.budget = String(budget);
+	setGasBudget(budget: number | bigint | string) {
+		this.#data.gasData.budget = String(budget);
 	}
 
-	setGasBudgetIfNotSet(budget: number | bigint) {
+	setGasBudgetIfNotSet(budget: number | bigint | string) {
 		if (this.#data.gasData.budget == null) {
-			this.#data.gasConfig.budget = String(budget);
+			this.#data.gasData.budget = String(budget);
 		}
 	}
 
 	setGasOwner(owner: string) {
-		this.#data.gasConfig.owner = owner;
+		this.#data.gasData.owner = owner;
 	}
 	setGasPayment(payments: ObjectRef[]) {
-		this.#data.gasConfig.payment = payments.map((payment) => parse(ObjectRefSchema, payment));
+		this.#data.gasData.payment = payments.map((payment) => parse(ObjectRefSchema, payment));
 	}
 
 	#data: TransactionDataBuilder;
-
-	/** @deprecated Use `getData()` instead. */
-	get blockData() {
-		return serializeV1TransactionData(this.#data.snapshot());
-	}
 
 	/** Get a snapshot of the transaction data, in JSON form: */
 	getData() {
@@ -354,15 +340,44 @@ export class Transaction {
 	}
 
 	constructor() {
-		const globalPlugins = getGlobalPluginRegistry();
 		this.#data = new TransactionDataBuilder();
-		this.#buildPlugins = [...globalPlugins.buildPlugins.values()];
-		this.#serializationPlugins = [...globalPlugins.serializationPlugins.values()];
+		this.#buildPlugins = [];
+		this.#serializationPlugins = [];
 	}
 
 	/** Returns an argument for the gas coin, to be used in a transaction. */
 	get gas() {
 		return { $kind: 'GasCoin' as const, GasCoin: true as const };
+	}
+
+	/**
+	 * Creates a Coin<T> of the specified type and amount (defaults to RTD).
+	 * Sourced from address balance when available, falling back to owned coins.
+	 * With `allowance`, spends only from the funder's address balance under that allowance.
+	 * Allowance IDs are resolved using the build client; app-bound allowances also require an app type and SpendPermit.
+	 */
+	coin(options: BalanceOptions): TransactionResult {
+		const amount = normalizeBalance(options);
+		return this.add(
+			options.allowance !== undefined
+				? allowanceBalance({ ...options, amount, outputKind: 'coin' })
+				: coinWithBalance({ ...options, balance: amount }),
+		);
+	}
+
+	/**
+	 * Creates a Balance<T> of the specified type and amount (defaults to RTD).
+	 * Sourced from address balance when available, falling back to owned coins.
+	 * With `allowance`, spends only from the funder's address balance under that allowance.
+	 * Allowance IDs are resolved using the build client; app-bound allowances also require an app type and SpendPermit.
+	 */
+	balance(options: BalanceOptions): TransactionResult {
+		const amount = normalizeBalance(options);
+		return this.add(
+			options.allowance !== undefined
+				? allowanceBalance({ ...options, amount, outputKind: 'balance' })
+				: createBalance({ ...options, balance: amount }),
+		);
 	}
 
 	/**
@@ -562,7 +577,7 @@ export class Transaction {
 	splitCoins<
 		const Amounts extends (TransactionArgument | SerializedBcs<any> | number | string | bigint)[],
 	>(coin: TransactionObjectArgument | string, amounts: Amounts) {
-		const command = Commands.SplitCoins(
+		const command = TransactionCommands.SplitCoins(
 			typeof coin === 'string' ? this.object(coin) : this.#resolveArgument(coin),
 			amounts.map((amount) =>
 				typeof amount === 'number' || typeof amount === 'bigint' || typeof amount === 'string'
@@ -583,7 +598,7 @@ export class Transaction {
 		sources: (TransactionObjectArgument | string)[],
 	) {
 		return this.add(
-			Commands.MergeCoins(
+			TransactionCommands.MergeCoins(
 				this.object(destination),
 				sources.map((src) => this.object(src)),
 			),
@@ -591,7 +606,7 @@ export class Transaction {
 	}
 	publish({ modules, dependencies }: { modules: number[][] | string[]; dependencies: string[] }) {
 		return this.add(
-			Commands.Publish({
+			TransactionCommands.Publish({
 				modules,
 				dependencies,
 			}),
@@ -609,7 +624,7 @@ export class Transaction {
 		ticket: TransactionObjectArgument | string;
 	}) {
 		return this.add(
-			Commands.Upgrade({
+			TransactionCommands.Upgrade({
 				modules,
 				dependencies,
 				package: packageId,
@@ -634,10 +649,10 @@ export class Transaction {
 				typeArguments?: string[];
 		  }) {
 		return this.add(
-			Commands.MoveCall({
+			TransactionCommands.MoveCall({
 				...input,
 				arguments: args?.map((arg) => this.#normalizeTransactionArgument(arg)),
-			} as Parameters<typeof Commands.MoveCall>[0]),
+			} as Parameters<typeof TransactionCommands.MoveCall>[0]),
 		);
 	}
 	transferObjects(
@@ -645,7 +660,7 @@ export class Transaction {
 		address: TransactionArgument | SerializedBcs<any> | string,
 	) {
 		return this.add(
-			Commands.TransferObjects(
+			TransactionCommands.TransferObjects(
 				objects.map((obj) => this.object(obj)),
 				typeof address === 'string'
 					? this.pure.address(address)
@@ -661,11 +676,49 @@ export class Transaction {
 		type?: string;
 	}) {
 		return this.add(
-			Commands.MakeMoveVec({
+			TransactionCommands.MakeMoveVec({
 				type,
 				elements: elements.map((obj) => this.object(obj)),
 			}),
 		);
+	}
+
+	/**
+	 * Creates a FundsWithdrawal input for withdrawing Balance<T> from an address balance.
+	 *
+	 * @param options.amount - The amount to withdraw (u64).
+	 * @param options.type - The coin type T (e.g., "0x2::rtd::RTD"), not Balance<T>. Defaults to RTD.
+	 * @param options.from - The withdrawal source. Defaults to the transaction sender.
+	 * @param options.allowance - The allowance ID, required when from is 'allowance'.
+	 * @param options.funder - The funder's address, required when from is 'allowance'.
+	 */
+	withdrawal(options: WithdrawalOptions): {
+		$kind: 'Input';
+		Input: number;
+		type?: 'object';
+	} {
+		const input: CallArg = {
+			$kind: 'FundsWithdrawal',
+			FundsWithdrawal: {
+				// TODO: support entire balance withdrawals once supported
+				reservation: { $kind: 'MaxAmountU64', MaxAmountU64: String(options.amount) },
+				typeArg: { $kind: 'Balance', Balance: options.type ?? '0x2::rtd::RTD' },
+				withdrawFrom:
+					options.from === 'allowance'
+						? {
+								$kind: 'SenderAllowance',
+								SenderAllowance: {
+									funder: normalizeRtdAddress(options.funder),
+									allowance: normalizeRtdAddress(options.allowance),
+								},
+							}
+						: options.from === 'sponsor'
+							? { $kind: 'Sponsor', Sponsor: true }
+							: { $kind: 'Sender', Sender: true },
+			},
+		};
+
+		return this.#addInput('object', input);
 	}
 
 	/**
@@ -702,6 +755,31 @@ export class Transaction {
 	}
 
 	/**
+	 * Checks if the transaction is prepared for serialization to JSON.
+	 * This means:
+	 *  - All async thunks have been fully resolved
+	 *  - All transaction intents have been resolved (unless in supportedIntents)
+	 *
+	 * Unlike `isFullyResolved()`, this does not require the sender, gas payment,
+	 * budget, or object versions to be set.
+	 */
+	isPreparedForSerialization(options: { supportedIntents?: string[] } = {}) {
+		if (this.#pendingPromises.size > 0) {
+			return false;
+		}
+
+		if (
+			this.#data.commands.some(
+				(cmd) => cmd.$Intent && !options.supportedIntents?.includes(cmd.$Intent.name),
+			)
+		) {
+			return false;
+		}
+
+		return true;
+	}
+
+	/**
 	 *  Ensures that:
 	 *  - All objects have been fully resolved to a specific version
 	 *  - All pure inputs have been serialized to bytes
@@ -713,15 +791,11 @@ export class Transaction {
 	 *  When true, the transaction will always be built to the same bytes and digest (unless the transaction is mutated)
 	 */
 	isFullyResolved() {
+		if (!this.isPreparedForSerialization()) {
+			return false;
+		}
+
 		if (!this.#data.sender) {
-			return false;
-		}
-
-		if (this.#pendingPromises.size > 0) {
-			return false;
-		}
-
-		if (this.#data.commands.some((cmd) => cmd.$Intent)) {
 			return false;
 		}
 
@@ -743,9 +817,7 @@ export class Transaction {
 
 	/** Derive transaction digest */
 	async getDigest(
-		options: {
-			client?: ClientWithCoreApi;
-		} = {},
+		options: Pick<BuildTransactionOptions, 'client' | 'assumeSufficientAddressBalances'> = {},
 	): Promise<string> {
 		await this.prepareForSerialization(options);
 		await this.#prepareBuild(options);
@@ -908,16 +980,21 @@ export class Transaction {
 
 		const steps = [...this.#serializationPlugins];
 
+		// A resolver may handle several intent names; run it once with its assigned intents.
+		const resolverIntents = new Map<TransactionPlugin, string[]>();
 		for (const intent of intents) {
-			if (options.supportedIntents?.includes(intent)) {
-				continue;
-			}
-
-			if (!this.#intentResolvers.has(intent)) {
-				throw new Error(`Missing intent resolver for ${intent}`);
-			}
-
-			steps.push(this.#intentResolvers.get(intent)!);
+			if (options.supportedIntents?.includes(intent)) continue;
+			const resolver = this.#intentResolvers.get(intent);
+			if (!resolver) throw new Error(`Missing intent resolver for ${intent}`);
+			const names = resolverIntents.get(resolver) ?? [];
+			names.push(intent);
+			resolverIntents.set(resolver, names);
+		}
+		for (const [resolver, intentNames] of resolverIntents) {
+			steps.push((data, buildOptions, next) => {
+				const resolverOptions = { ...buildOptions, intentNames };
+				return resolver(data, resolverOptions, next);
+			});
 		}
 
 		steps.push(namedPackagesPlugin());

@@ -4,33 +4,26 @@
 import { bcs } from 'rtd-bcs';
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { RtdTransactionBlockResponse } from '../../src/client';
-import { Transaction } from '../../src/transactions';
-import { TransactionDataBuilder } from '../../src/transactions/TransactionData';
-import { RTD_SYSTEM_STATE_OBJECT_ID } from '../../src/utils';
-import { publishPackage, setup, TestToolbox } from './utils/setup';
+import { Transaction } from '../../src/transactions/index.js';
+import { TransactionDataBuilder } from '../../src/transactions/TransactionData.js';
+import { RTD_SYSTEM_STATE_OBJECT_ID } from '../../src/utils/index.js';
+import { setup, TestToolbox } from './utils/setup.js';
 
 let toolbox: TestToolbox;
 let packageId: string;
-let publishTxn: RtdTransactionBlockResponse;
 let sharedObjectId: string;
+
 beforeAll(async () => {
 	toolbox = await setup();
-	({ packageId, publishTxn } = await publishPackage('serializer'));
-	const sharedObject = publishTxn.effects?.created!.filter(
-		(o) =>
-			typeof o.owner === 'object' &&
-			'Shared' in o.owner &&
-			o.owner.Shared.initial_shared_version !== undefined,
-	)[0];
-	sharedObjectId = sharedObject!.reference.objectId;
+	packageId = await toolbox.getPackage('test_data');
+	sharedObjectId = toolbox.getSharedObject('test_data', 'MutableShared')!;
 });
 
 describe('Transaction bcs Serialization and deserialization', () => {
 	async function serializeAndDeserialize(tx: Transaction, mutable: boolean[]) {
 		tx.setSender(toolbox.address());
 		const transactionBytes = await tx.build({
-			client: toolbox.client,
+			client: toolbox.jsonRpcClient,
 		});
 		const deserializedTxnBuilder = TransactionDataBuilder.fromBytes(transactionBytes);
 		expect(
@@ -100,11 +93,11 @@ describe('TXB v2 JSON serialization', () => {
 		const reserializedTxnJson = await deserializedTxnBuilder.getData();
 		expect(reserializedTxnJson).toEqual(transactionJson);
 		const reserializedTxnBytes = await deserializedTxnBuilder.build({
-			client: toolbox.client,
+			client: toolbox.grpcClient,
 		});
 		expect(reserializedTxnBytes).toEqual(
 			await tx.build({
-				client: toolbox.client,
+				client: toolbox.grpcClient,
 			}),
 		);
 
@@ -187,11 +180,11 @@ describe('TXB v1 JSON serialization', () => {
 		const transactionJson = json ?? (await tx.serialize());
 		const deserializedTxnBuilder = Transaction.from(transactionJson);
 		const reserializedTxnBytes = await deserializedTxnBuilder.build({
-			client: toolbox.client,
+			client: toolbox.jsonRpcClient,
 		});
 		expect(reserializedTxnBytes).toEqual(
 			await tx.build({
-				client: toolbox.client,
+				client: toolbox.jsonRpcClient,
 			}),
 		);
 

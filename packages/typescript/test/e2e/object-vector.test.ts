@@ -1,11 +1,11 @@
 // Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { Transaction } from '../../src/transactions';
-import { RTD_FRAMEWORK_ADDRESS } from '../../src/utils';
-import { publishPackage, setup, TestToolbox } from './utils/setup';
+import { Transaction } from '../../src/transactions/index.js';
+import { RTD_FRAMEWORK_ADDRESS } from '../../src/utils/index.js';
+import { setup, TestToolbox } from './utils/setup.js';
 
 describe('Test Move call with a vector of objects as input', () => {
 	let toolbox: TestToolbox;
@@ -17,17 +17,15 @@ describe('Test Move call with a vector of objects as input', () => {
 			target: `${packageId}::entry_point_vector::mint`,
 			arguments: [tx.pure.u64(val)],
 		});
-		const result = await toolbox.client.signAndExecuteTransaction({
-			signer: toolbox.keypair,
+		const result = await toolbox.keypair.signAndExecuteTransaction({
+			client: toolbox.grpcClient,
 			transaction: tx,
-			options: {
-				showEffects: true,
-			},
 		});
 
-		await toolbox.client.waitForTransaction({ digest: result.digest });
-		expect(result.effects?.status.status).toEqual('success');
-		return result.effects?.created![0].reference.objectId!;
+		await toolbox.grpcClient.core.waitForTransaction({ result });
+		expect(result.Transaction?.effects?.status.success).toEqual(true);
+		return result.Transaction?.effects?.changedObjects.filter((o) => o.idOperation === 'Created')[0]
+			?.objectId!;
 	}
 
 	async function destroyObjects(objects: string[], withType = false) {
@@ -40,21 +38,21 @@ describe('Test Move call with a vector of objects as input', () => {
 			target: `${packageId}::entry_point_vector::two_obj_vec_destroy`,
 			arguments: [vec],
 		});
-		const result = await toolbox.client.signAndExecuteTransaction({
-			signer: toolbox.keypair,
+		const result = await toolbox.keypair.signAndExecuteTransaction({
+			client: toolbox.grpcClient,
 			transaction: tx,
-			options: {
-				showEffects: true,
-			},
 		});
-		await toolbox.client.waitForTransaction({ digest: result.digest });
-		expect(result.effects?.status.status).toEqual('success');
+		await toolbox.grpcClient.core.waitForTransaction({ result });
+		expect(result.Transaction?.effects?.status.success).toEqual(true);
 	}
+
+	beforeAll(async () => {
+		const initToolbox = await setup();
+		packageId = await initToolbox.getPackage('test_data');
+	});
 
 	beforeEach(async () => {
 		toolbox = await setup();
-
-		({ packageId } = await publishPackage('entry_point_vector'));
 	});
 
 	it('Test object vector', async () => {
@@ -79,13 +77,10 @@ describe('Test Move call with a vector of objects as input', () => {
 			arguments: [tx.object(coinIDs[0]), vec],
 		});
 		tx.setGasPayment([{ objectId: coin.coinObjectId, digest: coin.digest, version: coin.version }]);
-		const result = await toolbox.client.signAndExecuteTransaction({
-			signer: toolbox.keypair,
+		const result = await toolbox.keypair.signAndExecuteTransaction({
+			client: toolbox.grpcClient,
 			transaction: tx,
-			options: {
-				showEffects: true,
-			},
 		});
-		expect(result.effects?.status.status).toEqual('success');
+		expect(result.Transaction?.effects?.status.success).toEqual(true);
 	});
 });

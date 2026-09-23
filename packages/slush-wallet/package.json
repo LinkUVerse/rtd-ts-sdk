@@ -1,34 +1,36 @@
 {
 	"name": "rtd-slush-wallet",
-	"version": "0.2.12",
+	"version": "1.2.5",
 	"description": "Wallet adapter for Slush web wallet",
 	"license": "Apache-2.0",
 	"author": "LinkU Labs <build@linkuverse.com>",
-	"type": "commonjs",
-	"main": "./dist/cjs/index.js",
-	"module": "./dist/esm/index.js",
-	"types": "./dist/cjs/index.d.ts",
+	"type": "module",
+	"main": "./dist/index.mjs",
+	"types": "./dist/index.d.mts",
 	"exports": {
 		".": {
-			"import": "./dist/esm/index.js",
-			"require": "./dist/cjs/index.js"
+			"types": "./dist/index.d.mts",
+			"import": "./dist/index.mjs",
+			"default": "./dist/index.mjs"
 		}
 	},
 	"sideEffects": false,
 	"files": [
 		"CHANGELOG.md",
 		"dist",
+		"docs",
 		"experimental"
 	],
 	"scripts": {
+		"test": "vitest run",
 		"clean": "rm -rf tsconfig.tsbuildinfo ./dist",
-		"build": "build-package",
+		"build": "rm -rf dist && tsc --noEmit && tsdown",
 		"prettier:check": "prettier -c --ignore-unknown .",
 		"prettier:fix": "prettier -w --ignore-unknown .",
-		"eslint:check": "eslint --max-warnings=0 .",
-		"eslint:fix": "pnpm run eslint:check --fix",
-		"lint": "pnpm run eslint:check && pnpm run prettier:check",
-		"lint:fix": "pnpm run eslint:fix && pnpm run prettier:fix"
+		"oxlint:check": "oxlint  .",
+		"oxlint:fix": "oxlint --fix",
+		"lint": "pnpm run oxlint:check && pnpm run prettier:check",
+		"lint:fix": "pnpm run oxlint:fix && pnpm run prettier:fix"
 	},
 	"repository": {
 		"type": "git",
@@ -39,17 +41,17 @@
 	},
 	"homepage": "https://github.com/LinkUVerse/rtd-ts-sdk/tree/main/packages/slush-wallet#readme",
 	"devDependencies": {
-		"rtd-build-scripts": "workspace:*",
-		"@types/node": "^24.10.1",
-		"typescript": "^5.9.3",
-		"vitest": "^4.0.15"
+		"@types/node": "^26.2.0",
+		"typescript": "^7.0.2",
+		"vitest": "^4.1.11"
 	},
 	"dependencies": {
-		"rtd-typescript": "workspace:*",
-		"rtd-utils": "workspace:*",
-		"rtd-wallet-standard": "workspace:*",
-		"rtd-window-wallet-core": "workspace:*",
-		"mitt": "^3.0.1",
-		"valibot": "^1.2.0"
+		"rtd-utils": "workspace:^",
+		"rtd-wallet-standard": "workspace:^",
+		"rtd-window-wallet-core": "workspace:^",
+		"valibot": "^1.4.2"
+	},
+	"peerDependencies": {
+		"rtd-typescript": "workspace:^"
 	}
 }

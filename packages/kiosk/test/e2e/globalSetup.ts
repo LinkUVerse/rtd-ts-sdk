@@ -14,13 +14,11 @@ declare module 'vitest' {
 	}
 }
 
-const RTD_TOOLS_TAG =
-	process.env.RTD_TOOLS_TAG ||
-	(process.arch === 'arm64'
-		? '06204e155ea3b35fe4c949321d70091ad0ed8437-arm64'
-		: '06204e155ea3b35fe4c949321d70091ad0ed8437');
-
 export default async function setup(project: TestProject) {
+	const image = process.env.RTD_TOOLS_IMAGE;
+	if (!image) {
+		throw new Error('Set RTD_TOOLS_IMAGE to a built RTD tools image before E2E tests');
+	}
 	console.log('Starting test containers');
 	const network = await new Network().start();
 
@@ -36,7 +34,7 @@ export default async function setup(project: TestProject) {
 		.withPullPolicy(PullPolicy.alwaysPull())
 		.start();
 
-	const localnet = await new GenericContainer(`linku/rtd-tools:${RTD_TOOLS_TAG}`)
+	const localnet = await new GenericContainer(image)
 		.withCommand([
 			'rtd',
 			'start',

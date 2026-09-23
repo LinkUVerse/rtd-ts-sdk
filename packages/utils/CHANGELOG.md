@@ -1,5 +1,46 @@
 # rtd-utils
 
+## 0.4.1
+
+### Patch Changes
+
+- f2f7048: Upgrade workspace dependencies, remove the legacy dapp-kit package, and migrate the
+  remaining consumers to the current gRPC-based dapp-kit. Remove the legacy API reference while
+  retaining the migration guide and deprecation notice.
+
+## 0.4.0
+
+### Minor Changes
+
+- bbf63cb: Updated dependencies
+
+## 0.3.3
+
+### Patch Changes
+
+- f7de3e5: Restore docs in published tarballs.
+
+## 0.3.2
+
+### Patch Changes
+
+- 9e067cf: Validate the new per-package release flow end-to-end across every public @linku package.
+  No functional changes — empty patch bump to force the orchestrator to dispatch every
+  release-<pkg>.yml workflow with `dry_run=false` so each package publishes via OIDC trusted
+  publishing.
+
+## 0.3.1
+
+### Patch Changes
+
+- 99d1e00: Add default export condition
+
+## 0.3.0
+
+### Minor Changes
+
+- 339d1e0: Add mitt
+
 ## 0.2.0
 
 ### Minor Changes

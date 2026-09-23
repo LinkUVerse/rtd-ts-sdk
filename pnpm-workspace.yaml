@@ -1,18 +1,9 @@
-autoInstallPeers: false
-publicHoistPattern:
-  - '*storybook*'
-# Enforce that packages must be at least 2 days old before they're installed
-# This reduces the risk of supply chain attacks from newly published packages
-minimumReleaseAge: 2880
 packages:
   - 'packages/**'
   - '!**/dist/**'
   - '!**/.next/**'
   - '!packages/typescript/test/**'
   - '!packages/kiosk/test/**'
-  - '!packages/deepbook/test/**'
-  - '!packages/codegen/tests/move/**'
-  - '!packages/create-dapp/templates'
   - '!packages/typescript/scripts'
   - '!packages/typescript/transactions'
   - '!packages/typescript/cryptography'
@@ -22,23 +13,43 @@ packages:
   - '!packages/typescript/multisig'
   - '!packages/typescript/utils'
   - '!packages/typescript/bcs'
-  - '!packages/enoki/react'
   - '!packages/typescript/graphql'
   - '!packages/typescript/keypairs/ed25519'
   - '!packages/typescript/keypairs/secp256k1'
   - '!packages/typescript/keypairs/secp256r1'
   - '!packages/typescript/graphql/schemas/2024.1'
   - '!packages/typescript/graphql/schemas/2024.4'
-  - '!packages/signers/aws'
-  - '!packages/signers/gcp'
-  - '!packages/signers/ledger'
   - '!packages/typescript/zklogin'
   - '!packages/typescript/keypairs/passkey'
-  - '!packages/typescript/graphql/schemas/latest'
-  - '!packages/signers/utils'
-  - '!packages/signers/webcrypto'
-  - '!packages/zksend/experimental/unified-adapter'
+  - '!packages/typescript/graphql/schema'
   - '!packages/typescript/experimental'
-  - '!packages/dapp-kit-next/packages/dapp-kit-core/web'
+  - '!packages/dapp-kit/packages/dapp-kit-core/web'
   - '!packages/typescript/grpc'
   - '!packages/typescript/jsonRpc'
+
+# Explicit empty allowlist — no package is permitted to run install/build scripts.
+# Review a dependency before approving it with `pnpm approve-builds`.
+allowBuilds: {}
+autoInstallPeers: true
+
+# Prevent transitive dependencies from resolving untrusted git or tarball URLs.
+blockExoticSubdeps: true
+
+# Disable dependency install/build lifecycle scripts by default.
+ignoreScripts: true
+# Without this, peerDeps using `*` (wallet-sdk / wallet-standard for
+# rtd-typescript) auto-install the npm-published copy alongside the
+# workspace one — two distinct `Transaction` types -> TS2322 in the
+# dapp-kit / walrus build chain. With link-workspace-packages on, any
+# range that the workspace version satisfies (including `*`) links to
+# the workspace sibling instead of the registry copy.
+linkWorkspacePackages: true
+# Enforce that packages must be at least 2 days old before they're installed
+# This reduces the risk of supply chain attacks from newly published packages
+minimumReleaseAge: 2880
+publicHoistPattern:
+  - '*storybook*'
+
+# Prompt before running scripts when node_modules is out of sync with the
+# lockfile, to catch drift or tampering between `pnpm install` and `pnpm run`.
+verifyDepsBeforeRun: 'prompt'

@@ -1,4 +1,4 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 /// Description:
@@ -20,8 +20,8 @@
 /// wish to move the item somewhere else.
 ///
 module kiosk::kiosk_lock_rule {
-    use sui::kiosk::{Self, Kiosk};
-    use sui::transfer_policy::{
+    use rtd::kiosk::{Self, Kiosk};
+    use rtd::transfer_policy::{
         Self as policy,
         TransferPolicy,
         TransferPolicyCap,

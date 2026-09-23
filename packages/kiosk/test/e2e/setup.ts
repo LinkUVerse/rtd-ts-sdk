@@ -6,8 +6,8 @@ import type {
 	DevInspectResults,
 	RtdObjectChangePublished,
 	RtdTransactionBlockResponse,
-} from 'rtd-typescript/client';
-import { getFullnodeUrl, RtdClient } from 'rtd-typescript/client';
+} from 'rtd-typescript/jsonRpc';
+import { getJsonRpcFullnodeUrl, RtdJsonRpcClient } from 'rtd-typescript/jsonRpc';
 import { FaucetRateLimitError, getFaucetHost, requestRtdFromFaucetV2 } from 'rtd-typescript/faucet';
 import { Ed25519Keypair } from 'rtd-typescript/keypairs/ed25519';
 import { Transaction } from 'rtd-typescript/transactions';
@@ -20,14 +20,14 @@ import type { KioskClient } from '../../src/index.js';
 import { KioskTransaction } from '../../src/index.js';
 
 const DEFAULT_FAUCET_URL = process.env.FAUCET_URL ?? getFaucetHost('localnet');
-const DEFAULT_FULLNODE_URL = process.env.FULLNODE_URL ?? getFullnodeUrl('localnet');
+const DEFAULT_FULLNODE_URL = process.env.FULLNODE_URL ?? getJsonRpcFullnodeUrl('localnet');
 
 export class TestToolbox {
 	keypair: Ed25519Keypair;
-	client: RtdClient;
+	client: RtdJsonRpcClient;
 	configPath: string;
 
-	constructor(keypair: Ed25519Keypair, client: RtdClient, configPath: string) {
+	constructor(keypair: Ed25519Keypair, client: RtdJsonRpcClient, configPath: string) {
 		this.keypair = keypair;
 		this.client = client;
 		this.configPath = configPath;
@@ -42,13 +42,14 @@ export class TestToolbox {
 	}
 }
 
-export function getClient(): RtdClient {
-	return new RtdClient({
+export function getClient(): RtdJsonRpcClient {
+	return new RtdJsonRpcClient({
+		network: 'localnet',
 		url: DEFAULT_FULLNODE_URL,
 	});
 }
 
-// TODO: expose these testing utils from @linku/rtd
+// TODO: expose these testing utils from rtd-typescript
 export async function setupRtdClient() {
 	const keypair = Ed25519Keypair.generate();
 	const address = keypair.getPublicKey().toRtdAddress();

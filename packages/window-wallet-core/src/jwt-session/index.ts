@@ -7,6 +7,8 @@ import { SignJWT, decodeJwt, jwtVerify } from 'jose';
 const AccountSchema = v.object({
 	address: v.string(),
 	publicKey: v.string(),
+	label: v.optional(v.string()),
+	features: v.optional(v.array(v.string())),
 });
 
 const JwtSessionSchema = v.object({

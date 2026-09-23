@@ -1,13 +1,11 @@
 // Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import type { NamedPackagesOverrides } from '../experimental/mvr.js';
-
 export { normalizedTypeToMoveTypeSignature, getPureBcsSchema } from './serializer.js';
 
 export { Inputs } from './Inputs.js';
 export {
-	Commands,
+	TransactionCommands,
 	type TransactionArgument,
 	type TransactionInput,
 	UpgradePolicy,
@@ -19,6 +17,8 @@ export {
 	type TransactionObjectInput,
 	type TransactionObjectArgument,
 	type TransactionResult,
+	type TransactionCopyOptions,
+	type WithdrawalOptions,
 } from './Transaction.js';
 
 export { type SerializedTransactionDataV2 } from './data/v2.js';
@@ -31,8 +31,6 @@ export type {
 	GasData,
 	CallArg,
 	Command,
-	OpenMoveTypeSignature,
-	OpenMoveTypeSignatureBody,
 } from './data/internal.js';
 
 export { TransactionDataBuilder } from './TransactionData.js';
@@ -50,13 +48,6 @@ export type {
 
 export { Arguments } from './Arguments.js';
 
-export {
-	namedPackagesPlugin,
-	type NamedPackagesPluginOptions,
-} from './plugins/NamedPackagesPlugin.js';
-
-export type { NamedPackagesOverrides };
-/** @deprecated Use NamedPackagesOverrides instead */
-export type NamedPackagesPluginCache = NamedPackagesOverrides;
-
 export { isArgument } from './utils.js';
+
+export type { BalanceOptions, AllowanceReference } from './intents/BalanceOptions.js';

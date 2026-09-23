@@ -1,0 +1,9 @@
+[package]
+name = "test_data"
+edition = "2024.beta"
+
+[dependencies]
+Rtd = { git = "https://github.com/LinkUVerse/rtd.git", subdir = "crates/rtd-framework/packages/rtd-framework", rev = "framework/testnet" }
+
+[addresses]
+test_data = "0x0"

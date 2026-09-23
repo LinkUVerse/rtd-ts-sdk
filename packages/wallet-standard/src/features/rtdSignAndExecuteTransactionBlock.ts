@@ -5,7 +5,7 @@ import type {
 	ExecuteTransactionRequestType,
 	RtdTransactionBlockResponse,
 	RtdTransactionBlockResponseOptions,
-} from 'rtd-typescript/client';
+} from 'rtd-typescript/jsonRpc';
 
 import type { RtdSignTransactionBlockInput } from './rtdSignTransactionBlock.js';
 

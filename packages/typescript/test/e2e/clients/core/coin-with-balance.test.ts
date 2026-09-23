@@ -1,0 +1,2279 @@
+// Copyright (c) LinkU Labs, Inc.
+// SPDX-License-Identifier: Apache-2.0
+
+import { fromHex, toBase64 } from 'rtd-bcs';
+import { beforeAll, describe, expect, it } from 'vitest';
+
+import { bcs } from '../../../../src/bcs/index.js';
+import { Ed25519Keypair } from '../../../../src/keypairs/ed25519/index.js';
+import { Transaction } from '../../../../src/transactions/index.js';
+import type { ClientWithCoreApi } from '../../../../src/client/core.js';
+import { normalizeRtdAddress, normalizeStructTag } from '../../../../src/utils/index.js';
+import {
+	isCoinReservationDigest,
+	parseCoinReservationBalance,
+} from '../../../../src/utils/coin-reservation.js';
+import { createTestWithAllClients, setup, TestToolbox } from '../../utils/setup.js';
+
+describe('coinWithBalance', () => {
+	let toolbox: TestToolbox;
+	let publishToolbox: TestToolbox;
+	let packageId: string;
+	let testType: string;
+	let testTypeZero: string;
+	let treasuryCapId: string;
+
+	const testWithAllClients = createTestWithAllClients(() => toolbox);
+
+	beforeAll(async () => {
+		[toolbox, publishToolbox] = await Promise.all([setup(), setup()]);
+		packageId = await publishToolbox.getPackage('test_data', { normalized: false });
+		testType = normalizeRtdAddress(packageId) + '::test::TEST';
+		testTypeZero = normalizeRtdAddress(packageId) + '::test_zero::TEST_ZERO';
+
+		// Get the TreasuryCap shared object to mint TEST coins
+		treasuryCapId = publishToolbox.getSharedObject('test_data', 'TreasuryCap<TEST>')!;
+		if (!treasuryCapId) {
+			throw new Error('TreasuryCap not found in pre-published package');
+		}
+
+		// Mint TEST coins to publishToolbox address for coin tests
+		const mintTx = new Transaction();
+		mintTx.moveCall({
+			target: `${packageId}::test::mint`,
+			arguments: [
+				mintTx.object(treasuryCapId),
+				mintTx.pure.u64(100), // enough for multiple test runs across all clients
+				mintTx.pure.address(publishToolbox.address()),
+			],
+		});
+
+		await publishToolbox.signAndExecuteTransaction({
+			transaction: mintTx,
+			signer: publishToolbox.keypair,
+		});
+	});
+
+	/** Get a fresh funded signer with RTD and TEST coins for isolated test runs. */
+	async function getFundedTestSigner(amount: number = 10) {
+		const { keypair, address } = await toolbox.getSigner({ coins: [1_000_000_000n] });
+		const mintTx = new Transaction();
+		mintTx.moveCall({
+			target: `${packageId}::test::mint`,
+			arguments: [
+				mintTx.object(treasuryCapId),
+				mintTx.pure.u64(amount),
+				mintTx.pure.address(address),
+			],
+		});
+		await publishToolbox.signAndExecuteTransaction({
+			transaction: mintTx,
+			signer: publishToolbox.keypair,
+		});
+		return { keypair, address };
+	}
+
+	testWithAllClients('works with rtd', async (client) => {
+		const { keypair, address } = await toolbox.getSigner({ coins: [1_000_000_000n] });
+		const tx = new Transaction();
+		const receiver = new Ed25519Keypair();
+
+		tx.transferObjects(
+			[
+				tx.coin({
+					type: 'gas',
+					balance: 12345n,
+				}),
+			],
+			receiver.toRtdAddress(),
+		);
+		tx.setSender(address);
+
+		expect(
+			JSON.parse(
+				await tx.toJSON({
+					supportedIntents: ['CoinWithBalance'],
+				}),
+			),
+		).toEqual({
+			expiration: null,
+			gasData: {
+				budget: null,
+				owner: null,
+				payment: null,
+				price: null,
+			},
+			inputs: [
+				{
+					Pure: {
+						bytes: toBase64(fromHex(receiver.toRtdAddress())),
+					},
+				},
+			],
+			sender: address,
+			commands: [
+				{
+					$Intent: {
+						data: {
+							balance: '12345',
+							type: 'gas',
+							outputKind: 'coin',
+						},
+						inputs: {},
+						name: 'CoinWithBalance',
+					},
+				},
+				{
+					TransferObjects: {
+						objects: [
+							{
+								Result: 0,
+							},
+						],
+						address: {
+							Input: 0,
+						},
+					},
+				},
+			],
+			version: 2,
+		});
+
+		expect(
+			JSON.parse(
+				await tx.toJSON({
+					supportedIntents: [],
+					client,
+				}),
+			),
+		).toEqual({
+			expiration: null,
+			gasData: {
+				budget: null,
+				owner: null,
+				payment: null,
+				price: null,
+			},
+			inputs: [
+				{
+					Pure: {
+						bytes: toBase64(fromHex(receiver.toRtdAddress())),
+					},
+				},
+				{
+					Pure: {
+						bytes: toBase64(bcs.u64().serialize(12345).toBytes()),
+					},
+				},
+			],
+			sender: address,
+			commands: [
+				{
+					SplitCoins: {
+						coin: {
+							GasCoin: true,
+						},
+						amounts: [
+							{
+								Input: 1,
+							},
+						],
+					},
+				},
+				{
+					TransferObjects: {
+						objects: [
+							{
+								NestedResult: [0, 0],
+							},
+						],
+						address: {
+							Input: 0,
+						},
+					},
+				},
+			],
+			version: 2,
+		});
+
+		const { digest } = await toolbox.jsonRpcClient.signAndExecuteTransaction({
+			transaction: tx,
+			signer: keypair,
+		});
+
+		const [result] = await Promise.all([
+			toolbox.jsonRpcClient.waitForTransaction({
+				digest,
+				options: { showEffects: true, showBalanceChanges: true },
+			}),
+			toolbox.waitForTransaction({ digest }),
+		]);
+
+		expect(result.effects?.status.status).toBe('success');
+		expect(
+			result.balanceChanges?.find(
+				(change) =>
+					typeof change.owner === 'object' &&
+					'AddressOwner' in change.owner &&
+					change.owner.AddressOwner === receiver.toRtdAddress(),
+			),
+		).toEqual({
+			amount: '12345',
+			coinType: '0x2::rtd::RTD',
+			owner: {
+				AddressOwner: receiver.toRtdAddress(),
+			},
+		});
+	});
+
+	testWithAllClients('works with custom coin', async (client) => {
+		const { keypair, address } = await getFundedTestSigner(10);
+		const tx = new Transaction();
+		const receiver = new Ed25519Keypair();
+
+		tx.transferObjects(
+			[
+				tx.coin({
+					type: testType,
+					balance: 1n,
+				}),
+			],
+			receiver.toRtdAddress(),
+		);
+		tx.setSender(address);
+
+		expect(
+			JSON.parse(
+				await tx.toJSON({
+					supportedIntents: ['CoinWithBalance'],
+				}),
+			),
+		).toEqual({
+			expiration: null,
+			gasData: {
+				budget: null,
+				owner: null,
+				payment: null,
+				price: null,
+			},
+			inputs: [
+				{
+					Pure: {
+						bytes: toBase64(fromHex(receiver.toRtdAddress())),
+					},
+				},
+			],
+			sender: address,
+			commands: [
+				{
+					$Intent: {
+						data: {
+							balance: '1',
+							type: testType,
+							outputKind: 'coin',
+						},
+						inputs: {},
+						name: 'CoinWithBalance',
+					},
+				},
+				{
+					TransferObjects: {
+						objects: [
+							{
+								Result: 0,
+							},
+						],
+						address: {
+							Input: 0,
+						},
+					},
+				},
+			],
+			version: 2,
+		});
+
+		expect(
+			JSON.parse(
+				await tx.toJSON({
+					supportedIntents: [],
+					client,
+				}),
+			),
+		).toEqual({
+			expiration: null,
+			gasData: {
+				budget: null,
+				owner: null,
+				payment: null,
+				price: null,
+			},
+			inputs: [
+				{
+					Pure: {
+						bytes: toBase64(fromHex(receiver.toRtdAddress())),
+					},
+				},
+				{
+					Object: {
+						ImmOrOwnedObject: expect.anything(),
+					},
+				},
+				{
+					Pure: {
+						bytes: toBase64(bcs.u64().serialize(1).toBytes()),
+					},
+				},
+			],
+			sender: address,
+			commands: [
+				{
+					SplitCoins: {
+						coin: {
+							Input: 1,
+						},
+						amounts: [
+							{
+								Input: 2,
+							},
+						],
+					},
+				},
+				{
+					TransferObjects: {
+						objects: [{ NestedResult: [0, 0] }],
+						address: {
+							Input: 0,
+						},
+					},
+				},
+			],
+			version: 2,
+		});
+
+		const result = await client.core.signAndExecuteTransaction({
+			transaction: tx,
+			signer: keypair,
+			include: {
+				effects: true,
+				balanceChanges: true,
+			},
+		});
+
+		expect(result.Transaction?.status.success).toBe(true);
+		expect(
+			result.Transaction!.balanceChanges?.find(
+				(change) => change.address === receiver.toRtdAddress(),
+			),
+		).toEqual({
+			amount: '1',
+			coinType: testType,
+			address: receiver.toRtdAddress(),
+		});
+	});
+
+	testWithAllClients(
+		'executes exact coin funding before a Random-consuming call',
+		async (client) => {
+			const { keypair, address } = await getFundedTestSigner(1);
+			const receiver = new Ed25519Keypair();
+			const tx = new Transaction();
+
+			const [returnedCoin] = tx.moveCall({
+				target: `${packageId}::random_coin::play`,
+				typeArguments: [testType],
+				arguments: [tx.coin({ type: testType, balance: 1n }), tx.object.random()],
+			});
+			tx.transferObjects([returnedCoin], receiver.toRtdAddress());
+			tx.setSender(address);
+
+			const result = await client.core.signAndExecuteTransaction({
+				transaction: tx,
+				signer: keypair,
+				include: { balanceChanges: true },
+			});
+
+			await client.core.waitForTransaction({ result });
+
+			expect(result.$kind).toBe('Transaction');
+			if (result.$kind !== 'Transaction') throw new Error('Transaction failed');
+			expect(result.Transaction.status.success).toBe(true);
+			expect(
+				result.Transaction.balanceChanges?.find(
+					(change) => change.address === receiver.toRtdAddress(),
+				)?.amount,
+			).toBe('1');
+		},
+	);
+
+	testWithAllClients(
+		'executes address-balance funding before a Random-consuming call',
+		async (client) => {
+			const { keypair, address } = await getFundedTestSigner(1);
+			const coins = await client.core.listCoins({ owner: address, coinType: testType });
+			expect(coins.objects.length).toBeGreaterThan(0);
+
+			const depositTx = new Transaction();
+			depositTx.moveCall({
+				target: '0x2::coin::send_funds',
+				typeArguments: [testType],
+				arguments: [depositTx.object(coins.objects[0].objectId), depositTx.pure.address(address)],
+			});
+			const depositResult = await client.core.signAndExecuteTransaction({
+				transaction: depositTx,
+				signer: keypair,
+			});
+			if (depositResult.$kind !== 'Transaction') throw new Error('Deposit failed');
+			await client.core.waitForTransaction({ result: depositResult });
+
+			const { balance } = await client.core.getBalance({ owner: address, coinType: testType });
+			expect(balance.addressBalance).toBe('1');
+			expect(balance.coinBalance).toBe('0');
+
+			const receiver = new Ed25519Keypair();
+			const tx = new Transaction();
+			const [returnedCoin] = tx.moveCall({
+				target: `${packageId}::random_coin::play`,
+				typeArguments: [testType],
+				arguments: [tx.coin({ type: testType, balance: 1n }), tx.object.random()],
+			});
+			tx.transferObjects([returnedCoin], receiver.toRtdAddress());
+			tx.setSender(address);
+
+			const result = await client.core.signAndExecuteTransaction({
+				transaction: tx,
+				signer: keypair,
+				include: { balanceChanges: true },
+			});
+
+			await client.core.waitForTransaction({ result });
+
+			expect(result.$kind).toBe('Transaction');
+			if (result.$kind !== 'Transaction') throw new Error('Transaction failed');
+			expect(result.Transaction.status.success).toBe(true);
+			expect(
+				result.Transaction.balanceChanges?.find(
+					(change) => change.address === receiver.toRtdAddress(),
+				)?.amount,
+			).toBe('1');
+		},
+	);
+
+	testWithAllClients('works with zero balance coin', async (client) => {
+		const { keypair, address } = await toolbox.getSigner({ coins: [1_000_000_000n] });
+		const tx = new Transaction();
+		const receiver = new Ed25519Keypair();
+
+		tx.transferObjects(
+			[
+				tx.coin({
+					type: testTypeZero,
+					balance: 0n,
+				}),
+				tx.coin({
+					balance: 0n,
+				}),
+			],
+			receiver.toRtdAddress(),
+		);
+		tx.setSender(address);
+
+		expect(
+			JSON.parse(
+				await tx.toJSON({
+					supportedIntents: ['CoinWithBalance'],
+				}),
+			),
+		).toEqual({
+			expiration: null,
+			gasData: {
+				budget: null,
+				owner: null,
+				payment: null,
+				price: null,
+			},
+			inputs: [
+				{
+					Pure: {
+						bytes: toBase64(fromHex(receiver.toRtdAddress())),
+					},
+				},
+			],
+			sender: address,
+			commands: [
+				{
+					$Intent: {
+						data: {
+							balance: '0',
+							type: testTypeZero,
+							outputKind: 'coin',
+						},
+						inputs: {},
+						name: 'CoinWithBalance',
+					},
+				},
+				{
+					$Intent: {
+						data: {
+							balance: '0',
+							type: 'gas',
+							outputKind: 'coin',
+						},
+						inputs: {},
+						name: 'CoinWithBalance',
+					},
+				},
+				{
+					TransferObjects: {
+						objects: [
+							{
+								Result: 0,
+							},
+							{
+								Result: 1,
+							},
+						],
+						address: {
+							Input: 0,
+						},
+					},
+				},
+			],
+			version: 2,
+		});
+
+		expect(
+			JSON.parse(
+				await tx.toJSON({
+					supportedIntents: [],
+					client,
+				}),
+			),
+		).toEqual({
+			expiration: null,
+			gasData: {
+				budget: null,
+				owner: null,
+				payment: null,
+				price: null,
+			},
+			inputs: [
+				{
+					Pure: {
+						bytes: toBase64(fromHex(receiver.toRtdAddress())),
+					},
+				},
+			],
+			sender: address,
+			commands: [
+				{
+					MoveCall: {
+						arguments: [],
+						function: 'zero',
+						module: 'coin',
+						package: '0x0000000000000000000000000000000000000000000000000000000000000002',
+						typeArguments: [testTypeZero],
+					},
+				},
+				{
+					MoveCall: {
+						arguments: [],
+						function: 'zero',
+						module: 'coin',
+						package: '0x0000000000000000000000000000000000000000000000000000000000000002',
+						typeArguments: [
+							'0x0000000000000000000000000000000000000000000000000000000000000002::rtd::RTD',
+						],
+					},
+				},
+				{
+					TransferObjects: {
+						objects: [{ Result: 0 }, { Result: 1 }],
+						address: {
+							Input: 0,
+						},
+					},
+				},
+			],
+			version: 2,
+		});
+
+		const result = await client.core.signAndExecuteTransaction({
+			transaction: tx,
+			signer: keypair,
+			include: {
+				effects: true,
+				balanceChanges: true,
+				objectTypes: true,
+			},
+		});
+
+		expect(result.Transaction?.status.success).toBe(true);
+		const objectTypes = result.Transaction?.objectTypes ?? {};
+		expect(
+			result.Transaction?.effects.changedObjects?.filter((change) => {
+				if (change.idOperation !== 'Created') return false;
+				if (
+					typeof change.outputOwner !== 'object' ||
+					!change.outputOwner ||
+					!('AddressOwner' in change.outputOwner)
+				)
+					return false;
+
+				return (
+					objectTypes[change.objectId] === normalizeStructTag(`0x2::coin::Coin<${testTypeZero}>`) &&
+					change.outputOwner.AddressOwner === receiver.toRtdAddress()
+				);
+			}).length,
+		).toEqual(1);
+	});
+
+	testWithAllClients('works with multiple coins', async (client) => {
+		const { keypair, address } = await getFundedTestSigner(10);
+		const tx = new Transaction();
+		const receiver = new Ed25519Keypair();
+
+		tx.transferObjects(
+			[
+				tx.coin({ type: testType, balance: 1n }),
+				tx.coin({ type: testType, balance: 2n }),
+				tx.coin({ type: 'gas', balance: 3n }),
+				tx.coin({ type: 'gas', balance: 4n }),
+				tx.coin({ type: testTypeZero, balance: 0n }),
+			],
+			receiver.toRtdAddress(),
+		);
+
+		tx.setSender(address);
+
+		expect(
+			JSON.parse(
+				await tx.toJSON({
+					supportedIntents: ['CoinWithBalance'],
+				}),
+			),
+		).toEqual({
+			expiration: null,
+			gasData: {
+				budget: null,
+				owner: null,
+				payment: null,
+				price: null,
+			},
+			inputs: [
+				{
+					Pure: {
+						bytes: toBase64(fromHex(receiver.toRtdAddress())),
+					},
+				},
+			],
+			sender: address,
+			commands: [
+				{
+					$Intent: {
+						data: {
+							balance: '1',
+							type: testType,
+							outputKind: 'coin',
+						},
+						inputs: {},
+						name: 'CoinWithBalance',
+					},
+				},
+				{
+					$Intent: {
+						data: {
+							balance: '2',
+							type: testType,
+							outputKind: 'coin',
+						},
+						inputs: {},
+						name: 'CoinWithBalance',
+					},
+				},
+				{
+					$Intent: {
+						data: {
+							balance: '3',
+							type: 'gas',
+							outputKind: 'coin',
+						},
+						inputs: {},
+						name: 'CoinWithBalance',
+					},
+				},
+				{
+					$Intent: {
+						data: {
+							balance: '4',
+							type: 'gas',
+							outputKind: 'coin',
+						},
+						inputs: {},
+						name: 'CoinWithBalance',
+					},
+				},
+				{
+					$Intent: {
+						data: {
+							balance: '0',
+							type: testTypeZero,
+							outputKind: 'coin',
+						},
+						inputs: {},
+						name: 'CoinWithBalance',
+					},
+				},
+				{
+					TransferObjects: {
+						objects: [
+							{
+								Result: 0,
+							},
+							{
+								Result: 1,
+							},
+							{
+								Result: 2,
+							},
+							{
+								Result: 3,
+							},
+							{
+								Result: 4,
+							},
+						],
+						address: {
+							Input: 0,
+						},
+					},
+				},
+			],
+			version: 2,
+		});
+
+		expect(
+			JSON.parse(
+				await tx.toJSON({
+					supportedIntents: [],
+					client,
+				}),
+			),
+		).toEqual({
+			expiration: null,
+			gasData: {
+				budget: null,
+				owner: null,
+				payment: null,
+				price: null,
+			},
+			inputs: [
+				{
+					Pure: {
+						bytes: toBase64(fromHex(receiver.toRtdAddress())),
+					},
+				},
+				{
+					Object: {
+						ImmOrOwnedObject: expect.anything(),
+					},
+				},
+				{
+					Pure: {
+						bytes: toBase64(bcs.u64().serialize(1).toBytes()),
+					},
+				},
+				{
+					Pure: {
+						bytes: toBase64(bcs.u64().serialize(2).toBytes()),
+					},
+				},
+				{
+					Pure: {
+						bytes: toBase64(bcs.u64().serialize(3).toBytes()),
+					},
+				},
+				{
+					Pure: {
+						bytes: toBase64(bcs.u64().serialize(4).toBytes()),
+					},
+				},
+			],
+			sender: address,
+			commands: [
+				{
+					SplitCoins: {
+						coin: {
+							Input: 1,
+						},
+						amounts: [{ Input: 2 }, { Input: 3 }],
+					},
+				},
+				{
+					SplitCoins: {
+						coin: {
+							GasCoin: true,
+						},
+						amounts: [{ Input: 4 }, { Input: 5 }],
+					},
+				},
+				{
+					MoveCall: {
+						arguments: [],
+						function: 'zero',
+						module: 'coin',
+						package: '0x0000000000000000000000000000000000000000000000000000000000000002',
+						typeArguments: [testTypeZero],
+					},
+				},
+				{
+					TransferObjects: {
+						objects: [
+							{ NestedResult: [0, 0] },
+							{ NestedResult: [0, 1] },
+							{ NestedResult: [1, 0] },
+							{ NestedResult: [1, 1] },
+							{ Result: 2 },
+						],
+						address: {
+							Input: 0,
+						},
+					},
+				},
+			],
+			version: 2,
+		});
+
+		const result = await client.core.signAndExecuteTransaction({
+			transaction: tx,
+			signer: keypair,
+			include: {
+				effects: true,
+				balanceChanges: true,
+				objectTypes: true,
+			},
+		});
+
+		expect(result.Transaction?.status.success).toBe(true);
+		expect(
+			result.Transaction?.balanceChanges?.filter(
+				(change) => change.address === receiver.toRtdAddress(),
+			),
+		).toEqual([
+			{
+				amount: '7',
+				coinType: normalizeStructTag('0x2::rtd::RTD'),
+				address: receiver.toRtdAddress(),
+			},
+			{
+				amount: '3',
+				coinType: testType,
+				address: receiver.toRtdAddress(),
+			},
+		]);
+		const objectTypes = result.Transaction?.objectTypes ?? {};
+		expect(
+			result.Transaction?.effects.changedObjects?.filter((change) => {
+				if (change.idOperation !== 'Created') return false;
+				if (
+					typeof change.outputOwner !== 'object' ||
+					!change.outputOwner ||
+					!('AddressOwner' in change.outputOwner)
+				)
+					return false;
+
+				return (
+					objectTypes[change.objectId] === normalizeStructTag(`0x2::coin::Coin<${testTypeZero}>`) &&
+					change.outputOwner.AddressOwner === receiver.toRtdAddress()
+				);
+			}).length,
+		).toEqual(1);
+	});
+
+	describe('with address balance', () => {
+		it('builds and executes offline with assumed address balances', async () => {
+			const client = toolbox.jsonRpcClient;
+			const { keypair, address } = await toolbox.getSigner({
+				coins: [1_000_000_000n, 1_000_000_000n],
+			});
+			const depositAmount = 100_000_000n;
+			const depositTx = new Transaction();
+			const [coinToDeposit] = depositTx.splitCoins(depositTx.gas, [depositAmount]);
+			depositTx.moveCall({
+				target: '0x2::coin::send_funds',
+				typeArguments: ['0x2::rtd::RTD'],
+				arguments: [coinToDeposit, depositTx.pure.address(address)],
+			});
+
+			const depositResult = await client.core.signAndExecuteTransaction({
+				transaction: depositTx,
+				signer: keypair,
+			});
+			await toolbox.waitForTransaction({ result: depositResult });
+
+			// Fetch all state before constructing the transaction. The build itself has no client.
+			const [{ systemState }, { chainIdentifier }] = await Promise.all([
+				client.core.getCurrentSystemState(),
+				client.core.getChainIdentifier(),
+			]);
+
+			const receiver = new Ed25519Keypair().toRtdAddress();
+			const tx = new Transaction();
+			tx.setSender(address);
+			tx.setGasPrice(systemState.referenceGasPrice);
+			tx.setGasBudget(10_000_000);
+			tx.setExpiration({
+				ValidDuring: {
+					minEpoch: Number(systemState.epoch),
+					maxEpoch: Number(systemState.epoch) + 1,
+					minTimestamp: null,
+					maxTimestamp: null,
+					chain: chainIdentifier,
+					nonce: 1,
+				},
+			});
+			tx.transferObjects([tx.coin({ balance: 1_000n })], receiver);
+
+			const bytes = await tx.build({ assumeSufficientAddressBalances: true });
+			expect(tx.getData().gasData.payment).toEqual([]);
+
+			const signature = await keypair.signTransaction(bytes);
+			const result = await client.core.executeTransaction({
+				transaction: bytes,
+				signatures: [signature.signature],
+				include: { effects: true },
+			});
+			await toolbox.waitForTransaction({ result });
+
+			if (result.$kind !== 'Transaction') {
+				throw new Error(JSON.stringify(result));
+			}
+			expect(result.Transaction.effects?.status.success).toBe(true);
+		});
+
+		it('uses an explicit gas coin when building offline with a gas reference', async () => {
+			const client = toolbox.jsonRpcClient;
+			const { keypair, address } = await toolbox.getSigner({
+				coins: [1_000_000_000n, 1_000_000_000n],
+			});
+			const depositTx = new Transaction();
+			const [coinToDeposit] = depositTx.splitCoins(depositTx.gas, [100_000_000n]);
+			depositTx.moveCall({
+				target: '0x2::coin::send_funds',
+				typeArguments: ['0x2::rtd::RTD'],
+				arguments: [coinToDeposit, depositTx.pure.address(address)],
+			});
+			const depositResult = await client.core.signAndExecuteTransaction({
+				transaction: depositTx,
+				signer: keypair,
+			});
+			await toolbox.waitForTransaction({ result: depositResult });
+
+			const [{ objects: coins }, { systemState }] = await Promise.all([
+				client.core.listCoins({ owner: address, coinType: '0x2::rtd::RTD' }),
+				client.core.getCurrentSystemState(),
+			]);
+			const gasCoin = coins[0];
+			if (!gasCoin) throw new Error('Expected a gas coin');
+
+			const tx = new Transaction();
+			tx.setSender(address);
+			tx.setGasPrice(systemState.referenceGasPrice);
+			tx.setGasBudget(10_000_000);
+			tx.setGasPayment([
+				{
+					objectId: gasCoin.objectId,
+					version: gasCoin.version,
+					digest: gasCoin.digest,
+				},
+			]);
+			const gasSplit = tx.splitCoins(tx.gas, [1]);
+			tx.transferObjects(
+				[gasSplit, tx.coin({ balance: 1_000n })],
+				new Ed25519Keypair().toRtdAddress(),
+			);
+
+			const bytes = await tx.build({ assumeSufficientAddressBalances: true });
+			expect(tx.getData().gasData.payment).toHaveLength(1);
+			expect(tx.getData().inputs.some((input) => input.$kind === 'FundsWithdrawal')).toBe(true);
+
+			const signature = await keypair.signTransaction(bytes);
+			const result = await client.core.executeTransaction({
+				transaction: bytes,
+				signatures: [signature.signature],
+				include: { effects: true },
+			});
+			await toolbox.waitForTransaction({ result });
+
+			if (result.$kind !== 'Transaction') {
+				throw new Error(JSON.stringify(result));
+			}
+			expect(result.Transaction.effects?.status.success).toBe(true);
+		});
+
+		testWithAllClients('uses address balance for RTD when available', async (client) => {
+			const depositAmount = 100_000_000n;
+			const depositTx = new Transaction();
+			const [coinToDeposit] = depositTx.splitCoins(depositTx.gas, [depositAmount]);
+			depositTx.moveCall({
+				target: '0x2::coin::send_funds',
+				typeArguments: ['0x2::rtd::RTD'],
+				arguments: [coinToDeposit, depositTx.pure.address(toolbox.address())],
+			});
+
+			const depositResult = await client.core.signAndExecuteTransaction({
+				transaction: depositTx,
+				signer: toolbox.keypair,
+			});
+			if (depositResult.$kind !== 'Transaction') throw new Error('Deposit failed');
+			await toolbox.waitForTransaction({ digest: depositResult.Transaction.digest });
+
+			const receiver = new Ed25519Keypair();
+			const requestAmount1 = 25_000_000n;
+			const requestAmount2 = 25_000_000n;
+			const totalAmount = requestAmount1 + requestAmount2;
+
+			const tx = new Transaction();
+			tx.transferObjects(
+				[
+					tx.coin({ type: 'gas', balance: requestAmount1 }),
+					tx.coin({ type: 'gas', balance: requestAmount2 }),
+				],
+				receiver.toRtdAddress(),
+			);
+			tx.setSender(toolbox.address());
+
+			expect(
+				JSON.parse(
+					await tx.toJSON({
+						supportedIntents: ['CoinWithBalance'],
+					}),
+				),
+			).toEqual({
+				expiration: null,
+				gasData: {
+					budget: null,
+					owner: null,
+					payment: null,
+					price: null,
+				},
+				inputs: [
+					{
+						Pure: {
+							bytes: toBase64(fromHex(receiver.toRtdAddress())),
+						},
+					},
+				],
+				sender: toolbox.address(),
+				commands: [
+					{
+						$Intent: {
+							data: {
+								balance: String(requestAmount1),
+								type: 'gas',
+								outputKind: 'coin',
+							},
+							inputs: {},
+							name: 'CoinWithBalance',
+						},
+					},
+					{
+						$Intent: {
+							data: {
+								balance: String(requestAmount2),
+								type: 'gas',
+								outputKind: 'coin',
+							},
+							inputs: {},
+							name: 'CoinWithBalance',
+						},
+					},
+					{
+						TransferObjects: {
+							objects: [{ Result: 0 }, { Result: 1 }],
+							address: { Input: 0 },
+						},
+					},
+				],
+				version: 2,
+			});
+
+			const resolved = JSON.parse(
+				await tx.toJSON({
+					supportedIntents: [],
+					client,
+				}),
+			);
+
+			// Coin intents go through Path 2. AB sufficient → coin::redeem_funds from AB.
+			// FundsWithdrawal input for the full amount
+			expect(resolved.inputs).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({
+						FundsWithdrawal: expect.objectContaining({
+							reservation: {
+								$kind: 'MaxAmountU64',
+								MaxAmountU64: String(totalAmount),
+							},
+						}),
+					}),
+				]),
+			);
+
+			expect(
+				resolved.commands.some(
+					(command: any) =>
+						command.MoveCall?.module === 'coin' && command.MoveCall?.function === 'redeem_funds',
+				),
+			).toBe(true);
+			expect(
+				resolved.commands.some(
+					(command: any) =>
+						command.MoveCall?.module === 'coin' && command.MoveCall?.function === 'send_funds',
+				),
+			).toBe(true);
+			expect(
+				resolved.commands.find((command: any) => command.SplitCoins)?.SplitCoins.amounts,
+			).toHaveLength(2);
+
+			const result = await client.core.signAndExecuteTransaction({
+				transaction: tx,
+				signer: toolbox.keypair,
+				include: { balanceChanges: true },
+			});
+
+			await client.core.waitForTransaction({ result });
+
+			expect(result.$kind).toBe('Transaction');
+			if (result.$kind !== 'Transaction') throw new Error('Transaction failed');
+
+			expect(result.Transaction.status.success).toBe(true);
+			expect(
+				result.Transaction.balanceChanges?.find(
+					(change) => change.address === receiver.toRtdAddress(),
+				)?.amount,
+			).toBe(String(totalAmount));
+		});
+
+		testWithAllClients('uses address balance for custom coin when available', async (client) => {
+			const coins = await client.core.listCoins({
+				owner: publishToolbox.address(),
+				coinType: testType,
+			});
+			expect(coins.objects.length).toBeGreaterThan(0);
+
+			const depositAmount = 4n;
+			const depositTx = new Transaction();
+			const [coinToDeposit] = depositTx.splitCoins(depositTx.object(coins.objects[0].objectId), [
+				depositAmount,
+			]);
+			depositTx.moveCall({
+				target: '0x2::coin::send_funds',
+				typeArguments: [testType],
+				arguments: [coinToDeposit, depositTx.pure.address(publishToolbox.address())],
+			});
+
+			const depositResult = await client.core.signAndExecuteTransaction({
+				transaction: depositTx,
+				signer: publishToolbox.keypair,
+			});
+			if (depositResult.$kind !== 'Transaction') throw new Error('Deposit failed');
+			await toolbox.waitForTransaction({ digest: depositResult.Transaction.digest });
+
+			const receiver = new Ed25519Keypair();
+			const requestAmount1 = 1n;
+			const requestAmount2 = 1n;
+			const totalAmount = requestAmount1 + requestAmount2;
+
+			const tx = new Transaction();
+			tx.transferObjects(
+				[
+					tx.coin({ type: testType, balance: requestAmount1 }),
+					tx.coin({ type: testType, balance: requestAmount2 }),
+				],
+				receiver.toRtdAddress(),
+			);
+			tx.setSender(publishToolbox.address());
+
+			expect(
+				JSON.parse(
+					await tx.toJSON({
+						supportedIntents: ['CoinWithBalance'],
+					}),
+				),
+			).toEqual({
+				expiration: null,
+				gasData: {
+					budget: null,
+					owner: null,
+					payment: null,
+					price: null,
+				},
+				inputs: [
+					{
+						Pure: {
+							bytes: toBase64(fromHex(receiver.toRtdAddress())),
+						},
+					},
+				],
+				sender: publishToolbox.address(),
+				commands: [
+					{
+						$Intent: {
+							data: {
+								balance: String(requestAmount1),
+								type: testType,
+								outputKind: 'coin',
+							},
+							inputs: {},
+							name: 'CoinWithBalance',
+						},
+					},
+					{
+						$Intent: {
+							data: {
+								balance: String(requestAmount2),
+								type: testType,
+								outputKind: 'coin',
+							},
+							inputs: {},
+							name: 'CoinWithBalance',
+						},
+					},
+					{
+						TransferObjects: {
+							objects: [{ Result: 0 }, { Result: 1 }],
+							address: { Input: 0 },
+						},
+					},
+				],
+				version: 2,
+			});
+
+			const resolved = JSON.parse(
+				await tx.toJSON({
+					supportedIntents: [],
+					client,
+				}),
+			);
+
+			// Coin intents go through Path 2. AB sufficient → coin::redeem_funds from AB.
+			expect(resolved.inputs).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({
+						FundsWithdrawal: expect.objectContaining({
+							reservation: {
+								$kind: 'MaxAmountU64',
+								MaxAmountU64: String(totalAmount),
+							},
+						}),
+					}),
+				]),
+			);
+
+			expect(
+				resolved.commands.some(
+					(command: any) =>
+						command.MoveCall?.module === 'coin' && command.MoveCall?.function === 'redeem_funds',
+				),
+			).toBe(true);
+			expect(
+				resolved.commands.some(
+					(command: any) =>
+						command.MoveCall?.module === 'coin' && command.MoveCall?.function === 'send_funds',
+				),
+			).toBe(true);
+			expect(
+				resolved.commands.find((command: any) => command.SplitCoins)?.SplitCoins.amounts,
+			).toHaveLength(2);
+
+			const result = await client.core.signAndExecuteTransaction({
+				transaction: tx,
+				signer: publishToolbox.keypair,
+				include: { balanceChanges: true },
+			});
+
+			await client.core.waitForTransaction({ result });
+
+			expect(result.$kind).toBe('Transaction');
+			if (result.$kind !== 'Transaction') throw new Error('Transaction failed');
+
+			expect(result.Transaction.status.success).toBe(true);
+			expect(
+				result.Transaction.balanceChanges?.find(
+					(change) => change.address === receiver.toRtdAddress(),
+				)?.amount,
+			).toBe(String(totalAmount));
+		});
+
+		testWithAllClients(
+			'gas type uses GasCoin directly when address balance is insufficient',
+			async (client) => {
+				// Use a signer with only coins (no address balance) to force GasCoin path
+				const { keypair: signer, address: signerAddress } = await toolbox.getSigner({
+					coins: [2_000_000_000n],
+				});
+
+				const receiver = new Ed25519Keypair();
+				const requestAmount1 = 500_000_000n;
+				const requestAmount2 = 500_000_000n;
+				const totalAmount = requestAmount1 + requestAmount2;
+
+				const tx = new Transaction();
+				tx.transferObjects(
+					[
+						tx.coin({ type: 'gas', balance: requestAmount1 }),
+						tx.coin({ type: 'gas', balance: requestAmount2 }),
+					],
+					receiver.toRtdAddress(),
+				);
+				tx.setSender(signerAddress);
+
+				expect(
+					JSON.parse(
+						await tx.toJSON({
+							supportedIntents: ['CoinWithBalance'],
+						}),
+					),
+				).toEqual({
+					expiration: null,
+					gasData: {
+						budget: null,
+						owner: null,
+						payment: null,
+						price: null,
+					},
+					inputs: [
+						{
+							Pure: {
+								bytes: toBase64(fromHex(receiver.toRtdAddress())),
+							},
+						},
+					],
+					sender: signerAddress,
+					commands: [
+						{
+							$Intent: {
+								data: {
+									balance: String(requestAmount1),
+									type: 'gas',
+									outputKind: 'coin',
+								},
+								inputs: {},
+								name: 'CoinWithBalance',
+							},
+						},
+						{
+							$Intent: {
+								data: {
+									balance: String(requestAmount2),
+									type: 'gas',
+									outputKind: 'coin',
+								},
+								inputs: {},
+								name: 'CoinWithBalance',
+							},
+						},
+						{
+							TransferObjects: {
+								objects: [{ Result: 0 }, { Result: 1 }],
+								address: { Input: 0 },
+							},
+						},
+					],
+					version: 2,
+				});
+
+				const resolved = JSON.parse(
+					await tx.toJSON({
+						supportedIntents: [],
+						client,
+					}),
+				);
+
+				// Gas type uses GasCoin directly — no AB redeem or merge needed.
+				// The gas coin reservation mechanism handles address balance.
+				expect(resolved.inputs).toEqual([
+					{
+						Pure: {
+							bytes: toBase64(fromHex(receiver.toRtdAddress())),
+						},
+					},
+					{
+						Pure: {
+							bytes: toBase64(bcs.u64().serialize(requestAmount1).toBytes()),
+						},
+					},
+					{
+						Pure: {
+							bytes: toBase64(bcs.u64().serialize(requestAmount2).toBytes()),
+						},
+					},
+				]);
+
+				expect(resolved.commands).toEqual([
+					{
+						SplitCoins: {
+							coin: { GasCoin: true },
+							amounts: [{ Input: 1 }, { Input: 2 }],
+						},
+					},
+					{
+						TransferObjects: {
+							objects: [{ NestedResult: [0, 0] }, { NestedResult: [0, 1] }],
+							address: { Input: 0 },
+						},
+					},
+				]);
+
+				const result = await client.core.signAndExecuteTransaction({
+					transaction: tx,
+					signer,
+					include: { balanceChanges: true },
+				});
+
+				await client.core.waitForTransaction({ result });
+
+				expect(result.$kind).toBe('Transaction');
+				if (result.$kind !== 'Transaction') throw new Error('Transaction failed');
+
+				expect(result.Transaction.status.success).toBe(true);
+				expect(
+					result.Transaction.balanceChanges?.find(
+						(change) => change.address === receiver.toRtdAddress(),
+					)?.amount,
+				).toBe(String(totalAmount));
+			},
+		);
+
+		testWithAllClients(
+			'uses coins directly when address balance is insufficient',
+			async (client) => {
+				// Use a fresh signer with only TEST coins and zero TEST AB
+				// to avoid accumulated state from prior tests.
+				const signer = new Ed25519Keypair();
+
+				// Fund with RTD for gas
+				const fundTx = new Transaction();
+				fundTx.transferObjects(
+					[fundTx.splitCoins(fundTx.gas, [2_000_000_000n])],
+					signer.toRtdAddress(),
+				);
+				const fundResult = await client.core.signAndExecuteTransaction({
+					transaction: fundTx,
+					signer: toolbox.keypair,
+				});
+				await toolbox.waitForTransaction({ result: fundResult });
+
+				// Mint TEST coins to the fresh signer
+				const mintTx = new Transaction();
+				mintTx.moveCall({
+					target: `${packageId}::test::mint`,
+					arguments: [
+						mintTx.object(treasuryCapId),
+						mintTx.pure.u64(50),
+						mintTx.pure.address(signer.toRtdAddress()),
+					],
+				});
+				const mintResult = await client.core.signAndExecuteTransaction({
+					transaction: mintTx,
+					signer: publishToolbox.keypair,
+				});
+				await toolbox.waitForTransaction({ result: mintResult });
+
+				const receiver = new Ed25519Keypair();
+				const requestAmount1 = 10n;
+				const requestAmount2 = 5n;
+				const totalAmount = requestAmount1 + requestAmount2;
+
+				const tx = new Transaction();
+				tx.transferObjects(
+					[
+						tx.coin({ type: testType, balance: requestAmount1 }),
+						tx.coin({ type: testType, balance: requestAmount2 }),
+					],
+					receiver.toRtdAddress(),
+				);
+				tx.setSender(signer.toRtdAddress());
+
+				const resolved = JSON.parse(
+					await tx.toJSON({
+						supportedIntents: [],
+						client,
+					}),
+				);
+
+				// No TEST AB exists — coins used directly, no FundsWithdrawal
+				expect(resolved.commands).toEqual([
+					{
+						SplitCoins: {
+							coin: { Input: expect.any(Number) },
+							amounts: [{ Input: expect.any(Number) }, { Input: expect.any(Number) }],
+						},
+					},
+					{
+						TransferObjects: {
+							objects: [{ NestedResult: [0, 0] }, { NestedResult: [0, 1] }],
+							address: { Input: 0 },
+						},
+					},
+				]);
+
+				const hasWithdrawal = resolved.inputs.some((i: any) => i.FundsWithdrawal);
+				expect(hasWithdrawal).toBe(false);
+
+				const result = await client.core.signAndExecuteTransaction({
+					transaction: tx,
+					signer,
+					include: { balanceChanges: true },
+				});
+
+				await client.core.waitForTransaction({ result });
+
+				expect(result.$kind).toBe('Transaction');
+				if (result.$kind !== 'Transaction') throw new Error('Transaction failed');
+
+				expect(result.Transaction.status.success).toBe(true);
+				expect(
+					result.Transaction.balanceChanges?.find(
+						(change) => change.address === receiver.toRtdAddress(),
+					)?.amount,
+				).toBe(String(totalAmount));
+			},
+		);
+	});
+
+	describe('createBalance', () => {
+		// Accounts with known, stable state for simulation-based tests.
+		// Simulate doesn't mutate state, so all transports see the same account.
+		let coinsOnlyKeypair: Ed25519Keypair; // TEST coins only, zero TEST address balance
+		let coinsAndBalanceKeypair: Ed25519Keypair; // TEST coins + TEST address balance
+
+		beforeAll(async () => {
+			coinsOnlyKeypair = new Ed25519Keypair();
+			coinsAndBalanceKeypair = new Ed25519Keypair();
+			const treasuryCapId = publishToolbox.getSharedObject('test_data', 'TreasuryCap<TEST>');
+
+			// Fund both with RTD + mint TEST coins
+			const setupTx = new Transaction();
+			setupTx.transferObjects(
+				[setupTx.splitCoins(setupTx.gas, [2_000_000_000n])],
+				coinsOnlyKeypair.toRtdAddress(),
+			);
+			setupTx.transferObjects(
+				[setupTx.splitCoins(setupTx.gas, [2_000_000_000n])],
+				coinsAndBalanceKeypair.toRtdAddress(),
+			);
+			setupTx.moveCall({
+				target: `${packageId}::test::mint`,
+				arguments: [
+					setupTx.object(treasuryCapId!),
+					setupTx.pure.u64(50),
+					setupTx.pure.address(coinsOnlyKeypair.toRtdAddress()),
+				],
+			});
+			setupTx.moveCall({
+				target: `${packageId}::test::mint`,
+				arguments: [
+					setupTx.object(treasuryCapId!),
+					setupTx.pure.u64(50),
+					setupTx.pure.address(coinsAndBalanceKeypair.toRtdAddress()),
+				],
+			});
+			const setupResult = await publishToolbox.grpcClient.signAndExecuteTransaction({
+				transaction: setupTx,
+				signer: publishToolbox.keypair,
+			});
+			await toolbox.waitForTransaction({ result: setupResult });
+
+			// Deposit 5 TEST to coinsAndBalanceKeypair's address balance
+			const coins = await publishToolbox.grpcClient.core.listCoins({
+				owner: coinsAndBalanceKeypair.toRtdAddress(),
+				coinType: testType,
+			});
+			const depositTx = new Transaction();
+			const [coinToDeposit] = depositTx.splitCoins(depositTx.object(coins.objects[0].objectId), [
+				5n,
+			]);
+			const [balToDeposit] = depositTx.moveCall({
+				target: '0x2::coin::into_balance',
+				typeArguments: [testType],
+				arguments: [coinToDeposit],
+			});
+			depositTx.moveCall({
+				target: '0x2::balance::send_funds',
+				typeArguments: [testType],
+				arguments: [balToDeposit, depositTx.pure.address(coinsAndBalanceKeypair.toRtdAddress())],
+			});
+			const depositResult = await publishToolbox.grpcClient.signAndExecuteTransaction({
+				transaction: depositTx,
+				signer: coinsAndBalanceKeypair,
+			});
+			await toolbox.waitForTransaction({ result: depositResult });
+		});
+
+		// Helper: resolve intent and simulate in one step
+		async function resolveAndSimulate(tx: Transaction, client: ClientWithCoreApi) {
+			const resolved = JSON.parse(await tx.toJSON({ supportedIntents: [], client }));
+			const simResult = await client.core.simulateTransaction({
+				transaction: tx,
+				include: { effects: true },
+			});
+			return { resolved, simResult };
+		}
+
+		// --- Zero balance path ---
+		testWithAllClients('balance::zero — createBalance with zero amount', async (client) => {
+			const tx = new Transaction();
+			const bal = tx.balance({ type: testTypeZero, balance: 0n });
+			tx.moveCall({
+				target: '0x2::balance::destroy_zero',
+				typeArguments: [testTypeZero],
+				arguments: [bal],
+			});
+			tx.setSender(coinsOnlyKeypair.toRtdAddress());
+
+			const { resolved, simResult } = await resolveAndSimulate(tx, client);
+
+			expect(resolved.commands).toEqual([
+				{
+					MoveCall: {
+						package: normalizeRtdAddress('0x2'),
+						module: 'balance',
+						function: 'zero',
+						typeArguments: [testTypeZero],
+						arguments: [],
+					},
+				},
+				{
+					MoveCall: {
+						package: normalizeRtdAddress('0x2'),
+						module: 'balance',
+						function: 'destroy_zero',
+						typeArguments: [testTypeZero],
+						arguments: [{ Result: 0 }],
+					},
+				},
+			]);
+
+			expect(simResult.$kind).toBe('Transaction');
+		});
+
+		// --- Path 1: Direct Withdrawal (all balance intents, AB sufficient) ---
+		testWithAllClients(
+			'Path 1 — createBalance with custom coin, AB sufficient (direct withdrawal)',
+			async (client) => {
+				// coinsAndBalanceKeypair has 5 TEST in address balance.
+				// Request 2 — AB is sufficient and all intents are balance → Path 1
+				const tx = new Transaction();
+				const bal = tx.balance({ type: testType, balance: 2n });
+				const [coin] = tx.moveCall({
+					target: '0x2::coin::from_balance',
+					typeArguments: [testType],
+					arguments: [bal],
+				});
+				tx.transferObjects([coin], new Ed25519Keypair().toRtdAddress());
+				tx.setSender(coinsAndBalanceKeypair.toRtdAddress());
+
+				const { resolved, simResult } = await resolveAndSimulate(tx, client);
+
+				// Path 1: balance::redeem_funds directly, no SplitCoins
+				expect(resolved.commands[0]).toEqual({
+					MoveCall: {
+						package: normalizeRtdAddress('0x2'),
+						module: 'balance',
+						function: 'redeem_funds',
+						typeArguments: [testType],
+						arguments: [{ Input: 1 }],
+					},
+				});
+
+				// No SplitCoins — direct withdrawal
+				const splitCmd = resolved.commands.find((c: any) => c.SplitCoins);
+				expect(splitCmd).toBeUndefined();
+
+				expect(simResult.$kind).toBe('Transaction');
+			},
+		);
+
+		// --- Path 1: Direct Withdrawal with RTD/gas balance ---
+		testWithAllClients(
+			'Path 1 — createBalance with RTD address balance (direct withdrawal)',
+			async (client) => {
+				// Use coinsOnlyKeypair which has RTD coins — deposit some to address balance
+				const depositTx = new Transaction();
+				const [coinToDeposit] = depositTx.splitCoins(depositTx.gas, [100_000_000n]);
+				depositTx.moveCall({
+					target: '0x2::coin::send_funds',
+					typeArguments: ['0x2::rtd::RTD'],
+					arguments: [coinToDeposit, depositTx.pure.address(coinsOnlyKeypair.toRtdAddress())],
+				});
+				const depositResult = await client.core.signAndExecuteTransaction({
+					transaction: depositTx,
+					signer: coinsOnlyKeypair,
+				});
+				if (depositResult.$kind !== 'Transaction') throw new Error('Deposit failed');
+				await toolbox.waitForTransaction({ digest: depositResult.Transaction.digest });
+
+				const tx = new Transaction();
+				const bal = tx.balance({ type: 'gas', balance: 10_000_000n });
+				const [coin] = tx.moveCall({
+					target: '0x2::coin::from_balance',
+					typeArguments: ['0x2::rtd::RTD'],
+					arguments: [bal],
+				});
+				tx.transferObjects([coin], new Ed25519Keypair().toRtdAddress());
+				tx.setSender(coinsOnlyKeypair.toRtdAddress());
+
+				const { resolved, simResult } = await resolveAndSimulate(tx, client);
+
+				// Path 1: balance::redeem_funds
+				expect(resolved.commands[0]).toEqual({
+					MoveCall: {
+						package: normalizeRtdAddress('0x2'),
+						module: 'balance',
+						function: 'redeem_funds',
+						typeArguments: [normalizeStructTag('0x2::rtd::RTD')],
+						arguments: [{ Input: 1 }],
+					},
+				});
+
+				expect(simResult.$kind).toBe('Transaction');
+			},
+		);
+
+		// --- Path 2: Coins only (no AB) ---
+		testWithAllClients(
+			'Path 2 — createBalance with custom coin (coins only, no AB)',
+			async (client) => {
+				const tx = new Transaction();
+				const bal = tx.balance({ type: testType, balance: 1n });
+				const [coin] = tx.moveCall({
+					target: '0x2::coin::from_balance',
+					typeArguments: [testType],
+					arguments: [bal],
+				});
+				tx.transferObjects([coin], new Ed25519Keypair().toRtdAddress());
+				tx.setSender(coinsOnlyKeypair.toRtdAddress());
+
+				const { resolved, simResult } = await resolveAndSimulate(tx, client);
+
+				expect(resolved.commands.some((command: any) => command.SplitCoins)).toBe(true);
+				expect(
+					resolved.commands.some(
+						(command: any) =>
+							command.MoveCall?.module === 'coin' && command.MoveCall?.function === 'into_balance',
+					),
+				).toBe(true);
+				expect(
+					resolved.commands.some(
+						(command: any) =>
+							command.MoveCall?.module === 'coin' && command.MoveCall?.function === 'send_funds',
+					),
+				).toBe(true);
+				expect(
+					resolved.commands.some(
+						(command: any) =>
+							command.MoveCall?.module === 'coin' && command.MoveCall?.function === 'from_balance',
+					),
+				).toBe(true);
+				expect(resolved.commands.some((command: any) => command.TransferObjects)).toBe(true);
+
+				expect(simResult.$kind).toBe('Transaction');
+			},
+		);
+
+		// --- Path 2: Exact coin balance → destroy_zero remainder ---
+		testWithAllClients(
+			'Path 2 — coinWithBalance with exact coin balance triggers destroy_zero',
+			async (client) => {
+				// coinsOnlyKeypair has exactly 50 TEST in coins, no address balance.
+				// tx.coin() is coin-only (no balance intent), so remainder uses destroy_zero.
+				const tx = new Transaction();
+				tx.transferObjects(
+					[tx.coin({ type: testType, balance: 50n })],
+					new Ed25519Keypair().toRtdAddress(),
+				);
+				tx.setSender(coinsOnlyKeypair.toRtdAddress());
+
+				const { resolved, simResult } = await resolveAndSimulate(tx, client);
+
+				expect(resolved.commands[0]).toHaveProperty('SplitCoins');
+
+				const destroyZeroCmd = resolved.commands.find(
+					(c: any) => c.MoveCall?.module === 'coin' && c.MoveCall?.function === 'destroy_zero',
+				);
+				expect(destroyZeroCmd).toBeDefined();
+
+				// No send_funds for coin-only path
+				const sendFundsCmd = resolved.commands.find(
+					(c: any) => c.MoveCall?.function === 'send_funds',
+				);
+				expect(sendFundsCmd).toBeUndefined();
+
+				expect(simResult.$kind).toBe('Transaction');
+			},
+		);
+
+		// --- Path 2: Balance intent with exact coins → send_funds (not destroy_zero) ---
+		testWithAllClients(
+			'Path 2 — createBalance with exact coin balance uses send_funds for remainder',
+			async (client) => {
+				// tx.balance() is a balance intent, so remainder goes to AB via send_funds
+				const tx = new Transaction();
+				const bal = tx.balance({ type: testType, balance: 50n });
+				const [coin] = tx.moveCall({
+					target: '0x2::coin::from_balance',
+					typeArguments: [testType],
+					arguments: [bal],
+				});
+				tx.transferObjects([coin], new Ed25519Keypair().toRtdAddress());
+				tx.setSender(coinsOnlyKeypair.toRtdAddress());
+
+				const { resolved, simResult } = await resolveAndSimulate(tx, client);
+
+				// send_funds for balance intent remainder (gasless-eligible)
+				const sendFundsCmd = resolved.commands.find(
+					(c: any) => c.MoveCall?.function === 'send_funds',
+				);
+				expect(sendFundsCmd).toBeDefined();
+
+				// No destroy_zero — balance intents always use send_funds
+				const destroyZeroCmd = resolved.commands.find(
+					(c: any) => c.MoveCall?.function === 'destroy_zero',
+				);
+				expect(destroyZeroCmd).toBeUndefined();
+
+				expect(simResult.$kind).toBe('Transaction');
+			},
+		);
+
+		// --- Path 2: Coins sufficient, AB available but unused ---
+		testWithAllClients(
+			'Path 2 — createBalance with custom coin, coins sufficient (AB untouched)',
+			async (client) => {
+				// coinsAndBalanceKeypair has 5 TEST in address balance + ~45 in coins.
+				// Request 10 — coins sufficient, not all balance intents → Path 2, no AB needed
+				const tx = new Transaction();
+				const bal = tx.balance({ type: testType, balance: 10n });
+				const [coin] = tx.moveCall({
+					target: '0x2::coin::from_balance',
+					typeArguments: [testType],
+					arguments: [bal],
+				});
+				tx.transferObjects([coin], new Ed25519Keypair().toRtdAddress());
+				tx.setSender(coinsAndBalanceKeypair.toRtdAddress());
+
+				const { resolved, simResult } = await resolveAndSimulate(tx, client);
+
+				// No FundsWithdrawal — coins are sufficient
+				const fundsInputs = resolved.inputs.filter(
+					(i: any) => typeof i === 'object' && i !== null && 'FundsWithdrawal' in i,
+				);
+				expect(fundsInputs.length).toBe(0);
+
+				// SplitCoins from coin objects
+				expect(resolved.commands[0]).toHaveProperty('SplitCoins');
+
+				expect(simResult.$kind).toBe('Transaction');
+			},
+		);
+
+		// --- Multiple createBalance from same pool ---
+		testWithAllClients(
+			'Path 2 — multiple createBalance intents, combined SplitCoins',
+			async (client) => {
+				const tx = new Transaction();
+				const bal1 = tx.balance({ type: testType, balance: 1n });
+				const bal2 = tx.balance({ type: testType, balance: 2n });
+				const [coin1] = tx.moveCall({
+					target: '0x2::coin::from_balance',
+					typeArguments: [testType],
+					arguments: [bal1],
+				});
+				const [coin2] = tx.moveCall({
+					target: '0x2::coin::from_balance',
+					typeArguments: [testType],
+					arguments: [bal2],
+				});
+				tx.transferObjects([coin1, coin2], new Ed25519Keypair().toRtdAddress());
+				tx.setSender(coinsOnlyKeypair.toRtdAddress());
+
+				const { resolved, simResult } = await resolveAndSimulate(tx, client);
+
+				// Inputs: [0: receiver, 1: coin_object, 2: u64(1), 3: u64(2), 4: sender_addr]
+				// Single SplitCoins with both amounts
+				expect(resolved.commands[0]).toEqual({
+					SplitCoins: {
+						coin: { Input: 1 },
+						amounts: [{ Input: 2 }, { Input: 3 }],
+					},
+				});
+
+				// 2 into_balance for intent conversions (remainder uses coin::send_funds directly)
+				const intoBalanceCmds = resolved.commands.filter(
+					(c: any) => c.MoveCall?.function === 'into_balance',
+				);
+				expect(intoBalanceCmds.length).toBe(2);
+
+				// Remainder is sent back via coin::send_funds
+				const coinSendFundsCmd = resolved.commands.find(
+					(c: any) => c.MoveCall?.module === 'coin' && c.MoveCall?.function === 'send_funds',
+				);
+				expect(coinSendFundsCmd).toBeDefined();
+
+				expect(simResult.$kind).toBe('Transaction');
+			},
+		);
+
+		// --- Gas type: SplitCoins from GasCoin ---
+		testWithAllClients(
+			'Path 2 — createBalance with RTD/gas (GasCoin, no remainder)',
+			async (client) => {
+				// Use a signer with only coins (no address balance) to force Path 2
+				const { address } = await toolbox.getSigner({ coins: [1_000_000_000n] });
+
+				const tx = new Transaction();
+				const bal = tx.balance({ type: 'gas', balance: 500_000_000n });
+				const [coin] = tx.moveCall({
+					target: '0x2::coin::from_balance',
+					typeArguments: ['0x2::rtd::RTD'],
+					arguments: [bal],
+				});
+				tx.transferObjects([coin], new Ed25519Keypair().toRtdAddress());
+				tx.setSender(address);
+
+				const { resolved, simResult } = await resolveAndSimulate(tx, client);
+
+				// Inputs: [0: receiver, 1: u64(500_000_000)]
+				// SplitCoins from GasCoin + into_balance
+				expect(resolved.commands[0]).toEqual({
+					SplitCoins: {
+						coin: { GasCoin: true },
+						amounts: [{ Input: 1 }],
+					},
+				});
+				expect(resolved.commands[1]).toEqual({
+					MoveCall: {
+						package: normalizeRtdAddress('0x2'),
+						module: 'coin',
+						function: 'into_balance',
+						typeArguments: [normalizeStructTag('0x2::rtd::RTD')],
+						arguments: [{ NestedResult: [0, 0] }],
+					},
+				});
+
+				// No remainder for gas type
+				const sendFundsCmd = resolved.commands.find(
+					(c: any) => c.MoveCall?.function === 'send_funds',
+				);
+				expect(sendFundsCmd).toBeUndefined();
+
+				expect(simResult.$kind).toBe('Transaction');
+			},
+		);
+
+		// --- Mixed coinWithBalance + createBalance ---
+		testWithAllClients(
+			'Path 2 — mixed coinWithBalance + createBalance for same type',
+			async (client) => {
+				const tx = new Transaction();
+				const coinResult = tx.coin({ type: testType, balance: 1n });
+				const balResult = tx.balance({ type: testType, balance: 1n });
+				const [coinFromBal] = tx.moveCall({
+					target: '0x2::coin::from_balance',
+					typeArguments: [testType],
+					arguments: [balResult],
+				});
+				tx.transferObjects([coinResult, coinFromBal], new Ed25519Keypair().toRtdAddress());
+				tx.setSender(coinsOnlyKeypair.toRtdAddress());
+
+				const { resolved, simResult } = await resolveAndSimulate(tx, client);
+
+				// Inputs: [0: receiver, 1: coin_object, 2: u64(1), 3: u64(1), 4: sender_addr]
+				// Combined SplitCoins with both amounts
+				expect(resolved.commands[0]).toEqual({
+					SplitCoins: {
+						coin: { Input: 1 },
+						amounts: [{ Input: 2 }, { Input: 3 }],
+					},
+				});
+
+				// into_balance for the createBalance intent
+				expect(resolved.commands[1]).toEqual({
+					MoveCall: {
+						package: normalizeRtdAddress('0x2'),
+						module: 'coin',
+						function: 'into_balance',
+						typeArguments: [testType],
+						arguments: [{ NestedResult: [0, 1] }],
+					},
+				});
+
+				expect(simResult.$kind).toBe('Transaction');
+			},
+		);
+	});
+
+	describe('coin reservation (JSON-RPC only)', () => {
+		/** Build a transaction and extract gas payment from the BCS output. */
+		async function buildAndGetPayment(tx: Transaction, client: ClientWithCoreApi) {
+			const bytes = await tx.build({ client });
+			const built = Transaction.from(bytes);
+			return built.getData().gasData.payment;
+		}
+
+		it('tx.coin with gas type uses coin reservation ref when AB is insufficient', async () => {
+			const client = toolbox.jsonRpcClient;
+
+			// Create a fresh signer with coins + address balance
+			const signer = new Ed25519Keypair();
+			const depositAmount = 500_000_000n;
+
+			// Fund with RTD first
+			const fundTx = new Transaction();
+			fundTx.transferObjects(
+				[fundTx.splitCoins(fundTx.gas, [2_000_000_000n])],
+				signer.toRtdAddress(),
+			);
+			const fundResult = await client.core.signAndExecuteTransaction({
+				transaction: fundTx,
+				signer: toolbox.keypair,
+			});
+			await toolbox.waitForTransaction({ result: fundResult });
+
+			// Deposit RTD into address balance via send_funds
+			const depositTx = new Transaction();
+			const [coinToDeposit] = depositTx.splitCoins(depositTx.gas, [depositAmount]);
+			depositTx.moveCall({
+				target: '0x2::coin::send_funds',
+				typeArguments: ['0x2::rtd::RTD'],
+				arguments: [coinToDeposit, depositTx.pure.address(signer.toRtdAddress())],
+			});
+			const depositResult = await client.core.signAndExecuteTransaction({
+				transaction: depositTx,
+				signer: signer,
+			});
+			await toolbox.waitForTransaction({ result: depositResult });
+
+			// Request more than AB — forces GasCoin usage, which triggers reservation
+			const receiver = new Ed25519Keypair();
+			const requestAmount = 600_000_000n;
+			const tx = new Transaction();
+			tx.transferObjects(
+				[tx.coin({ type: 'gas', balance: requestAmount })],
+				receiver.toRtdAddress(),
+			);
+			tx.setSender(signer.toRtdAddress());
+
+			// Build and check gas payment includes a reservation ref
+			const payment = await buildAndGetPayment(tx, client);
+			expect(payment!.length).toBeGreaterThanOrEqual(1);
+
+			// First payment should be the reservation ref (version "0", magic digest)
+			const reservationRef = payment![0];
+			expect(reservationRef.version).toBe('0');
+			expect(isCoinReservationDigest(reservationRef.digest)).toBe(true);
+
+			const reservedBalance = parseCoinReservationBalance(reservationRef.digest);
+			expect(reservedBalance).toBeGreaterThan(0n);
+
+			// Execute the transaction — should succeed
+			const result = await client.core.signAndExecuteTransaction({
+				transaction: tx,
+				signer,
+				include: { balanceChanges: true },
+			});
+			await client.core.waitForTransaction({ result });
+
+			expect(result.$kind).toBe('Transaction');
+			if (result.$kind !== 'Transaction') throw new Error('Transaction failed');
+			expect(result.Transaction.status.success).toBe(true);
+
+			// Verify the receiver got the expected amount
+			expect(
+				result.Transaction.balanceChanges?.find(
+					(change) => change.address === receiver.toRtdAddress(),
+				)?.amount,
+			).toBe(String(requestAmount));
+		});
+
+		it('tx.coin with gas type combines coins + address balance when neither alone is sufficient', async () => {
+			const client = toolbox.jsonRpcClient;
+
+			const signer = new Ed25519Keypair();
+
+			// Fund signer with a RTD coin
+			const fundTx = new Transaction();
+			fundTx.transferObjects(
+				[fundTx.splitCoins(fundTx.gas, [2_000_000_000n])],
+				signer.toRtdAddress(),
+			);
+			const fundResult = await client.core.signAndExecuteTransaction({
+				transaction: fundTx,
+				signer: toolbox.keypair,
+			});
+			await toolbox.waitForTransaction({ result: fundResult });
+
+			// Also deposit into address balance
+			const addressBalanceAmount = 500_000_000n;
+			const depositTx = new Transaction();
+			const [coinToDeposit] = depositTx.splitCoins(depositTx.gas, [addressBalanceAmount]);
+			depositTx.moveCall({
+				target: '0x2::coin::send_funds',
+				typeArguments: ['0x2::rtd::RTD'],
+				arguments: [coinToDeposit, depositTx.pure.address(signer.toRtdAddress())],
+			});
+			const depositResult = await client.core.signAndExecuteTransaction({
+				transaction: depositTx,
+				signer: signer,
+			});
+			await toolbox.waitForTransaction({ result: depositResult });
+
+			// Get signer's coin balance to know how much they have
+			const coins = await client.core.listCoins({
+				owner: signer.toRtdAddress(),
+				coinType: normalizeStructTag('0x2::rtd::RTD'),
+			});
+			const totalCoinBalance = coins.objects.reduce((acc, c) => acc + BigInt(c.balance), 0n);
+
+			// Request more than coins alone but less than coins + address balance
+			const requestAmount = totalCoinBalance + 100_000_000n;
+			const receiver = new Ed25519Keypair();
+			const tx = new Transaction();
+			tx.transferObjects(
+				[tx.coin({ type: 'gas', balance: requestAmount })],
+				receiver.toRtdAddress(),
+			);
+			tx.setSender(signer.toRtdAddress());
+
+			// Build — should have reservation ref + coin refs in payment
+			const payment = await buildAndGetPayment(tx, client);
+			expect(payment!.length).toBeGreaterThanOrEqual(2);
+
+			// First entry should be reservation ref
+			expect(payment![0].version).toBe('0');
+			expect(isCoinReservationDigest(payment![0].digest)).toBe(true);
+
+			// Execute
+			const result = await client.core.signAndExecuteTransaction({
+				transaction: tx,
+				signer,
+				include: { balanceChanges: true },
+			});
+			await client.core.waitForTransaction({ result });
+
+			expect(result.$kind).toBe('Transaction');
+			if (result.$kind !== 'Transaction') throw new Error('Transaction failed');
+			expect(result.Transaction.status.success).toBe(true);
+		});
+
+		it('tx.balance with gas type executes via address balance withdrawal', async () => {
+			const client = toolbox.jsonRpcClient;
+
+			const signer = new Ed25519Keypair();
+			const depositAmount = 500_000_000n;
+
+			// Fund and deposit into address balance
+			const fundTx = new Transaction();
+			fundTx.transferObjects(
+				[fundTx.splitCoins(fundTx.gas, [2_000_000_000n])],
+				signer.toRtdAddress(),
+			);
+			const fundResult = await client.core.signAndExecuteTransaction({
+				transaction: fundTx,
+				signer: toolbox.keypair,
+			});
+			await toolbox.waitForTransaction({ result: fundResult });
+
+			const depositTx = new Transaction();
+			const [coinToDeposit] = depositTx.splitCoins(depositTx.gas, [depositAmount]);
+			depositTx.moveCall({
+				target: '0x2::coin::send_funds',
+				typeArguments: ['0x2::rtd::RTD'],
+				arguments: [coinToDeposit, depositTx.pure.address(signer.toRtdAddress())],
+			});
+			const depositResult = await client.core.signAndExecuteTransaction({
+				transaction: depositTx,
+				signer: signer,
+			});
+			await toolbox.waitForTransaction({ result: depositResult });
+
+			// Use tx.balance instead of tx.coin — produces Balance<RTD>
+			// Path 1 (all balance, AB sufficient) uses redeem_funds directly,
+			// no GasCoin reference, so no reservation ref in gas payment.
+			const requestAmount = 100_000_000n;
+			const tx = new Transaction();
+			const bal = tx.balance({ type: 'gas', balance: requestAmount });
+			const [coinFromBal] = tx.moveCall({
+				target: '0x2::coin::from_balance',
+				typeArguments: ['0x2::rtd::RTD'],
+				arguments: [bal],
+			});
+			tx.transferObjects([coinFromBal], new Ed25519Keypair().toRtdAddress());
+			tx.setSender(signer.toRtdAddress());
+
+			// Execute — should succeed using direct withdrawal from address balance
+			const result = await client.core.signAndExecuteTransaction({
+				transaction: tx,
+				signer,
+			});
+			await client.core.waitForTransaction({ result });
+
+			expect(result.$kind).toBe('Transaction');
+			if (result.$kind !== 'Transaction') throw new Error('Transaction failed');
+			expect(result.Transaction.status.success).toBe(true);
+		});
+
+		it('reservation ref encodes correct balance and epoch', async () => {
+			const client = toolbox.jsonRpcClient;
+
+			const signer = new Ed25519Keypair();
+			const depositAmount = 200_000_000n;
+
+			// Fund and deposit
+			const fundTx = new Transaction();
+			fundTx.transferObjects(
+				[fundTx.splitCoins(fundTx.gas, [2_000_000_000n])],
+				signer.toRtdAddress(),
+			);
+			const fundResult = await client.core.signAndExecuteTransaction({
+				transaction: fundTx,
+				signer: toolbox.keypair,
+			});
+			await toolbox.waitForTransaction({ result: fundResult });
+
+			const depositTx = new Transaction();
+			const [coinToDeposit] = depositTx.splitCoins(depositTx.gas, [depositAmount]);
+			depositTx.moveCall({
+				target: '0x2::coin::send_funds',
+				typeArguments: ['0x2::rtd::RTD'],
+				arguments: [coinToDeposit, depositTx.pure.address(signer.toRtdAddress())],
+			});
+			const depositResult = await client.core.signAndExecuteTransaction({
+				transaction: depositTx,
+				signer: signer,
+			});
+			await toolbox.waitForTransaction({ result: depositResult });
+
+			// Build a transaction that triggers reservation — request > AB so GasCoin is used
+			const requestAmount = 300_000_000n;
+			const tx = new Transaction();
+			tx.transferObjects(
+				[tx.coin({ type: 'gas', balance: requestAmount })],
+				new Ed25519Keypair().toRtdAddress(),
+			);
+			tx.setSender(signer.toRtdAddress());
+
+			const payment = await buildAndGetPayment(tx, client);
+			const reservationRef = payment![0];
+
+			// Validate reservation ref structure
+			expect(reservationRef.version).toBe('0');
+			expect(isCoinReservationDigest(reservationRef.digest)).toBe(true);
+
+			// The reserved balance should equal the address balance (no withdrawals from AB)
+			const reservedBalance = parseCoinReservationBalance(reservationRef.digest);
+			expect(reservedBalance).toBe(depositAmount);
+		});
+	});
+});

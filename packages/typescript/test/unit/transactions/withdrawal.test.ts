@@ -1,0 +1,162 @@
+// Copyright (c) LinkU Labs, Inc.
+// SPDX-License-Identifier: Apache-2.0
+
+import { describe, expect, expectTypeOf, it } from 'vitest';
+
+import { bcs } from '../../../src/bcs/index.js';
+import { Transaction, type WithdrawalOptions } from '../../../src/transactions/index.js';
+import { normalizeStructTag, normalizeRtdAddress } from '../../../src/utils/index.js';
+
+const RTD = '0x2::rtd::RTD';
+const FUNDER = normalizeRtdAddress('0xf00d');
+const ALLOWANCE = normalizeRtdAddress('0xa110');
+const SPENDER = normalizeRtdAddress('0x5e11');
+
+describe('tx.withdrawal()', () => {
+	it('defaults to withdrawing from the sender', () => {
+		const tx = new Transaction();
+		tx.withdrawal({ amount: 100n });
+
+		expect(tx.getData().inputs[0]).toEqual({
+			$kind: 'FundsWithdrawal',
+			FundsWithdrawal: {
+				reservation: { $kind: 'MaxAmountU64', MaxAmountU64: '100' },
+				typeArg: { $kind: 'Balance', Balance: RTD },
+				withdrawFrom: { $kind: 'Sender', Sender: true },
+			},
+		});
+	});
+
+	it.each(['sender', 'sponsor'] as const)('serializes an explicit %s source', async (from) => {
+		const tx = new Transaction();
+		tx.withdrawal({ amount: 100n, from });
+		const restored = Transaction.fromKind(await tx.build({ onlyTransactionKind: true }));
+		expect(restored.getData().inputs[0].FundsWithdrawal?.withdrawFrom).toEqual(
+			from === 'sender' ? { $kind: 'Sender', Sender: true } : { $kind: 'Sponsor', Sponsor: true },
+		);
+	});
+
+	it('requires allowance fields only for the allowance source', () => {
+		expectTypeOf<{
+			amount: bigint;
+			from: 'allowance';
+			allowance: string;
+		}>().not.toMatchTypeOf<WithdrawalOptions>();
+		expectTypeOf<{
+			amount: bigint;
+			from: 'allowance';
+			funder: string;
+		}>().not.toMatchTypeOf<WithdrawalOptions>();
+		expectTypeOf<{
+			amount: bigint;
+			from: 'sender' | 'sponsor';
+			funder: string;
+			allowance: string;
+		}>().not.toMatchTypeOf<WithdrawalOptions>();
+		expectTypeOf<{
+			amount: bigint;
+			funder: string;
+			allowance: string;
+		}>().not.toMatchTypeOf<WithdrawalOptions>();
+		expectTypeOf<{
+			amount: bigint;
+			from: 'allowance';
+			funder: string;
+			allowance: string;
+		}>().toMatchTypeOf<WithdrawalOptions>();
+	});
+
+	it('creates a SenderAllowance withdrawal with normalized addresses', () => {
+		const tx = new Transaction();
+		tx.withdrawal({
+			amount: 100n,
+			from: 'allowance',
+			funder: '0xf00d',
+			allowance: '0xa110',
+		});
+
+		expect(tx.getData().inputs[0]).toEqual({
+			$kind: 'FundsWithdrawal',
+			FundsWithdrawal: {
+				reservation: { $kind: 'MaxAmountU64', MaxAmountU64: '100' },
+				typeArg: { $kind: 'Balance', Balance: RTD },
+				withdrawFrom: {
+					$kind: 'SenderAllowance',
+					SenderAllowance: { funder: FUNDER, allowance: ALLOWANCE },
+				},
+			},
+		});
+	});
+
+	it('round-trips a SenderAllowance withdrawal through JSON and BCS', async () => {
+		const tx = new Transaction();
+		tx.setSender(SPENDER);
+		const withdrawal = tx.withdrawal({
+			amount: 100n,
+			from: 'allowance',
+			funder: FUNDER,
+			allowance: ALLOWANCE,
+		});
+		const balance = tx.moveCall({
+			target: '0x2::allowance::balance_spend',
+			typeArguments: [RTD],
+			arguments: [
+				tx.sharedObjectRef({ objectId: ALLOWANCE, initialSharedVersion: 5, mutable: true }),
+				withdrawal,
+				tx.object.clock(),
+			],
+		});
+		tx.transferObjects([balance], SPENDER);
+
+		const restored = Transaction.from(await tx.toJSON());
+		expect(restored.getData().inputs[0]).toEqual(tx.getData().inputs[0]);
+
+		const bytes = await tx.build({ onlyTransactionKind: true });
+		const kind = bcs.TransactionKind.parse(bytes);
+		expect(kind.ProgrammableTransaction?.inputs[0]).toEqual({
+			$kind: 'FundsWithdrawal',
+			FundsWithdrawal: {
+				reservation: { $kind: 'MaxAmountU64', MaxAmountU64: '100' },
+				typeArg: { $kind: 'Balance', Balance: normalizeStructTag(RTD) },
+				withdrawFrom: {
+					$kind: 'SenderAllowance',
+					SenderAllowance: { funder: FUNDER, allowance: ALLOWANCE },
+				},
+			},
+		});
+	});
+
+	it('reports unsupported withdrawal source enum variants', async () => {
+		const tx = new Transaction();
+		tx.withdrawal({ amount: 100n });
+		const json = JSON.parse(await tx.toJSON());
+		json.inputs[0].FundsWithdrawal.withdrawFrom = { FutureSource: true };
+
+		expect(() => Transaction.from(JSON.stringify(json))).toThrow(
+			'Unsupported enum variant "FutureSource". Expected one of: "Sender", "Sponsor", "SenderAllowance".',
+		);
+	});
+});
+
+describe('bcs.CallArg', () => {
+	it('serializes SenderAllowance as WithdrawFrom variant 2', () => {
+		const callArg = {
+			FundsWithdrawal: {
+				reservation: { MaxAmountU64: '100' },
+				typeArg: { Balance: RTD },
+				withdrawFrom: { SenderAllowance: { funder: FUNDER, allowance: ALLOWANCE } },
+			},
+		};
+		const bytes = bcs.CallArg.serialize(callArg).toBytes();
+
+		// WithdrawFrom is the last field: variant index, then two 32-byte addresses.
+		const withdrawFrom = bytes.slice(-65);
+		expect(withdrawFrom[0]).toBe(2);
+		expect(bcs.Address.parse(withdrawFrom.slice(1, 33))).toBe(FUNDER);
+		expect(bcs.Address.parse(withdrawFrom.slice(33))).toBe(ALLOWANCE);
+		expect(bcs.CallArg.parse(bytes).FundsWithdrawal?.withdrawFrom).toEqual({
+			$kind: 'SenderAllowance',
+			SenderAllowance: { funder: FUNDER, allowance: ALLOWANCE },
+		});
+	});
+});

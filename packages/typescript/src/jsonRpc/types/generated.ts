@@ -10,14 +10,58 @@
  * /crates/rtd-open-rpc/spec/openrpc.json
  */
 
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
+export interface AccumulatorEvent {
+	accumulatorObj: string;
+	address: string;
+	operation: AccumulatorOperation;
+	ty: string;
+	value: AccumulatorValue;
+}
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
+export type AccumulatorOperation = 'merge' | 'split';
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
+export type AccumulatorValue =
+	| {
+			integer: string;
+	  }
+	| {
+			integerTuple: [string, string];
+	  }
+	| {
+			eventDigest: [string, string][];
+	  };
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface Balance {
 	coinObjectCount: number;
 	coinType: string;
+	/**
+	 * The portion of `total_balance` that resides in the address balance rather than in the coin objects.
+	 * `total_balance` is the total amount of funds owned by the address. That is, do not add these two
+	 * fields together.
+	 */
+	fundsInAddressBalance?: string;
 	lockedBalance: {
 		[key: string]: string;
 	};
 	totalBalance: string;
 }
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface BalanceChange {
 	/**
 	 * The amount indicate the balance value changes, negative amount means spending coin value and
@@ -28,6 +72,10 @@ export interface BalanceChange {
 	/** Owner of the balance change */
 	owner: ObjectOwner;
 }
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface Checkpoint {
 	/** Commitments to checkpoint state */
 	checkpointCommitments: CheckpointCommitment[];
@@ -59,15 +107,36 @@ export interface Checkpoint {
 	/** Validator Signature */
 	validatorSignature: string;
 }
-export type CheckpointCommitment = {
-	ECMHLiveObjectSetDigest: ECMHLiveObjectSetDigest;
-};
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
+export type CheckpointCommitment =
+	| {
+			ECMHLiveObjectSetDigest: ECMHLiveObjectSetDigest;
+	  }
+	| {
+			CheckpointArtifactsDigest: string;
+	  };
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export type CheckpointId = string | string;
-/** A claim consists of value and index_mod_4. */
+/**
+ * A claim consists of value and index_mod_4.
+ *
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface Claim {
 	indexMod4: number;
 	value: string;
 }
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface CoinStruct {
 	balance: string;
 	coinObjectId: string;
@@ -76,12 +145,22 @@ export interface CoinStruct {
 	previousTransaction: string;
 	version: string;
 }
-/** RPC representation of the [Committee] type. */
+/**
+ * RPC representation of the [Committee] type.
+ *
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface CommitteeInfo {
 	epoch: string;
 	validators: [string, string][];
 }
-/** Unlike [enum Signature], [enum CompressedSignature] does not contain public key. */
+/**
+ * Unlike [enum Signature], [enum CompressedSignature] does not contain public key.
+ *
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export type CompressedSignature =
 	| {
 			Ed25519: string;
@@ -98,7 +177,10 @@ export type CompressedSignature =
 	| {
 			Passkey: string;
 	  };
-/** Uses an enum to allow for future expansion of the ConsensusDeterminedVersionAssignments. */
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export type ConsensusDeterminedVersionAssignments =
 	| {
 			CancelledTransactions: [string, [string, string][]][];
@@ -106,6 +188,10 @@ export type ConsensusDeterminedVersionAssignments =
 	| {
 			CancelledTransactionsV2: [string, [[string, string], string][]][];
 	  };
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export type RtdParsedData =
 	| {
 			dataType: 'moveObject';
@@ -119,6 +205,10 @@ export type RtdParsedData =
 				[key: string]: unknown;
 			};
 	  };
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface DelegatedStake {
 	stakes: StakeObject[];
 	/** Staking pool object id. */
@@ -126,7 +216,12 @@ export interface DelegatedStake {
 	/** Validator's Address. */
 	validatorAddress: string;
 }
-/** Additional rguments supplied to dev inspect beyond what is allowed in today's API. */
+/**
+ * Additional rguments supplied to dev inspect beyond what is allowed in today's API.
+ *
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface DevInspectArgs {
 	/** The gas budget for the transaction. */
 	gasBudget?: string | null;
@@ -139,7 +234,12 @@ export interface DevInspectArgs {
 	/** Whether to skip transaction checks for the transaction. */
 	skipChecks?: boolean | null;
 }
-/** The response from processing a dev inspect transaction */
+/**
+ * The response from processing a dev inspect transaction
+ *
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface DevInspectResults {
 	/**
 	 * Summary of effects that likely would be generated if the transaction is actually run. Note however,
@@ -158,12 +258,20 @@ export interface DevInspectResults {
 	/** Execution results (including return values) from executing the transactions */
 	results?: RtdExecutionResult[] | null;
 }
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface DisplayFieldsResponse {
 	data?: {
-		[key: string]: string;
+		[key: string]: unknown;
 	} | null;
 	error?: ObjectResponseError | null;
 }
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface DryRunTransactionBlockResponse {
 	balanceChanges: BalanceChange[];
 	effects: TransactionEffects;
@@ -173,6 +281,10 @@ export interface DryRunTransactionBlockResponse {
 	objectChanges: RtdObjectChange[];
 	suggestedGasPrice?: string | null;
 }
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export type DynamicFieldInfo =
 	| {
 			digest: string;
@@ -194,15 +306,32 @@ export type DynamicFieldInfo =
 			bcsEncoding: 'base58';
 			bcsName: string;
 	  };
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface DynamicFieldName {
 	type: string;
 	value: unknown;
 }
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export type DynamicFieldType = 'DynamicField' | 'DynamicObject';
-/** The Sha256 digest of an EllipticCurveMultisetHash committing to the live object set. */
+/**
+ * The Sha256 digest of an EllipticCurveMultisetHash committing to the live object set.
+ *
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface ECMHLiveObjectSetDigest {
 	digest: number[];
 }
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface EndOfEpochData {
 	/** Commitments to epoch specific state (e.g. live object set) */
 	epochCommitments: CheckpointCommitment[];
@@ -221,6 +350,10 @@ export interface EndOfEpochData {
 	 */
 	nextEpochProtocolVersion: string;
 }
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export type RtdEvent =
 	| {
 			/**
@@ -266,6 +399,10 @@ export type RtdEvent =
 			bcs: string;
 			bcsEncoding: 'base58';
 	  };
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export type RtdEventFilter =
 	/** Return all events. */
 	| {
@@ -318,12 +455,25 @@ export type RtdEventFilter =
 				startTime: string;
 			};
 	  };
-/** Unique ID of a Rtd Event, the ID is a combination of transaction digest and event seq number. */
+/**
+ * Unique ID of a Rtd Event, the ID is a combination of transaction digest and event seq number.
+ *
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface EventId {
 	eventSeq: string;
 	txDigest: string;
 }
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export type ExecuteTransactionRequestType = 'WaitForEffectsCert' | 'WaitForLocalExecution';
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export type ExecutionStatus = {
 	status: 'success' | 'failure';
 	error?: string;
@@ -346,6 +496,9 @@ export type ExecutionStatus = {
  * objects added up to a pool of "potential rebate". This rebate then is reduced by the "nonrefundable
  * rate" such that:
  * `potential_rebate(storage cost of deleted/mutated objects) = storage_rebate + non_refundable_storage_fee`
+ *
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
  */
 export interface GasCostSummary {
 	/** Cost of computation/execution */
@@ -360,18 +513,30 @@ export interface GasCostSummary {
 	 */
 	storageRebate: string;
 }
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface RtdGasData {
 	budget: string;
 	owner: string;
 	payment: RtdObjectRef[];
 	price: string;
 }
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface GetPastObjectRequest {
 	/** the ID of the queried object */
 	objectId: string;
 	/** the version of the queried object. */
 	version: string;
 }
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export type InputObjectKind =
 	| {
 			MovePackage: string;
@@ -386,6 +551,10 @@ export type InputObjectKind =
 				mutable?: boolean;
 			};
 	  };
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface MoveCallParams {
 	arguments: unknown[];
 	function: string;
@@ -393,11 +562,19 @@ export interface MoveCallParams {
 	packageObjectId: string;
 	typeArguments?: string[];
 }
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export type RtdMoveFunctionArgType =
 	| 'Pure'
 	| {
 			Object: ObjectValueKind;
 	  };
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export type MoveStruct =
 	| MoveValue[]
 	| {
@@ -409,6 +586,10 @@ export type MoveStruct =
 	| {
 			[key: string]: MoveValue;
 	  };
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export type MoveValue =
 	| number
 	| boolean
@@ -421,6 +602,10 @@ export type MoveValue =
 	| MoveStruct
 	| null
 	| MoveVariant;
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface MoveVariant {
 	fields: {
 		[key: string]: MoveValue;
@@ -428,7 +613,12 @@ export interface MoveVariant {
 	type: string;
 	variant: string;
 }
-/** The struct that contains signatures and public keys necessary for authenticating a MultiSig. */
+/**
+ * The struct that contains signatures and public keys necessary for authenticating a MultiSig.
+ *
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface MultiSig {
 	/** A bitmap that indicates the position of which public key the signature should be authenticated with. */
 	bitmap: number;
@@ -443,6 +633,9 @@ export interface MultiSig {
 /**
  * Deprecated, use [struct MultiSig] instead. The struct that contains signatures and public keys
  * necessary for authenticating a MultiSigLegacy.
+ *
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
  */
 export interface MultiSigLegacy {
 	/** A bitmap that indicates the position of which public key the signature should be authenticated with. */
@@ -455,7 +648,12 @@ export interface MultiSigLegacy {
 	/** The plain signature encoded with signature scheme. */
 	sigs: CompressedSignature[];
 }
-/** The struct that contains the public key used for authenticating a MultiSig. */
+/**
+ * The struct that contains the public key used for authenticating a MultiSig.
+ *
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface MultiSigPublicKey {
 	/** A list of public key and its corresponding weight. */
 	pk_map: [PublicKey, number][];
@@ -468,6 +666,9 @@ export interface MultiSigPublicKey {
 /**
  * Deprecated, use [struct MultiSigPublicKey] instead. The struct that contains the public key used for
  * authenticating a MultiSig.
+ *
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
  */
 export interface MultiSigPublicKeyLegacy {
 	/** A list of public key and its corresponding weight. */
@@ -481,6 +682,9 @@ export interface MultiSigPublicKeyLegacy {
 /**
  * ObjectChange are derived from the object mutations in the TransactionEffect to provide richer object
  * information.
+ *
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
  */
 export type RtdObjectChange =
 	/** Module published */
@@ -533,6 +737,10 @@ export type RtdObjectChange =
 			type: 'created';
 			version: string;
 	  };
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface RtdObjectData {
 	/**
 	 * Move object content or package content in BCS, default to be None unless
@@ -549,7 +757,7 @@ export interface RtdObjectData {
 	/**
 	 * The Display metadata for frontend UI rendering, default to be None unless
 	 * RtdObjectDataOptions.showContent is set to true This can also be None if the struct type does not
-	 * have Display defined See more details in <https://forums.rtd.life/t/nft-object-display-proposal/4872>
+	 * have Display defined See more details in <https://forums.rtd.io/t/nft-object-display-proposal/4872>
 	 */
 	display?: DisplayFieldsResponse | null;
 	objectId: string;
@@ -570,6 +778,10 @@ export interface RtdObjectData {
 	/** Object version. */
 	version: string;
 }
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface RtdObjectDataOptions {
 	/** Whether to show the content in BCS format. Default to be False */
 	showBcs?: boolean;
@@ -589,6 +801,10 @@ export interface RtdObjectDataOptions {
 	/** Whether to show the type of the object. Default to be False */
 	showType?: boolean;
 }
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export type ObjectRead =
 	/** The object exists and is found with this version */
 	| {
@@ -615,6 +831,10 @@ export type ObjectRead =
 			};
 			status: 'VersionTooHigh';
 	  };
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface RtdObjectRef {
 	/** Base64 string representing the object digest */
 	digest: string;
@@ -623,6 +843,10 @@ export interface RtdObjectRef {
 	/** Object version. */
 	version: string;
 }
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export type ObjectResponseError =
 	| {
 			code: 'notExists';
@@ -647,17 +871,33 @@ export type ObjectResponseError =
 			code: 'displayError';
 			error: string;
 	  };
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface RtdObjectResponseQuery {
 	/** If None, no filter will be applied */
 	filter?: RtdObjectDataFilter | null;
 	/** config which fields to include in the response, by default only digest is included */
 	options?: RtdObjectDataOptions | null;
 }
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export type ObjectValueKind = 'ByImmutableReference' | 'ByMutableReference' | 'ByValue';
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface OwnedObjectRef {
 	owner: ObjectOwner;
 	reference: RtdObjectRef;
 }
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export type ObjectOwner =
 	/** Object is exclusively owned by a single address, and is mutable. */
 	| {
@@ -690,6 +930,9 @@ export type ObjectOwner =
  * `next_cursor` points to the last item in the page; Reading with `next_cursor` will start from the
  * next item after `next_cursor` if `next_cursor` is `Some`, otherwise it will start from the first
  * item.
+ *
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
  */
 export interface PaginatedCheckpoints {
 	data: Checkpoint[];
@@ -700,6 +943,9 @@ export interface PaginatedCheckpoints {
  * `next_cursor` points to the last item in the page; Reading with `next_cursor` will start from the
  * next item after `next_cursor` if `next_cursor` is `Some`, otherwise it will start from the first
  * item.
+ *
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
  */
 export interface PaginatedCoins {
 	data: CoinStruct[];
@@ -710,6 +956,9 @@ export interface PaginatedCoins {
  * `next_cursor` points to the last item in the page; Reading with `next_cursor` will start from the
  * next item after `next_cursor` if `next_cursor` is `Some`, otherwise it will start from the first
  * item.
+ *
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
  */
 export interface PaginatedDynamicFieldInfos {
 	data: DynamicFieldInfo[];
@@ -720,6 +969,9 @@ export interface PaginatedDynamicFieldInfos {
  * `next_cursor` points to the last item in the page; Reading with `next_cursor` will start from the
  * next item after `next_cursor` if `next_cursor` is `Some`, otherwise it will start from the first
  * item.
+ *
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
  */
 export interface PaginatedEvents {
 	data: RtdEvent[];
@@ -730,6 +982,9 @@ export interface PaginatedEvents {
  * `next_cursor` points to the last item in the page; Reading with `next_cursor` will start from the
  * next item after `next_cursor` if `next_cursor` is `Some`, otherwise it will start from the first
  * item.
+ *
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
  */
 export interface PaginatedStrings {
 	data: string[];
@@ -740,6 +995,9 @@ export interface PaginatedStrings {
  * `next_cursor` points to the last item in the page; Reading with `next_cursor` will start from the
  * next item after `next_cursor` if `next_cursor` is `Some`, otherwise it will start from the first
  * item.
+ *
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
  */
 export interface PaginatedObjectsResponse {
 	data: RtdObjectResponse[];
@@ -750,6 +1008,9 @@ export interface PaginatedObjectsResponse {
  * `next_cursor` points to the last item in the page; Reading with `next_cursor` will start from the
  * next item after `next_cursor` if `next_cursor` is `Some`, otherwise it will start from the first
  * item.
+ *
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
  */
 export interface PaginatedTransactionResponse {
 	data: RtdTransactionBlockResponse[];
@@ -759,6 +1020,9 @@ export interface PaginatedTransactionResponse {
 /**
  * An passkey authenticator with parsed fields. See field defition below. Can be initialized from
  * [struct RawPasskeyAuthenticator].
+ *
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
  */
 export interface PasskeyAuthenticator {
 	/**
@@ -774,6 +1038,10 @@ export interface PasskeyAuthenticator {
 	 */
 	client_data_json: string;
 }
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface ProtocolConfig {
 	attributes: {
 		[key: string]: ProtocolConfigValue | null;
@@ -785,6 +1053,10 @@ export interface ProtocolConfig {
 	minSupportedProtocolVersion: string;
 	protocolVersion: string;
 }
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export type ProtocolConfigValue =
 	| {
 			u16: string;
@@ -801,6 +1073,10 @@ export type ProtocolConfigValue =
 	| {
 			bool: string;
 	  };
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export type PublicKey =
 	| {
 			Ed25519: string;
@@ -817,6 +1093,10 @@ export type PublicKey =
 	| {
 			Passkey: string;
 	  };
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export type RPCTransactionRequestParams =
 	| {
 			transferObjectRequestParams: TransferObjectParams;
@@ -824,6 +1104,10 @@ export type RPCTransactionRequestParams =
 	| {
 			moveCallRequestParams: MoveCallParams;
 	  };
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export type RawData =
 	| {
 			bcsBytes: string;
@@ -844,6 +1128,10 @@ export type RawData =
 			typeOriginTable: TypeOrigin[];
 			version: string;
 	  };
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export type Signature =
 	| {
 			Ed25519RtdSignature: string;
@@ -854,6 +1142,10 @@ export type Signature =
 	| {
 			Secp256r1RtdSignature: string;
 	  };
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export type StakeObject =
 	| {
 			principal: string;
@@ -880,12 +1172,21 @@ export type StakeObject =
 			stakedRtdId: string;
 			status: 'Unstaked';
 	  };
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface RtdActiveJwk {
 	epoch: string;
 	jwk: RtdJWK;
 	jwk_id: RtdJwkId;
 }
-/** An argument to a transaction in a programmable transaction block */
+/**
+ * An argument to a transaction in a programmable transaction block
+ *
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export type RtdArgument =
 	| 'GasCoin' /** One of the input objects or primitive values (from `ProgrammableTransactionBlock` inputs) */
 	| {
@@ -900,9 +1201,17 @@ export type RtdArgument =
 	| {
 			NestedResult: [number, number];
 	  };
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface RtdAuthenticatorStateExpire {
 	min_epoch: string;
 }
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export type RtdCallArg =
 	| {
 			type: 'object';
@@ -929,7 +1238,17 @@ export type RtdCallArg =
 			type: 'pure';
 			value: unknown;
 			valueType?: string | null;
+	  }
+	| {
+			reservation: RtdReservation;
+			type: 'fundsWithdrawal';
+			typeArg: RtdWithdrawalTypeArg;
+			withdrawFrom: RtdWithdrawFrom;
 	  };
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface RtdChangeEpoch {
 	computation_charge: string;
 	epoch: string;
@@ -937,6 +1256,10 @@ export interface RtdChangeEpoch {
 	storage_charge: string;
 	storage_rebate: string;
 }
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface CoinMetadata {
 	/** Number of decimal places the coin uses. */
 	decimals: number;
@@ -951,12 +1274,20 @@ export interface CoinMetadata {
 	/** Symbol for the token */
 	symbol: string;
 }
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export type RtdEndOfEpochTransactionKind =
 	| 'AuthenticatorStateCreate'
 	| 'RandomnessStateCreate'
 	| 'CoinDenyListStateCreate'
 	| 'StoreExecutionTimeObservations'
 	| 'AccumulatorRootCreate'
+	| 'CoinRegistryCreate'
+	| 'DisplayRegistryCreate'
+	| 'AddressAliasStateCreate'
+	| 'WriteAccumulatorStorageCost'
 	| {
 			ChangeEpoch: RtdChangeEpoch;
 	  }
@@ -969,36 +1300,68 @@ export type RtdEndOfEpochTransactionKind =
 	| {
 			BridgeCommitteeUpdate: string;
 	  };
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface RtdExecutionResult {
 	/** The value of any arguments that were mutably borrowed. Non-mut borrowed values are not included */
 	mutableReferenceOutputs?: [RtdArgument, number[], string][];
 	/** The return values from the transaction */
 	returnValues?: [number[], string][];
 }
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface RtdJWK {
 	alg: string;
 	e: string;
 	kty: string;
 	n: string;
 }
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface RtdJwkId {
 	iss: string;
 	kid: string;
 }
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export type RtdMoveAbility = 'Copy' | 'Drop' | 'Store' | 'Key';
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface RtdMoveAbilitySet {
 	abilities: RtdMoveAbility[];
 }
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface RtdMoveAbort {
 	error_code?: string | null;
 	function?: string | null;
 	line?: number | null;
 	module_id?: string | null;
 }
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface RtdMoveModuleId {
 	address: string;
 	name: string;
 }
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface RtdMoveNormalizedEnum {
 	abilities: RtdMoveAbilitySet;
 	typeParameters: RtdMoveStructTypeParameter[];
@@ -1007,10 +1370,18 @@ export interface RtdMoveNormalizedEnum {
 		[key: string]: RtdMoveNormalizedField[];
 	};
 }
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface RtdMoveNormalizedField {
 	name: string;
 	type: RtdMoveNormalizedType;
 }
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface RtdMoveNormalizedFunction {
 	isEntry: boolean;
 	parameters: RtdMoveNormalizedType[];
@@ -1018,6 +1389,10 @@ export interface RtdMoveNormalizedFunction {
 	typeParameters: RtdMoveAbilitySet[];
 	visibility: RtdMoveVisibility;
 }
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface RtdMoveNormalizedModule {
 	address: string;
 	enums?: {
@@ -1033,11 +1408,19 @@ export interface RtdMoveNormalizedModule {
 		[key: string]: RtdMoveNormalizedStruct;
 	};
 }
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface RtdMoveNormalizedStruct {
 	abilities: RtdMoveAbilitySet;
 	fields: RtdMoveNormalizedField[];
 	typeParameters: RtdMoveStructTypeParameter[];
 }
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export type RtdMoveNormalizedType =
 	| 'Bool'
 	| 'U8'
@@ -1068,11 +1451,23 @@ export type RtdMoveNormalizedType =
 	| {
 			MutableReference: RtdMoveNormalizedType;
 	  };
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface RtdMoveStructTypeParameter {
 	constraints: RtdMoveAbilitySet;
 	isPhantom: boolean;
 }
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export type RtdMoveVisibility = 'Private' | 'Public' | 'Friend';
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export type RtdObjectDataFilter =
 	| {
 			MatchAll: RtdObjectDataFilter[];
@@ -1112,6 +1507,10 @@ export type RtdObjectDataFilter =
 	| {
 			Version: string;
 	  };
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface RtdObjectResponse {
 	data?: RtdObjectData | null;
 	error?: ObjectResponseError | null;
@@ -1119,6 +1518,9 @@ export interface RtdObjectResponse {
 /**
  * The transaction for calling a Move function, either an entry function or a public function (which
  * cannot return references).
+ *
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
  */
 export interface MoveCallRtdTransaction {
 	/** The arguments to the function. */
@@ -1133,9 +1535,19 @@ export interface MoveCallRtdTransaction {
 	type_arguments?: string[];
 }
 /**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
+export type RtdReservation = {
+	maxAmountU64: string;
+};
+/**
  * This is the JSON-RPC type for the RTD system state object. It flattens all fields to make them
  * top-level fields such that it as minimum dependencies to the internal data structures of the RTD
  * system state type.
+ *
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
  */
 export interface RtdSystemStateSummary {
 	/** The list of active validators in the current epoch. */
@@ -1245,7 +1657,12 @@ export interface RtdSystemStateSummary {
 	 */
 	validatorVeryLowStakeThreshold: string;
 }
-/** A single transaction in a programmable transaction block. */
+/**
+ * A single transaction in a programmable transaction block.
+ *
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export type RtdTransaction =
 	/** A call to either an entry or a public Move function */
 	| {
@@ -1282,10 +1699,17 @@ export type RtdTransaction =
 	| {
 			MakeMoveVec: [string | null, RtdArgument[]];
 	  };
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export type RtdTransactionBlockBuilderMode = 'Commit' | 'DevInspect';
 /**
  * This is the JSON-RPC type for the RTD validator. It flattens all inner structures to top-level
  * fields so that they are decoupled from the internal definitions.
+ *
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
  */
 export interface RtdValidatorSummary {
 	commissionRate: string;
@@ -1339,13 +1763,37 @@ export interface RtdValidatorSummary {
 	workerAddress: string;
 	workerPubkeyBytes: string;
 }
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
+export type RtdWithdrawFrom = 'sender' | 'sponsor';
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
+export type RtdWithdrawalTypeArg = {
+	balance: string;
+};
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface CoinSupply {
 	value: string;
 }
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface RtdTransactionBlock {
 	data: TransactionBlockData;
 	txSignatures: string[];
 }
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface TransactionBlockBytes {
 	/** the gas objects to be used */
 	gas: RtdObjectRef[];
@@ -1354,17 +1802,26 @@ export interface TransactionBlockBytes {
 	/** BCS serialized transaction data bytes without its type tag, as base-64 encoded string. */
 	txBytes: string;
 }
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export type TransactionBlockData = {
 	gasData: RtdGasData;
 	messageVersion: 'v1';
 	sender: string;
 	transaction: RtdTransactionBlockKind;
 };
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export type TransactionEffects =
 	/** The response from processing a transaction or a certified transaction */
 	{
 		/** The abort error populated if the transaction failed with an abort code. */
 		abortError?: RtdMoveAbort | null;
+		accumulatorEvents?: AccumulatorEvent[];
 		/** ObjectRef and owner of new objects created. */
 		created?: OwnedObjectRef[];
 		/** Object Refs of objects now deleted (the old refs). */
@@ -1411,10 +1868,18 @@ export type TransactionEffects =
 		/** Object refs of objects now wrapped in other objects. */
 		wrapped?: RtdObjectRef[];
 	};
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface TransactionBlockEffectsModifiedAtVersions {
 	objectId: string;
 	sequenceNumber: string;
 }
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export type RtdTransactionBlockKind =
 	/** A system transaction that will update epoch information on-chain. */
 	| {
@@ -1497,6 +1962,10 @@ export type RtdTransactionBlockKind =
 			 */
 			transactions: RtdTransaction[];
 	  };
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface RtdTransactionBlockResponse {
 	balanceChanges?: BalanceChange[] | null;
 	/**
@@ -1520,6 +1989,10 @@ export interface RtdTransactionBlockResponse {
 	/** Transaction input data */
 	transaction?: RtdTransactionBlock | null;
 }
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface RtdTransactionBlockResponseOptions {
 	/** Whether to show balance_changes. Default to be False */
 	showBalanceChanges?: boolean;
@@ -1536,12 +2009,20 @@ export interface RtdTransactionBlockResponseOptions {
 	/** Whether to show bcs-encoded transaction input data */
 	showRawInput?: boolean;
 }
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface RtdTransactionBlockResponseQuery {
 	/** If None, no filter will be applied */
 	filter?: TransactionFilter | null;
 	/** config which fields to include in the response, by default only digest is included */
 	options?: RtdTransactionBlockResponseOptions | null;
 }
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export type TransactionFilter =
 	/** CURRENTLY NOT SUPPORTED. Query by checkpoint. */
 	| {
@@ -1586,51 +2067,96 @@ export type TransactionFilter =
 	| {
 			TransactionKindIn: string[];
 	  };
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface TransferObjectParams {
 	objectId: string;
 	recipient: string;
 }
-/** Identifies a struct and the module it was defined in */
+/**
+ * Identifies a struct and the module it was defined in
+ *
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface TypeOrigin {
 	datatype_name: string;
 	module_name: string;
 	package: string;
 }
-/** Upgraded package info for the linkage table */
+/**
+ * Upgraded package info for the linkage table
+ *
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface UpgradeInfo {
 	/** ID of the upgraded packages */
 	upgraded_id: string;
 	/** Version of the upgraded package */
 	upgraded_version: string;
 }
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface ValidatorApy {
 	address: string;
 	apy: number;
 }
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface ValidatorsApy {
 	apys: ValidatorApy[];
 	epoch: string;
 }
-/** An zk login authenticator with all the necessary fields. */
+/**
+ * An zk login authenticator with all the necessary fields.
+ *
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface ZkLoginAuthenticator {
 	inputs: ZkLoginInputs;
 	maxEpoch: string;
 	userSignature: Signature;
 }
-/** All inputs required for the zk login proof verification and other public inputs. */
+/**
+ * All inputs required for the zk login proof verification and other public inputs.
+ *
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface ZkLoginInputs {
 	addressSeed: string;
 	headerBase64: string;
 	issBase64Details: Claim;
 	proofPoints: ZkLoginProof;
 }
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export type ZkLoginIntentScope = 'TransactionData' | 'PersonalMessage';
-/** The struct for zk login proof. */
+/**
+ * The struct for zk login proof.
+ *
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface ZkLoginProof {
 	a: string[];
 	b: string[][];
 	c: string[];
 }
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient` from
+ * `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface ZkLoginVerifyResult {
 	/** The errors field captures any verification error */
 	errors: string[];

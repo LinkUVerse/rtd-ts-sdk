@@ -22,9 +22,13 @@ import type {
 	Wallet,
 	WalletIcon,
 } from 'rtd-wallet-standard';
-import { getWallets, ReadonlyWalletAccount, RTD_CHAINS } from 'rtd-wallet-standard';
-import type { Emitter } from 'mitt';
-import mitt from 'mitt';
+import {
+	getWallets,
+	ReadonlyWalletAccount,
+	RTD_CHAINS,
+	RTD_MAINNET_CHAIN,
+} from 'rtd-wallet-standard';
+import { mitt, type Emitter } from 'rtd-utils';
 import type { InferOutput } from 'valibot';
 import { boolean, object, parse, string } from 'valibot';
 import { DappPostMessageChannel, decodeJwtSession } from 'rtd-window-wallet-core';
@@ -39,6 +43,9 @@ const SLUSH_SESSION_KEY = 'slush:session';
 
 export const SLUSH_WALLET_NAME = 'Slush' as const;
 
+export const SLUSH_WALLET_ICON =
+	'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNDgiIHZpZXdCb3g9IjAgMCA0OCA0OCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTAgMjRDMCAxMC43NDUyIDEwLjc0NTIgMCAyNCAwQzM3LjI1NDggMCA0OCAxMC43NDUyIDQ4IDI0QzQ4IDM3LjI1NDggMzcuMjU0OCA0OCAyNCA0OEMxMC43NDUyIDQ4IDAgMzcuMjU0OCAwIDI0WiIgZmlsbD0iIzBDMEExRiIvPgo8cGF0aCBkPSJNMTMuMTM1OCAzMi4xMDg1QzE0LjE3MDEgMzUuOTY4MyAxOC4wMzMxIDM5LjQ2MjQgMjYuMDI1NSAzNy4zMjA4QzMzLjY1MTUgMzUuMjc3NCAzOC40MzA5IDI5LjAwNCAzNy4xOTE2IDI0LjM3ODlDMzYuNzYzNiAyMi43ODE3IDM1LjQ3NDYgMjEuNzAwNiAzMy40ODcyIDIxLjg3NjVMMTUuNzE2NSAyMy4zNTcyQzE0LjU5NzMgMjMuNDQzIDE0LjA4NDIgMjMuMjU5NiAxMy43ODgxIDIyLjU1NDNDMTMuNTAxIDIxLjg4MjMgMTMuNjY0NiAyMS4xNjA5IDE1LjAxNjMgMjAuNDc3N0wyOC41NDAxIDEzLjUzNzRDMjkuNTc2NyAxMy4wMSAzMC4yNjcxIDEyLjc4OTMgMzAuODk4IDEzLjAxMjZDMzEuMjkzNCAxMy4xNTYzIDMxLjU1MzggMTMuNzI4NCAzMS4zMTQ3IDE0LjQzNDRMMzAuNDM3OCAxNy4wMjMyQzI5LjM2MTcgMjAuMjAwMiAzMS42NjUzIDIwLjkzODIgMzIuOTY0MSAyMC41OTAyQzM0LjkyODkgMjAuMDYzNyAzNS4zOTExIDE4LjE5MjMgMzQuNzU4MSAxNS44Mjk5QzMzLjE1MzMgOS44NDA1NCAyNi43OTkgOC45MDQxMSAyMS4wMzc4IDEwLjQ0NzhDMTUuMTc2NyAxMi4wMTgzIDEwLjA5NiAxNi43Njc2IDExLjY0NzQgMjIuNTU3M0MxMi4wMTI5IDIzLjkyMTYgMTMuMjY4NyAyNS4wMTE2IDE0LjcyMzIgMjQuOTc4NUwxNi45NDM4IDI0Ljk3MzFDMTcuNDAwNCAyNC45NjI1IDE3LjIzNiAyNSAxOC4xMTcgMjQuOTI3MUMxOC45OTggMjQuODU0MSAyMS4zNTA5IDI0LjU2NDYgMjEuMzUwOSAyNC41NjQ2TDMyLjg5NjIgMjMuMjU4TDMzLjE5MzcgMjMuMjE0OEMzMy44Njg5IDIzLjA5OTcgMzQuMzc5MiAyMy4yNzUgMzQuODEwNiAyNC4wMTgzQzM1LjQ1NjMgMjUuMTMwNCAzNC40NzEyIDI1Ljk2OTEgMzMuMjkyIDI2Ljk3MzFDMzMuMjYwNSAyNyAzMy4yMjg4IDI3LjAyNyAzMy4xOTcgMjcuMDU0MUwyMy4wNDgyIDM1LjgwMDVDMjEuMzA4NyAzNy4zMDA4IDIwLjA4NjcgMzYuNzM2NyAxOS42NTg4IDM1LjEzOTVMMTguMTQzMSAyOS40ODI5QzE3Ljc2ODcgMjguMDg1NCAxNi40MDQxIDI2Ljk4ODkgMTQuODA1NiAyNy40MTcyQzEyLjgwNzUgMjcuOTUyNiAxMi42NDU1IDMwLjI3ODQgMTMuMTM1OCAzMi4xMDg1WiIgZmlsbD0iI0ZCRkFGRiIvPgo8L3N2Zz4K' as const;
+
 const RTD_WALLET_EXTENSION_ID = 'com.linkuverse.rtdwallet' as const;
 const METADATA_API_URL = 'https://api.slush.app/api/wallet/metadata';
 
@@ -46,7 +53,7 @@ const FALLBACK_METADATA = {
 	id: 'com.linkuverse.rtdwallet.web',
 	walletName: 'Slush',
 	description: 'Trade and earn on Rtd.',
-	icon: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTAiIGhlaWdodD0iNTAiIHZpZXdCb3g9IjAgMCA1MCA1MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjUwIiBoZWlnaHQ9IjUwIiBmaWxsPSIjNENBMkZGIi8+CjxwYXRoIGQ9Ik0xMi4zNDczIDM0LjcyNTRDMTMuNTU1MyAzOS4yMzM2IDE4LjA2NzMgNDMuMzE0OCAyNy40MDI1IDQwLjgxMzRDMzYuMzA5NyAzOC40MjY3IDQxLjg5MjEgMzEuMDk5MyA0MC40NDQ2IDI1LjY5NzJDMzkuOTQ0NyAyMy44MzE3IDM4LjQzOTEgMjIuNTY4OSAzNi4xMTc4IDIyLjc3NDRMMTUuMzYxNSAyNC41MDM4QzE0LjA1NDQgMjQuNjA0MSAxMy40NTUgMjQuMzg5OCAxMy4xMDkyIDIzLjU2NjFDMTIuNzczOCAyMi43ODEyIDEyLjk2NDkgMjEuOTM4NSAxNC41NDM3IDIxLjE0MDZMMzAuMzM5NiAxMy4wMzQyQzMxLjU1MDMgMTIuNDE4MiAzMi4zNTY3IDEyLjE2MDUgMzMuMDkzNiAxMi40MjEzQzMzLjU1NTUgMTIuNTg5MSAzMy44NTk2IDEzLjI1NzQgMzMuNTgwMyAxNC4wODJMMzIuNTU2MSAxNy4xMDU2QzMxLjI5OTIgMjAuODE2NCAzMy45ODk5IDIxLjY3ODQgMzUuNTA2OCAyMS4yNzE5QzM3LjgwMTcgMjAuNjU3IDM4LjM0MTYgMTguNDcxMiAzNy42MDIzIDE1LjcxMTlDMzUuNzI3OCA4LjcxNjI5IDI4LjMwNTkgNy42MjI1NCAyMS41NzY4IDkuNDI1NTlDMTQuNzMxMSAxMS4yNTk5IDguNzk2ODEgMTYuODA3MiAxMC42MDg4IDIzLjU2OTZDMTEuMDM1OCAyNS4xNjMgMTIuNTAyNSAyNi40MzYyIDE0LjIwMTQgMjYuMzk3NUwxNi43OTUgMjYuMzkxMkMxNy4zMjg0IDI2LjM3ODggMTcuMTM2MyAyNi40MjI3IDE4LjE2NTMgMjYuMzM3NEMxOS4xOTQ0IDI2LjI1MjIgMjEuOTQyNSAyNS45MTQgMjEuOTQyNSAyNS45MTRMMzUuNDI3NSAyNC4zODhMMzUuNzc1IDI0LjMzNzVDMzYuNTYzNyAyNC4yMDMgMzcuMTU5NyAyNC40MDc5IDM3LjY2MzYgMjUuMjc2QzM4LjQxNzcgMjYuNTc1IDM3LjI2NzIgMjcuNTU0NiAzNS44ODk5IDI4LjcyNzJDMzUuODUzIDI4Ljc1ODYgMzUuODE2IDI4Ljc5MDEgMzUuNzc4OSAyOC44MjE4TDIzLjkyNSAzOS4wMzc3QzIxLjg5MzMgNDAuNzkwMSAyMC40NjYgNDAuMTMxMSAxOS45NjYyIDM4LjI2NTZMMTguMTk1OCAzMS42NTg3QzE3Ljc1ODUgMzAuMDI2NCAxNi4xNjQ2IDI4Ljc0NTYgMTQuMjk3NiAyOS4yNDU5QzExLjk2MzggMjkuODcxMiAxMS43NzQ2IDMyLjU4NzggMTIuMzQ3MyAzNC43MjU0WiIgZmlsbD0iIzA2MEQxNCIvPgo8L3N2Zz4K',
+	icon: SLUSH_WALLET_ICON,
 	enabled: true,
 };
 
@@ -76,7 +83,6 @@ const walletAccountFeatures = [
 	'rtd:signAndExecuteTransaction',
 	'rtd:signPersonalMessage',
 	'rtd:signTransactionBlock',
-	'rtd:signAndExecuteTransactionBlock',
 ] as const;
 
 function getAccountsFromSession(session: string) {
@@ -85,7 +91,10 @@ function getAccountsFromSession(session: string) {
 		return new ReadonlyWalletAccount({
 			address: account.address,
 			chains: RTD_CHAINS,
-			features: walletAccountFeatures,
+			// Older wallet sessions omit capabilities; an explicit empty list is watch-only.
+			features: account.features
+				? walletAccountFeatures.filter((feature) => account.features?.includes(feature))
+				: walletAccountFeatures,
 			publicKey: fromBase64(account.publicKey),
 		});
 	});
@@ -100,6 +109,7 @@ export class SlushWallet implements Wallet {
 	#walletName: string;
 	#icon: WalletIcon;
 	#name: string;
+	#removeStorageListener: (() => void) | null = null;
 
 	get name() {
 		return this.#walletName;
@@ -181,6 +191,25 @@ export class SlushWallet implements Wallet {
 		this.#name = name;
 		this.#walletName = metadata.walletName;
 		this.#icon = metadata.icon as WalletIcon;
+		if (typeof window !== 'undefined') {
+			const target = window;
+			const onStorage = (event: StorageEvent) => {
+				if (
+					event.storageArea !== localStorage ||
+					(event.key !== SLUSH_SESSION_KEY && event.key !== null)
+				)
+					return;
+				this.#setAccounts(this.#getPreviouslyAuthorizedAccounts());
+			};
+			target.addEventListener('storage', onStorage);
+			this.#removeStorageListener = () => target.removeEventListener('storage', onStorage);
+		}
+	}
+
+	/** Stop observing cross-tab session changes. Registered wallets dispose on unregister. */
+	dispose() {
+		this.#removeStorageListener?.();
+		this.#removeStorageListener = null;
 	}
 
 	#signTransactionBlock: RtdSignTransactionBlockMethod = async ({
@@ -256,7 +285,7 @@ export class SlushWallet implements Wallet {
 			type: 'sign-personal-message',
 			message: toBase64(message),
 			address: account.address,
-			chain: chain ?? account.chains[0],
+			chain: chain ?? RTD_MAINNET_CHAIN,
 			session: getSessionFromStorage(),
 		});
 
@@ -340,17 +369,7 @@ export function registerSlushWallet(
 ) {
 	const wallets = getWallets();
 
-	let unregister: (() => void) | null = null;
-
-	// listen for wallet registration
-	wallets.on('register', (wallet) => {
-		if (wallet.id === RTD_WALLET_EXTENSION_ID) {
-			unregister?.();
-		}
-	});
-
-	const extension = wallets.get().find((wallet) => wallet.id === RTD_WALLET_EXTENSION_ID);
-	if (extension) {
+	if (wallets.get().some((wallet) => wallet.id === RTD_WALLET_EXTENSION_ID)) {
 		return;
 	}
 
@@ -359,13 +378,27 @@ export function registerSlushWallet(
 		origin,
 		metadata: FALLBACK_METADATA,
 	});
-	unregister = wallets.register(slushWalletInstance);
+	const unregisterWallet = wallets.register(slushWalletInstance);
+	let unregistered = false;
+	const unregister = () => {
+		if (unregistered) return;
+		unregistered = true;
+		slushWalletInstance.dispose();
+		stopRegistrationListener();
+		unregisterWallet();
+	};
+	const stopRegistrationListener = wallets.on('register', (wallet) => {
+		if (wallet.id === RTD_WALLET_EXTENSION_ID) unregister();
+	});
+	// Another registration listener may have installed the extension synchronously.
+	if (wallets.get().some((wallet) => wallet.id === RTD_WALLET_EXTENSION_ID)) unregister();
 
 	fetchMetadata(metadataApiUrl)
 		.then((metadata) => {
+			if (unregistered) return;
 			if (!metadata.enabled) {
 				console.log('Slush wallet is not currently enabled.');
-				unregister?.();
+				unregister();
 				return;
 			}
 			slushWalletInstance.updateMetadata(metadata);

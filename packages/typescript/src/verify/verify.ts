@@ -9,78 +9,102 @@ import { Ed25519PublicKey } from '../keypairs/ed25519/publickey.js';
 import { PasskeyPublicKey } from '../keypairs/passkey/publickey.js';
 import { Secp256k1PublicKey } from '../keypairs/secp256k1/publickey.js';
 import { Secp256r1PublicKey } from '../keypairs/secp256r1/publickey.js';
-// eslint-disable-next-line import/no-cycle
 import { MultiSigPublicKey } from '../multisig/publickey.js';
-import type { ZkLoginCompatibleClient } from '../zklogin/publickey.js';
 import { ZkLoginPublicIdentifier } from '../zklogin/publickey.js';
+import type { ClientWithCoreApi } from '../client/core.js';
+
+/**
+ * Whether `signature` is a valid signature over `bytes` (and, if `options.address`
+ * is given, was produced by that address). Returns `false` for a malformed or
+ * cryptographically invalid signature, or one that doesn't match the address;
+ * only an *environmental* failure (e.g. a zkLogin JWK/epoch lookup) throws, so a
+ * network blip is never reported as an invalid signature.
+ */
+export async function isValidSignature(
+	bytes: Uint8Array,
+	signature: string,
+	options: { address?: string } = {},
+): Promise<boolean> {
+	const parsed = tryParseSignature(signature);
+	if (!parsed) return false;
+	if (!(await parsed.publicKey.verify(bytes, parsed.serializedSignature))) return false;
+	return options.address ? parsed.publicKey.verifyAddress(options.address) : true;
+}
+
+/** Like {@link isValidSignature}, for a personal message. */
+export async function isValidPersonalMessageSignature(
+	message: Uint8Array,
+	signature: string,
+	options: { client?: ClientWithCoreApi; address?: string } = {},
+): Promise<boolean> {
+	const parsed = tryParseSignature(signature, { client: options.client });
+	if (!parsed) return false;
+	if (!(await parsed.publicKey.verifyPersonalMessage(message, parsed.serializedSignature))) {
+		return false;
+	}
+	return options.address ? parsed.publicKey.verifyAddress(options.address) : true;
+}
+
+/** Like {@link isValidSignature}, for transaction bytes. */
+export async function isValidTransactionSignature(
+	transaction: Uint8Array,
+	signature: string,
+	options: { client?: ClientWithCoreApi; address?: string } = {},
+): Promise<boolean> {
+	const parsed = tryParseSignature(signature, { client: options.client });
+	if (!parsed) return false;
+	if (!(await parsed.publicKey.verifyTransaction(transaction, parsed.serializedSignature))) {
+		return false;
+	}
+	return options.address ? parsed.publicKey.verifyAddress(options.address) : true;
+}
 
 export async function verifySignature(
 	bytes: Uint8Array,
 	signature: string,
-	options?: {
-		address?: string;
-	},
+	options: { address?: string } = {},
 ): Promise<PublicKey> {
-	const parsedSignature = parseSignature(signature);
-
-	if (!(await parsedSignature.publicKey.verify(bytes, parsedSignature.serializedSignature))) {
+	const { publicKey } = parseSignature(signature);
+	if (!(await isValidSignature(bytes, signature))) {
 		throw new Error(`Signature is not valid for the provided data`);
 	}
-
-	if (options?.address && !parsedSignature.publicKey.verifyAddress(options.address)) {
+	if (options.address && !publicKey.verifyAddress(options.address)) {
 		throw new Error(`Signature is not valid for the provided address`);
 	}
-
-	return parsedSignature.publicKey;
+	return publicKey;
 }
 
 export async function verifyPersonalMessageSignature(
 	message: Uint8Array,
 	signature: string,
-	options: { client?: ZkLoginCompatibleClient; address?: string } = {},
+	options: { client?: ClientWithCoreApi; address?: string } = {},
 ): Promise<PublicKey> {
-	const parsedSignature = parseSignature(signature, options);
-
-	if (
-		!(await parsedSignature.publicKey.verifyPersonalMessage(
-			message,
-			parsedSignature.serializedSignature,
-		))
-	) {
+	const { publicKey } = parseSignature(signature, options);
+	if (!(await isValidPersonalMessageSignature(message, signature, { client: options.client }))) {
 		throw new Error(`Signature is not valid for the provided message`);
 	}
-
-	if (options?.address && !parsedSignature.publicKey.verifyAddress(options.address)) {
+	if (options.address && !publicKey.verifyAddress(options.address)) {
 		throw new Error(`Signature is not valid for the provided address`);
 	}
-
-	return parsedSignature.publicKey;
+	return publicKey;
 }
 
 export async function verifyTransactionSignature(
 	transaction: Uint8Array,
 	signature: string,
-	options: { client?: ZkLoginCompatibleClient; address?: string } = {},
+	options: { client?: ClientWithCoreApi; address?: string } = {},
 ): Promise<PublicKey> {
-	const parsedSignature = parseSignature(signature, options);
-
-	if (
-		!(await parsedSignature.publicKey.verifyTransaction(
-			transaction,
-			parsedSignature.serializedSignature,
-		))
-	) {
+	const { publicKey } = parseSignature(signature, options);
+	if (!(await isValidTransactionSignature(transaction, signature, { client: options.client }))) {
 		throw new Error(`Signature is not valid for the provided Transaction`);
 	}
-
-	if (options?.address && !parsedSignature.publicKey.verifyAddress(options.address)) {
+	if (options.address && !publicKey.verifyAddress(options.address)) {
 		throw new Error(`Signature is not valid for the provided address`);
 	}
-
-	return parsedSignature.publicKey;
+	return publicKey;
 }
 
-function parseSignature(signature: string, options: { client?: ZkLoginCompatibleClient } = {}) {
+function parseSignature(signature: string, options: { client?: ClientWithCoreApi } = {}) {
 	const parsedSignature = parseSerializedSignature(signature);
 
 	if (parsedSignature.signatureScheme === 'MultiSig') {
@@ -101,10 +125,19 @@ function parseSignature(signature: string, options: { client?: ZkLoginCompatible
 	};
 }
 
+/** {@link parseSignature}, returning `null` instead of throwing on a malformed signature. */
+function tryParseSignature(signature: string, options: { client?: ClientWithCoreApi } = {}) {
+	try {
+		return parseSignature(signature, options);
+	} catch {
+		return null;
+	}
+}
+
 export function publicKeyFromRawBytes(
 	signatureScheme: SignatureScheme,
 	bytes: Uint8Array,
-	options: { client?: ZkLoginCompatibleClient; address?: string } = {},
+	options: { client?: ClientWithCoreApi; address?: string } = {},
 ): PublicKey {
 	let publicKey: PublicKey;
 	switch (signatureScheme) {
@@ -139,7 +172,7 @@ export function publicKeyFromRawBytes(
 
 export function publicKeyFromRtdBytes(
 	publicKey: string | Uint8Array,
-	options: { client?: ZkLoginCompatibleClient; address?: string } = {},
+	options: { client?: ClientWithCoreApi; address?: string } = {},
 ) {
 	const bytes = typeof publicKey === 'string' ? fromBase64(publicKey) : publicKey;
 

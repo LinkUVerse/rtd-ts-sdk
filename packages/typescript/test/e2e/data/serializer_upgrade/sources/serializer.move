@@ -1,11 +1,11 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 module serializer::serializer_tests;
 
 use std::ascii;
 use std::string::String;
-use sui::clock::Clock;
+use rtd::clock::Clock;
 
 public struct MutableShared has key {
     id: UID,

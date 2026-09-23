@@ -1,4 +1,4 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 /// Description:
@@ -12,7 +12,7 @@
 /// - Prevent trading of locked items with low amounts (e.g. by using purchase_cap).
 ///
 module kiosk::floor_price_rule {
-    use sui::transfer_policy::{
+    use rtd::transfer_policy::{
         Self as policy,
         TransferPolicy,
         TransferPolicyCap,

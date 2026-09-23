@@ -15,10 +15,10 @@
 	"scripts": {
 		"prettier:check": "prettier -c --ignore-unknown .",
 		"prettier:fix": "prettier -w --ignore-unknown .",
-		"eslint:check": "eslint --max-warnings=0 .",
-		"eslint:fix": "pnpm run eslint:check --fix",
-		"lint": "pnpm run eslint:check && pnpm run prettier:check",
-		"lint:fix": "pnpm run eslint:fix && pnpm run prettier:fix",
+		"oxlint:check": "oxlint .",
+		"oxlint:fix": "oxlint --fix .",
+		"lint": "pnpm run oxlint:check && pnpm run prettier:check",
+		"lint:fix": "pnpm run oxlint:fix && pnpm run prettier:fix",
 		"build": "tsc --build"
 	},
 	"devDependencies": {
@@ -29,9 +29,9 @@
 		"find-up": "^7.0.0",
 		"postcss": "^8.5.6",
 		"postcss-prefix-selector": "^2.1.1",
-		"typescript": "^5.9.3"
+		"typescript": "^7.0.2"
 	},
 	"dependencies": {
-		"@types/node": "^24.10.1"
+		"@types/node": "^26.2.0"
 	}
 }

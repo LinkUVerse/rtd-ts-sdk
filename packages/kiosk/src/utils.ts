@@ -1,41 +1,40 @@
 // Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+import { bcs } from 'rtd-typescript/bcs';
+import type { ClientWithCoreApi, RtdClientTypes } from 'rtd-typescript/client';
+import { normalizeStructTag, normalizeRtdAddress, parseStructTag } from 'rtd-typescript/utils';
+
+import { Item, Listing, Lock, Kiosk as KioskStruct } from './contracts/0x2/kiosk.js';
 import type {
-	DynamicFieldInfo,
-	PaginationArguments,
-	RtdClient,
-	RtdObjectData,
-	RtdObjectDataFilter,
-	RtdObjectDataOptions,
-	RtdObjectResponse,
-} from 'rtd-typescript/client';
-import {
-	fromBase64,
-	normalizeStructTag,
-	normalizeRtdAddress,
-	parseStructTag,
-} from 'rtd-typescript/utils';
+	Kiosk,
+	KioskData,
+	KioskListing,
+	KioskPaginationArguments,
+	ObjectWithDisplay,
+} from './types/index.js';
 
-import { KioskType } from './bcs.js';
-import type { Kiosk, KioskData, KioskListing, TransferPolicyCap } from './types/index.js';
-import { TRANSFER_POLICY_CAP_TYPE } from './types/index.js';
-import { chunk } from 'rtd-utils';
+export type DynamicFieldInfo = RtdClientTypes.ListDynamicFieldsResponse['dynamicFields'][number];
 
-const DEFAULT_QUERY_LIMIT = 50;
+export async function getKioskObject(client: ClientWithCoreApi, id: string): Promise<Kiosk> {
+	const { object } = await client.core.getObject({
+		objectId: id,
+		include: { content: true },
+	});
 
-export async function getKioskObject(client: RtdClient, id: string): Promise<Kiosk> {
-	const queryRes = await client.getObject({ id, options: { showBcs: true } });
-
-	if (!queryRes || queryRes.error || !queryRes.data) {
-		throw new Error(`Kiosk ${id} not found; ${queryRes.error}`);
+	if (!object.content) {
+		throw new Error(`Kiosk ${id} not found or has no content`);
 	}
 
-	if (!queryRes.data.bcs || !('bcsBytes' in queryRes.data.bcs)) {
-		throw new Error(`Invalid kiosk query: ${id}, expected object, got package`);
-	}
+	const parsed = KioskStruct.parse(object.content);
 
-	return KioskType.parse(fromBase64(queryRes.data.bcs!.bcsBytes));
+	return {
+		id: parsed.id,
+		profits: parsed.profits.value.toString(),
+		owner: parsed.owner,
+		itemCount: parsed.item_count,
+		allowExtensions: parsed.allow_extensions,
+	};
 }
 
 // helper to extract kiosk data from dynamic fields.
@@ -49,31 +48,52 @@ export function extractKioskData(
 		(acc: KioskData, val: DynamicFieldInfo) => {
 			const type = val.name.type;
 
-			if (type.startsWith('0x2::kiosk::Item')) {
-				acc.itemIds.push(val.objectId);
+			const parsedType = parseStructTag(type);
+			const baseType = `${normalizeRtdAddress(parsedType.address)}::${parsedType.module}::${parsedType.name}`;
+
+			if (
+				baseType ===
+				'0x0000000000000000000000000000000000000000000000000000000000000002::kiosk::Item'
+			) {
+				const parsed = Item.parse(val.name.bcs);
+				acc.itemIds.push(parsed.id);
 				acc.items.push({
-					objectId: val.objectId,
-					type: val.objectType,
+					objectId: parsed.id,
+					type: val.valueType,
 					isLocked: false,
 					kioskId,
 				});
 			}
-			if (type.startsWith('0x2::kiosk::Listing')) {
-				acc.listingIds.push(val.objectId);
+
+			if (
+				baseType ===
+				'0x0000000000000000000000000000000000000000000000000000000000000002::kiosk::Listing'
+			) {
+				const parsed = Listing.parse(val.name.bcs);
+
+				acc.listingIds.push(val.fieldId);
 				listings.push({
-					objectId: (val.name.value as { id: string }).id,
-					listingId: val.objectId,
-					isExclusive: (val.name.value as { is_exclusive: boolean }).is_exclusive,
+					objectId: parsed.id,
+					listingId: val.fieldId,
+					isExclusive: parsed.is_exclusive,
 				});
 			}
-			if (type.startsWith('0x2::kiosk::Lock')) {
-				lockedItemIds?.push((val.name.value as { id: string }).id);
+
+			if (
+				baseType ===
+				'0x0000000000000000000000000000000000000000000000000000000000000002::kiosk::Lock'
+			) {
+				lockedItemIds?.push(Lock.parse(val.name.bcs).id);
 			}
 
-			if (type.startsWith('0x2::kiosk_extension::ExtensionKey')) {
+			// Check for ExtensionKey type
+			if (
+				baseType ===
+				'0x0000000000000000000000000000000000000000000000000000000000000002::kiosk_extension::ExtensionKey'
+			) {
 				acc.extensions.push({
-					objectId: val.objectId,
-					type: normalizeStructTag(parseStructTag(val.name.type).typeParams[0]),
+					objectId: val.fieldId,
+					type: normalizeStructTag(parsedType.typeParams[0]),
 				});
 			}
 
@@ -89,10 +109,8 @@ export function extractKioskData(
 export function attachListingsAndPrices(
 	kioskData: KioskData,
 	listings: KioskListing[],
-	listingObjects: RtdObjectResponse[],
+	listingObjects: ObjectWithDisplay[],
 ) {
-	// map item listings as {item_id: KioskListing}
-	// for easier mapping on the nex
 	const itemListings = listings.reduce<Record<string, KioskListing>>(
 		(acc: Record<string, KioskListing>, item, idx) => {
 			acc[item.objectId] = { ...item };
@@ -101,12 +119,13 @@ export function attachListingsAndPrices(
 			// that's the case when we don't have the `listingPrices` included.
 			if (listingObjects.length === 0) return acc;
 
-			const content = listingObjects[idx].data?.content;
-			const data = content?.dataType === 'moveObject' ? content?.fields : null;
+			const obj = listingObjects[idx];
 
-			if (!data) return acc;
+			// Parse BCS content to extract the price (u64 value)
+			if (obj.content) {
+				acc[item.objectId].price = bcs.u64().parse(obj.content).toString();
+			}
 
-			acc[item.objectId].price = (data as { value: string }).value;
 			return acc;
 		},
 		{},
@@ -118,11 +137,12 @@ export function attachListingsAndPrices(
 }
 
 /**
- * A helper that attaches the listing prices to kiosk listings.
+ * A helper that attaches object data to kiosk items.
+ * Works with core API objects that contain BCS content.
  */
-export function attachObjects(kioskData: KioskData, objects: RtdObjectData[]) {
-	const mapping = objects.reduce<Record<string, RtdObjectData>>(
-		(acc: Record<string, RtdObjectData>, obj) => {
+export function attachObjects(kioskData: KioskData, objects: ObjectWithDisplay[]) {
+	const mapping = objects.reduce<Record<string, ObjectWithDisplay>>(
+		(acc: Record<string, ObjectWithDisplay>, obj) => {
 			acc[obj.objectId] = obj;
 			return acc;
 		},
@@ -154,90 +174,30 @@ export function attachLockedItems(kioskData: KioskData, lockedItemIds: string[])
 }
 
 /**
- * A helper to fetch all DF pages.
+ * A helper to fetch all dynamic field pages.
  * We need that to fetch the kiosk DFs consistently, until we have
  * RPC calls that allow filtering of Type / batch fetching of spec
  */
 export async function getAllDynamicFields(
-	client: RtdClient,
+	client: ClientWithCoreApi,
 	parentId: string,
-	pagination: PaginationArguments<string>,
-) {
+	pagination: KioskPaginationArguments,
+): Promise<DynamicFieldInfo[]> {
 	let hasNextPage = true;
-	let cursor = undefined;
+	let cursor: string | null = null;
 	const data: DynamicFieldInfo[] = [];
 
 	while (hasNextPage) {
-		const result = await client.getDynamicFields({
+		const result = await client.core.listDynamicFields({
 			parentId,
 			limit: pagination.limit || undefined,
 			cursor,
 		});
-		data.push(...result.data);
+
+		data.push(...result.dynamicFields);
+
 		hasNextPage = result.hasNextPage;
-		cursor = result.nextCursor;
-	}
-
-	return data;
-}
-
-/**
- * A helper to fetch all objects that works with pagination.
- * It will fetch all objects in the array, and limit it to 50/request.
- * Requests are sent using `Promise.all`.
- */
-export async function getAllObjects(
-	client: RtdClient,
-	ids: string[],
-	options: RtdObjectDataOptions,
-	limit: number = DEFAULT_QUERY_LIMIT,
-) {
-	const chunks = chunk(ids, limit);
-
-	const results = await Promise.all(
-		chunks.map((chunk) => {
-			return client.multiGetObjects({
-				ids: chunk,
-				options,
-			});
-		}),
-	);
-
-	return results.flat();
-}
-
-/**
- * A helper to return all owned objects, with an optional filter.
- * It parses all the pages and returns the data.
- */
-export async function getAllOwnedObjects({
-	client,
-	owner,
-	filter,
-	limit = DEFAULT_QUERY_LIMIT,
-	options = { showType: true, showContent: true },
-}: {
-	client: RtdClient;
-	owner: string;
-	filter?: RtdObjectDataFilter;
-	options?: RtdObjectDataOptions;
-	limit?: number;
-}) {
-	let hasNextPage = true;
-	let cursor = undefined;
-	const data: RtdObjectResponse[] = [];
-
-	while (hasNextPage) {
-		const result = await client.getOwnedObjects({
-			owner,
-			filter,
-			limit,
-			cursor,
-			options,
-		});
-		data.push(...result.data);
-		hasNextPage = result.hasNextPage;
-		cursor = result.nextCursor;
+		cursor = result.cursor;
 	}
 
 	return data;
@@ -253,29 +213,6 @@ export function percentageToBasisPoints(percentage: number) {
 	if (percentage < 0 || percentage > 100)
 		throw new Error('Percentage needs to be in the [0,100] range.');
 	return Math.ceil(percentage * 100);
-}
-
-/**
- * A helper to parse a transfer policy Cap into a usable object.
- */
-export function parseTransferPolicyCapObject(
-	item: RtdObjectResponse,
-): TransferPolicyCap | undefined {
-	const type = (item?.data?.content as { type: string })?.type;
-
-	//@ts-ignore-next-line
-	const policy = item?.data?.content?.fields?.policy_id as string;
-
-	if (!type.includes(TRANSFER_POLICY_CAP_TYPE)) return undefined;
-
-	// Transform 0x2::transfer_policy::TransferPolicyCap<itemType> -> itemType
-	const objectType = type.replace(TRANSFER_POLICY_CAP_TYPE + '<', '').slice(0, -1);
-
-	return {
-		policyId: policy,
-		policyCapId: item.data?.objectId!,
-		type: objectType,
-	};
 }
 
 // Normalizes the packageId part of a rule's type.

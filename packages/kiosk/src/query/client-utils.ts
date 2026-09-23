@@ -1,0 +1,80 @@
+// Copyright (c) LinkU Labs, Inc.
+// SPDX-License-Identifier: Apache-2.0
+
+import type { RtdClientTypes } from 'rtd-typescript/client';
+import { isRtdGraphQLClient } from 'rtd-typescript/graphql';
+
+import type { ObjectWithDisplay } from '../types/kiosk.js';
+import type { KioskCompatibleClient } from '../types/index.js';
+
+const DEFAULT_QUERY_LIMIT = 50;
+const MAX_EVENT_QUERY_PAGES = 10;
+
+export async function getAllObjects(
+	client: KioskCompatibleClient,
+	ids: string[],
+): Promise<ObjectWithDisplay[]> {
+	if (ids.length === 0) return [];
+
+	const { objects } = await client.core.getObjects({
+		objectIds: ids,
+		include: {
+			content: true,
+			previousTransaction: true,
+			display: true,
+		},
+	});
+
+	return objects
+		.filter(
+			(
+				object,
+			): object is RtdClientTypes.Object<{
+				content: true;
+				previousTransaction: true;
+				display: true;
+			}> => !(object instanceof Error),
+		)
+		.map((object) => ({
+			...object,
+			previousTransaction: object.previousTransaction ?? null,
+			display: object.display
+				? {
+						data: object.display.output,
+						error: object.display.errors ? JSON.stringify(object.display.errors) : null,
+					}
+				: undefined,
+		}));
+}
+
+export async function queryEvents(
+	client: KioskCompatibleClient,
+	eventType: string,
+): Promise<{ json: unknown }[]> {
+	// Preserve the windows returned by the previously transport-specific implementations.
+	const order = isRtdGraphQLClient(client) ? 'ascending' : 'descending';
+	const events: RtdClientTypes.EventEntry[] = [];
+	let cursor: string | null = null;
+
+	// gRPC can return empty scan-limited pages. Continue through a bounded number of those pages
+	// while preserving the 50-event window returned by the previous transport-specific queries.
+	for (let pageCount = 0; pageCount < MAX_EVENT_QUERY_PAGES; pageCount++) {
+		const remaining = DEFAULT_QUERY_LIMIT - events.length;
+		const page = await client.core.listEvents({
+			filter: { eventType },
+			limit: remaining,
+			order,
+			...(cursor ? (order === 'descending' ? { before: cursor } : { after: cursor }) : {}),
+		});
+
+		events.push(...page.events.slice(0, remaining));
+		if (!page.hasNextPage || events.length === DEFAULT_QUERY_LIMIT) break;
+
+		if (!page.endCursor || page.endCursor === cursor) {
+			throw new Error('Event query did not return a cursor for the next page');
+		}
+		cursor = page.endCursor;
+	}
+
+	return events.map((event) => ({ json: event.json }));
+}

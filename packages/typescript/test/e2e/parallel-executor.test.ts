@@ -3,16 +3,15 @@
 
 import { afterEach, afterAll, beforeAll, beforeEach, describe, expect, it, Mock, vi } from 'vitest';
 
-import { bcs } from '../../src/bcs';
-import { RtdClient } from '../../src/client';
-import { Ed25519Keypair } from '../../src/keypairs/ed25519';
-import { ParallelTransactionExecutor, Transaction } from '../../src/transactions';
-import { setup, TestToolbox } from './utils/setup';
+import { GrpcCoreClient } from '../../src/grpc/index.js';
+import { Ed25519Keypair } from '../../src/keypairs/ed25519/index.js';
+import { ParallelTransactionExecutor, Transaction } from '../../src/transactions/index.js';
+import { setup, TestToolbox } from './utils/setup.js';
 
 let toolbox: TestToolbox;
 let executor: ParallelTransactionExecutor;
 
-describe('ParallelTransactionExecutor', { retry: 3 }, () => {
+describe('ParallelTransactionExecutor', () => {
 	beforeAll(async () => {
 		toolbox = await setup();
 
@@ -20,15 +19,15 @@ describe('ParallelTransactionExecutor', { retry: 3 }, () => {
 		await toolbox.mintNft();
 
 		executor = new ParallelTransactionExecutor({
-			client: toolbox.client,
+			client: toolbox.grpcClient,
 			signer: toolbox.keypair,
 			maxPoolSize: 3,
 			coinBatchSize: 2,
 		});
 
-		vi.spyOn(toolbox.client, 'multiGetObjects');
-		vi.spyOn(toolbox.client, 'getCoins');
-		vi.spyOn(toolbox.client, 'executeTransactionBlock');
+		vi.spyOn(toolbox.grpcClient.core, 'getObjects');
+		vi.spyOn(toolbox.grpcClient.core, 'listCoins');
+		vi.spyOn(toolbox.grpcClient.core, 'executeTransaction');
 	});
 
 	afterEach(async () => {
@@ -49,14 +48,14 @@ describe('ParallelTransactionExecutor', { retry: 3 }, () => {
 		let maxConcurrentRequests = 0;
 		let totalTransactions = 0;
 
-		(toolbox.client.executeTransactionBlock as Mock).mockImplementation(async function (
-			this: RtdClient,
+		(toolbox.grpcClient.core.executeTransaction as Mock).mockImplementation(async function (
+			this: GrpcCoreClient,
 			input,
 		) {
 			totalTransactions++;
 			concurrentRequests++;
 			maxConcurrentRequests = Math.max(maxConcurrentRequests, concurrentRequests);
-			const promise = RtdClient.prototype.executeTransactionBlock.call(this, input);
+			const promise = GrpcCoreClient.prototype.executeTransaction.call(this, input);
 
 			return promise.finally(() => {
 				concurrentRequests--;
@@ -77,8 +76,8 @@ describe('ParallelTransactionExecutor', { retry: 3 }, () => {
 		// 10 + initial coin split + 1 refill to reach concurrency limit
 		expect(totalTransactions).toBe(12);
 
-		const digest = new Set(results.map((result) => result.digest));
-		expect(digest.size).toBe(results.length);
+		const digests = new Set(results.map((r) => (r.Transaction ?? r.FailedTransaction).digest));
+		expect(digests.size).toBe(results.length);
 	});
 
 	it('handles gas coin transfers', async () => {
@@ -92,13 +91,13 @@ describe('ParallelTransactionExecutor', { retry: 3 }, () => {
 
 		const results = await Promise.all(txbs.map((txb) => executor.executeTransaction(txb)));
 
-		const digest = new Set(results.map((result) => result.digest));
-		expect(digest.size).toBe(results.length);
+		const digests = new Set(results.map((r) => (r.Transaction ?? r.FailedTransaction).digest));
+		expect(digests.size).toBe(results.length);
 
 		const returnFunds = new Transaction();
 		returnFunds.transferObjects([returnFunds.gas], toolbox.address());
 
-		await toolbox.client.signAndExecuteTransaction({
+		await toolbox.grpcClient.signAndExecuteTransaction({
 			transaction: returnFunds,
 			signer: receiver,
 		});
@@ -111,9 +110,10 @@ describe('ParallelTransactionExecutor', { retry: 3 }, () => {
 			if (i % 2 === 0) {
 				txb.transferObjects([txb.splitCoins(txb.gas, [1])[0]], toolbox.address());
 			} else {
+				// Use an object argument so normalizeInputs tries to resolve the function and fails quickly
 				txb.moveCall({
 					target: '0x123::foo::bar',
-					arguments: [],
+					arguments: [txb.object('0x6')],
 				});
 			}
 
@@ -126,7 +126,10 @@ describe('ParallelTransactionExecutor', { retry: 3 }, () => {
 		const succeeded = new Set(
 			results
 				.filter((result) => result.status === 'fulfilled')
-				.map((r) => (r.status === 'fulfilled' ? r.value.digest : null)),
+				.map((r) => {
+					if (r.status !== 'fulfilled') return null;
+					return (r.value.Transaction ?? r.value.FailedTransaction).digest;
+				}),
 		);
 
 		expect(failed.length).toBe(5);
@@ -141,18 +144,17 @@ describe('ParallelTransactionExecutor', { retry: 3 }, () => {
 				txb.transferObjects([coin], toolbox.address());
 				const result = await executor.executeTransaction(txb);
 
-				const effects = bcs.TransactionEffects.fromBase64(result.effects);
-				const newCoinId = effects.V2?.changedObjects.find(
-					([_id, { outputState }], index) =>
-						index !== effects.V2.gasObjectIndex && outputState.ObjectWrite,
-				)?.[0]!;
+				const effects = (result.Transaction ?? result.FailedTransaction).effects!;
+				const newCoinId = effects.changedObjects.find(
+					(obj) =>
+						obj.objectId !== effects.gasObject?.objectId && obj.outputState === 'ObjectWrite',
+				)?.objectId!;
 
 				return newCoinId;
 			}),
 		);
 
 		const txbs = newCoins.flatMap((newCoinId) => {
-			expect(toolbox.client.getCoins).toHaveBeenCalledTimes(0);
 			const txb2 = new Transaction();
 			txb2.transferObjects([newCoinId], toolbox.address());
 			const txb3 = new Transaction();
@@ -165,14 +167,13 @@ describe('ParallelTransactionExecutor', { retry: 3 }, () => {
 
 		const results = await Promise.all(txbs.map((txb) => executor.executeTransaction(txb)));
 
-		const digests = new Set(results.map((result) => result.digest));
-
+		const digests = new Set(results.map((r) => (r.Transaction ?? r.FailedTransaction).digest));
 		expect(digests.size).toBe(9);
 	});
 
 	it('removes coins from pool when they drop below the minimum', async () => {
 		executor = new ParallelTransactionExecutor({
-			client: toolbox.client,
+			client: toolbox.grpcClient,
 			signer: toolbox.keypair,
 			maxPoolSize: 1,
 			coinBatchSize: 1,
@@ -185,16 +186,102 @@ describe('ParallelTransactionExecutor', { retry: 3 }, () => {
 		tx1.transferObjects([await toolbox.mintNft()], toolbox.address());
 		const r1 = await executor.executeTransaction(tx1);
 
-		expect(r1.data.effects?.status.status).toEqual('success');
+		expect((r1.Transaction ?? r1.FailedTransaction).status.success).toEqual(true);
 		// 1 tx to fill the gas pool + the executed transaction
-		expect(toolbox.client.executeTransactionBlock).toHaveBeenCalledTimes(2);
+		expect(toolbox.grpcClient.core.executeTransaction).toHaveBeenCalledTimes(2);
 
 		const tx2 = new Transaction();
 		tx2.transferObjects([await toolbox.mintNft()], toolbox.address());
 		const r2 = await executor.executeTransaction(tx2);
 
-		expect(r2.data.effects?.status.status).toEqual('success');
+		expect((r2.Transaction ?? r2.FailedTransaction).status.success).toEqual(true);
 		// 2 txs to refill the gas pool + 2 executed transactions
-		expect(toolbox.client.executeTransactionBlock).toHaveBeenCalledTimes(4);
+		expect(toolbox.grpcClient.core.executeTransaction).toHaveBeenCalledTimes(4);
+	});
+});
+
+describe('ParallelTransactionExecutor with addressBalance mode', () => {
+	let addressBalanceExecutor: ParallelTransactionExecutor;
+
+	beforeAll(async () => {
+		// Wait for any pending transactions from previous tests
+		await executor.waitForLastTransaction();
+
+		// First deposit funds to address balance using send_funds
+		const depositAmount = 500_000_000n; // 0.5 RTD
+		const depositTx = new Transaction();
+		const [coinToDeposit] = depositTx.splitCoins(depositTx.gas, [depositAmount]);
+		depositTx.moveCall({
+			target: '0x2::coin::send_funds',
+			typeArguments: ['0x2::rtd::RTD'],
+			arguments: [coinToDeposit, depositTx.pure.address(toolbox.address())],
+		});
+		const depositResult = await toolbox.grpcClient.signAndExecuteTransaction({
+			signer: toolbox.keypair,
+			transaction: depositTx,
+		});
+
+		await toolbox.grpcClient.core.waitForTransaction({ result: depositResult });
+
+		addressBalanceExecutor = new ParallelTransactionExecutor({
+			client: toolbox.grpcClient,
+			signer: toolbox.keypair,
+			gasMode: 'addressBalance',
+			maxPoolSize: 3,
+		});
+	});
+
+	afterEach(async () => {
+		await addressBalanceExecutor.waitForLastTransaction();
+	});
+
+	beforeEach(async () => {
+		await addressBalanceExecutor.resetCache();
+	});
+
+	it('Executes transactions using address balance for gas', async () => {
+		const receiver = new Ed25519Keypair();
+		const txb = new Transaction();
+		// Use withdrawal to get funds from address balance, then redeem to coin
+		const withdrawalInput = txb.withdrawal({ amount: 1000n });
+		const [coin] = txb.moveCall({
+			target: '0x2::coin::redeem_funds',
+			typeArguments: ['0x2::rtd::RTD'],
+			arguments: [withdrawalInput],
+		});
+		txb.transferObjects([coin], receiver.toRtdAddress());
+
+		const result = await addressBalanceExecutor.executeTransaction(txb);
+		const resultTx = result.Transaction ?? result.FailedTransaction;
+
+		expect(resultTx.status.success).toEqual(true);
+	});
+
+	it('Executes multiple transactions in parallel with address balance', async () => {
+		const receiver = new Ed25519Keypair();
+		const txbs = [];
+
+		for (let i = 0; i < 5; i++) {
+			const txb = new Transaction();
+			const withdrawalInput = txb.withdrawal({ amount: 1000n });
+			const [coin] = txb.moveCall({
+				target: '0x2::coin::redeem_funds',
+				typeArguments: ['0x2::rtd::RTD'],
+				arguments: [withdrawalInput],
+			});
+			txb.transferObjects([coin], receiver.toRtdAddress());
+			txbs.push(txb);
+		}
+
+		const results = await Promise.all(
+			txbs.map((txb) => addressBalanceExecutor.executeTransaction(txb)),
+		);
+
+		const digests = new Set(results.map((r) => (r.Transaction ?? r.FailedTransaction).digest));
+		expect(digests.size).toBe(results.length);
+
+		results.forEach((r) => {
+			expect((r.Transaction ?? r.FailedTransaction).status.success).toEqual(true);
+		});
 	});
 });

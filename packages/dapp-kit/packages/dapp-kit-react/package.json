@@ -1,0 +1,65 @@
+{
+	"name": "rtd-dapp-kit-react",
+	"author": "LinkU Labs <build@linkuverse.com>",
+	"description": "React bindings for rtd-dapp-kit-core",
+	"version": "2.1.32",
+	"license": "Apache-2.0",
+	"files": [
+		"LICENSE",
+		"README.md",
+		"dist",
+		"docs",
+		"src"
+	],
+	"type": "module",
+	"module": "./dist/index.mjs",
+	"types": "./dist/index.d.mts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.mts",
+			"import": "./dist/index.mjs",
+			"default": "./dist/index.mjs"
+		},
+		"./ui": {
+			"types": "./dist/ui.d.mts",
+			"import": "./dist/ui.mjs",
+			"default": "./dist/ui.mjs"
+		}
+	},
+	"scripts": {
+		"clean": "rm -rf tsconfig.tsbuildinfo ./dist",
+		"build": "pnpm typecheck && tsdown",
+		"typecheck": "tsc --noEmit",
+		"dev": "tsdown --watch",
+		"prettier:check": "prettier -c --ignore-unknown .",
+		"prettier:fix": "prettier -w --ignore-unknown .",
+		"oxlint:check": "oxlint  .",
+		"oxlint:fix": "oxlint --fix",
+		"lint": "pnpm run oxlint:check && pnpm run prettier:check",
+		"lint:fix": "pnpm run oxlint:fix && pnpm run prettier:fix"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/LinkUVerse/rtd-ts-sdk.git"
+	},
+	"bugs": {
+		"url": "https://github.com/LinkUVerse/rtd-ts-sdk/issues/new"
+	},
+	"publishConfig": {
+		"access": "public"
+	},
+	"devDependencies": {
+		"tsdown": "0.22.14",
+		"typescript": "^7.0.2"
+	},
+	"dependencies": {
+		"@lit/react": "^1.0.8",
+		"@nanostores/react": "^1.0.0",
+		"nanostores": "^1.4.2",
+		"rtd-dapp-kit-core": "workspace:^"
+	},
+	"peerDependencies": {
+		"@types/react": ">=17.0.0",
+		"react": ">=17.0.0"
+	}
+}

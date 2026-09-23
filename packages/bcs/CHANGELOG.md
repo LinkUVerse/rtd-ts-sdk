@@ -1,5 +1,77 @@
 # Change Log
 
+## 2.1.1
+
+### Patch Changes
+
+- f2f7048: Upgrade workspace dependencies, remove the legacy dapp-kit package, and migrate the
+  remaining consumers to the current gRPC-based dapp-kit. Remove the legacy API reference while
+  retaining the migration guide and deprecation notice.
+
+## 2.1.0
+
+### Minor Changes
+
+- bbf63cb: Updated dependencies
+
+### Patch Changes
+
+- Updated dependencies [bbf63cb]
+  - rtd-utils@0.4.0
+
+## 2.0.5
+
+### Patch Changes
+
+- f7de3e5: Restore docs in published tarballs.
+- Updated dependencies [f7de3e5]
+  - rtd-utils@0.3.3
+
+## 2.0.4
+
+### Patch Changes
+
+- 9e067cf: Validate the new per-package release flow end-to-end across every public @linku package.
+  No functional changes — empty patch bump to force the orchestrator to dispatch every
+  release-<pkg>.yml workflow with `dry_run=false` so each package publishes via OIDC trusted
+  publishing.
+- Updated dependencies [9e067cf]
+  - rtd-utils@0.3.2
+
+## 2.0.3
+
+### Patch Changes
+
+- 43e69f8: Add embedded LLM-friendly docs to published packages
+
+## 2.0.2
+
+### Patch Changes
+
+- 99d1e00: Add default export condition
+- Updated dependencies [99d1e00]
+  - rtd-utils@0.3.1
+
+## 2.0.1
+
+### Patch Changes
+
+- Updated dependencies [339d1e0]
+  - rtd-utils@0.3.0
+
+## 2.0.0
+
+### Major Changes
+
+- e00788c: Remove deprecated exports: `toB58`, `fromB58`, `toB64`, `fromB64`, `toHEX`, `fromHEX`.
+  Use `toBase58`, `fromBase58`, `toBase64`, `fromBase64`, `toHex`, `fromHex` instead.
+
+### Minor Changes
+
+- e00788c: Add automatic sorting of map entries by serialized key bytes in `bcs.map()` to match
+  Rust's BTreeMap BCS serialization. Also exports `compareBcsBytes` helper for lexicographic byte
+  comparison.
+
 ## 1.9.2
 
 ### Patch Changes
@@ -168,8 +240,8 @@
 
 - a92b03de42: The Typescript SDK has been renamed to `rtd-typescript` and includes many new features
   and breaking changes. See the
-  [full migration guide](https://sdk.linkuverse.com/typescript/migrations/rtd-1.0) for details on
-  how to upgrade.
+  [full migration guide](https://sdk.linkuverse.com/rtd/migrations/rtd-1.0) for details on how to
+  upgrade.
 
 ## 0.11.1
 

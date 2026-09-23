@@ -11,13 +11,13 @@ const header = `
 
 const config: CodegenConfig = {
 	overwrite: true,
-	schema:
-		'https://raw.githubusercontent.com/LinkUVerse/rtd/refs/heads/main/crates/rtd-indexer-alt-graphql/schema.graphql',
+	schema: 'src/graphql/generated/schema.graphql',
 	documents: ['src/graphql/queries/*.graphql'],
 	ignoreNoDocuments: true,
 	generates: {
 		'src/graphql/generated/queries.ts': {
 			config: {
+				enumType: 'native',
 				scalars: {
 					BigInt: 'string',
 					Base64: 'string',
@@ -38,7 +38,6 @@ const config: CodegenConfig = {
 						content: header,
 					},
 				},
-				'typescript',
 				'typescript-operations',
 				{
 					'typed-document-node': {

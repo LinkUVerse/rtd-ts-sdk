@@ -1,0 +1,108 @@
+---
+name: docs-writing
+description: 'Write and maintain SDK documentation in packages/docs/content/. Use when adding new doc pages, updating existing docs, or modifying the documentation structure. Ensures frontmatter, meta.json, and LLM index stay in sync.'
+---
+
+# SDK Documentation Writing
+
+Write documentation for the Rtd TypeScript SDK ecosystem in `packages/docs/content/`. All docs are MDX files organized by package, rendered by fumadocs, and exported as flat markdown for LLM consumption.
+
+## Before Writing
+
+1. Read the relevant `meta.json` to understand the section structure.
+2. Check existing pages in the same section for style and conventions.
+3. Read [references/structure.md](references/structure.md) for directory layout and meta.json format.
+4. Read [references/style-guide.md](references/style-guide.md) for writing conventions.
+
+## Creating a New Doc Page
+
+1. Create the `.mdx` file in the appropriate `content/` subdirectory.
+2. Add YAML frontmatter with both `title` and `description` (required):
+
+```mdx
+---
+title: My New Feature
+description: Short one-line description under 120 characters
+---
+
+Content goes here...
+```
+
+3. Add the page name to the parent `meta.json` `pages` array in the correct order.
+4. If creating a new section directory, create a `meta.json` with `title` and `pages`.
+5. Regenerate the LLM index: `pnpm --filter rtd-docs build:docs`
+6. Validate: `pnpm --filter rtd-docs validate-docs`
+
+## Adding Docs for a New Package
+
+When a new SDK package needs documentation:
+
+1. Create `packages/docs/content/<package-name>/` with `meta.json` (`root: true`) and `index.mdx`
+2. Add `"build:docs": "tsx ../docs/scripts/build-docs.ts"` to the package's `package.json` scripts
+3. Add `"docs"` to the package's `files` array in `package.json` (so docs are published to npm)
+4. Add the package as a dependency in `packages/docs/package.json`
+5. See [references/structure.md](references/structure.md) for full checklist
+
+## Editing Existing Docs
+
+1. Read the full page before editing — understand context.
+2. Keep the `description` frontmatter accurate after changes.
+3. After significant structural changes, regenerate and validate:
+   ```bash
+   pnpm --filter rtd-docs build:docs
+   pnpm --filter rtd-docs validate-docs
+   ```
+
+## Key Rules
+
+1. **Every MDX file must have `title` and `description`** — CI validates this.
+2. **Descriptions under 120 characters** — used in the LLM index.
+3. **No trailing period** on descriptions.
+4. **Use code examples liberally** — show, don't tell.
+5. **Import from public API paths** — `rtd-typescript/transactions`, not internal paths.
+6. **Use fenced code blocks** with `tsx` or `typescript` language tag.
+7. **Every new page must be in a `meta.json` `pages` array** — or it won't appear in navigation.
+8. **`dist/` and `docs/` are generated at build time** — not committed to git. Run `build:docs` to verify output locally.
+9. **New packages need `build:docs` script and `docs` in `files`** — or docs won't be published to npm.
+
+## Common Mistakes — STOP
+
+- Adding an MDX file without updating `meta.json` → Page won't appear in navigation or index
+- Missing `description` in frontmatter → CI validation will fail
+- Using internal import paths → Readers won't be able to use them
+- Using JSX components without imports → MDX build will fail
+- Adding a new section directory without `meta.json` → Pages won't be indexed
+
+## Navigation
+
+- **[Directory Structure](references/structure.md)** — Content layout, meta.json format, how pages are organized by package
+- **[Style Guide](references/style-guide.md)** — Writing conventions, MDX features, code example patterns
+
+## Before Committing
+
+Always validate before committing doc changes:
+
+```bash
+pnpm --filter rtd-docs validate-docs
+```
+
+This checks frontmatter completeness and orphan detection. Fix any errors before committing.
+
+## Build Commands
+
+```npm
+# Generate all docs (combined dist/ + per-section indices)
+pnpm --filter rtd-docs build:docs
+
+# Generate docs for a single package (run from package dir)
+pnpm --filter rtd-typescript build:docs
+
+# Build everything (includes build:docs automatically via turbo)
+pnpm turbo build
+
+# Validate frontmatter + orphan detection
+pnpm --filter rtd-docs validate-docs
+
+# Full site build (Next.js)
+pnpm --filter rtd-docs build
+```

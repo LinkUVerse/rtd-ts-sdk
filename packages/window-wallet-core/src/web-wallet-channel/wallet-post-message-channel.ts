@@ -58,6 +58,18 @@ export class WalletPostMessageChannel {
 			throw new Error('Requested account not found in session');
 		}
 
+		const requiredFeatures = {
+			'sign-transaction': ['rtd:signTransaction', 'rtd:signTransactionBlock'],
+			'sign-and-execute-transaction': ['rtd:signAndExecuteTransaction'],
+			'sign-personal-message': ['rtd:signPersonalMessage'],
+		}[this.#request.payload.type];
+		if (
+			addressInSession.features !== undefined &&
+			!requiredFeatures.some((feature) => addressInSession.features!.includes(feature))
+		) {
+			throw new Error('Requested operation not authorized by session');
+		}
+
 		return session;
 	}
 

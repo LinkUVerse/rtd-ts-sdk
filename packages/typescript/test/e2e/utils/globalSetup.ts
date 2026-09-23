@@ -2,8 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { resolve } from 'path';
-import { GenericContainer, Network, PullPolicy } from 'testcontainers';
+import { GenericContainer, getContainerRuntimeClient, Network, PullPolicy } from 'testcontainers';
 import type { TestProject } from 'vitest/node';
+
+import type { PrePublishedPackage } from './prePublish.js';
+import { prePublishPackages } from './prePublish.js';
 
 declare module 'vitest' {
 	export interface ProvidedContext {
@@ -11,16 +14,15 @@ declare module 'vitest' {
 		graphqlPort: number;
 		faucetPort: number;
 		rtdToolsContainerId: string;
+		prePublishedPackages: Record<string, PrePublishedPackage>;
 	}
 }
 
-const RTD_TOOLS_TAG =
-	process.env.RTD_TOOLS_TAG ||
-	(process.arch === 'arm64'
-		? '06204e155ea3b35fe4c949321d70091ad0ed8437-arm64'
-		: '06204e155ea3b35fe4c949321d70091ad0ed8437');
-
 export default async function setup(project: TestProject) {
+	const image = process.env.RTD_TOOLS_IMAGE;
+	if (!image) {
+		throw new Error('Set RTD_TOOLS_IMAGE to a built RTD tools image before E2E tests');
+	}
 	console.log('Starting test containers');
 	const network = await new Network().start();
 
@@ -36,7 +38,7 @@ export default async function setup(project: TestProject) {
 		.withPullPolicy(PullPolicy.alwaysPull())
 		.start();
 
-	const localnet = await new GenericContainer(`mysten/rtd-tools:${RTD_TOOLS_TAG}`)
+	const localnet = await new GenericContainer(image)
 		// .withPullPolicy(PullPolicy.alwaysPull())
 		.withCommand([
 			'rtd',
@@ -58,8 +60,32 @@ export default async function setup(project: TestProject) {
 		})
 		.start();
 
-	project.provide('faucetPort', localnet.getMappedPort(9123));
-	project.provide('localnetPort', localnet.getMappedPort(9000));
-	project.provide('graphqlPort', localnet.getMappedPort(9125));
-	project.provide('rtdToolsContainerId', localnet.getId());
+	const faucetPort = localnet.getMappedPort(9123);
+	const localnetPort = localnet.getMappedPort(9000);
+	const graphqlPort = localnet.getMappedPort(9125);
+	const containerId = localnet.getId();
+
+	// Set up the default rtd config so `rtd keytool` and `rtd move build` commands work.
+	// The config file is checked in at data/localnet-client.yaml and copied into the container.
+	const runtimeClient = await getContainerRuntimeClient();
+	const container = runtimeClient.container.getById(containerId);
+	await runtimeClient.container.exec(container, ['mkdir', '-p', '/root/.rtd/rtd_config']);
+	await runtimeClient.container.exec(container, [
+		'bash',
+		'-c',
+		"echo '[]' > /root/.rtd/rtd_config/rtd.keystore && cp /test-data/localnet-client.yaml /root/.rtd/rtd_config/client.yaml",
+	]);
+
+	project.provide('faucetPort', faucetPort);
+	project.provide('localnetPort', localnetPort);
+	project.provide('graphqlPort', graphqlPort);
+	project.provide('rtdToolsContainerId', containerId);
+
+	// Pre-publish shared packages
+	const prePublished = await prePublishPackages({
+		fullnodeUrl: `http://127.0.0.1:${localnetPort}`,
+		faucetUrl: `http://127.0.0.1:${faucetPort}`,
+		containerId,
+	});
+	project.provide('prePublishedPackages', prePublished);
 }

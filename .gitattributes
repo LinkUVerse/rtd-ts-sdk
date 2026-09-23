@@ -1,9 +1,12 @@
-packages/typescript/src/grpc/proto/** linguist-generated=true
-packages/typescript/src/graphql/generated/** linguist-generated=true
-packages/suins-v2/src/contracts/** linguist-generated=true
+packages/rtd/src/grpc/proto/** linguist-generated=true
+packages/rtd/src/graphql/generated/** linguist-generated=true
+packages/rtdns-v2/src/contracts/** linguist-generated=true
 packages/codegen/tests/generated/** linguist-generated=true
 packages/walrus/src/contracts/** linguist-generated=true
 packages/walrus-wasm/web/** linguist-generated=true
 packages/walrus-wasm/nodejs/** linguist-generated=true
 packages/deepbook-v3/src/contracts/** linguist-generated=true
 packages/payment-kit/src/contracts/** linguist-generated=true
+packages/kiosk/src/contracts/** linguist-generated=true
+packages/pas/src/contracts/** linguist-generated=true
+packages/hashi/src/contracts/** linguist-generated=true

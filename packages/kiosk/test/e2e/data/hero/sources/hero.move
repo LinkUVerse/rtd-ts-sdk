@@ -1,9 +1,9 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 module hero::hero;
 
-use sui::package;
+use rtd::package;
 
 public struct Hero has key, store {
     id: UID,

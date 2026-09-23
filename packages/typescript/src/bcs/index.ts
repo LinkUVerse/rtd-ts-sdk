@@ -10,38 +10,54 @@ import {
 	CallArg,
 	Command,
 	CompressedSignature,
+	Data,
 	GasData,
 	Intent,
 	IntentMessage,
 	IntentScope,
 	IntentVersion,
+	MoveObject,
+	MoveObjectType,
+	MovePackage,
 	MultiSig,
 	MultiSigPkMap,
 	MultiSigPublicKey,
 	ObjectArg,
 	ObjectDigest,
+	ObjectInner,
 	Owner,
 	PasskeyAuthenticator,
 	ProgrammableMoveCall,
 	ProgrammableTransaction,
 	PublicKey,
-	SenderSignedData,
-	SenderSignedTransaction,
 	SharedObjectRef,
 	StructTag,
 	RtdObjectRef,
+	TransactionExpiration,
+	TypeOrigin,
+	TypeTag,
+	UpgradeInfo,
+} from './bcs.js';
+import {
+	SenderSignedData,
+	SenderSignedTransaction,
 	TransactionData,
 	TransactionDataV1,
-	TransactionExpiration,
 	TransactionKind,
-	TypeTag,
-} from './bcs.js';
+} from './transactions.js';
 import { TransactionEffects } from './effects.js';
 
 export type { TypeTag } from './types.js';
 
 export { TypeTagSerializer } from './type-tag-serializer.js';
-export { BcsType, BcsStruct, BcsEnum, BcsTuple, type BcsTypeOptions } from 'rtd-bcs';
+export {
+	BcsType,
+	BcsStruct,
+	BcsEnum,
+	BcsTuple,
+	type BcsTypeOptions,
+	compareBcsBytes,
+} from 'rtd-bcs';
 
 const rtdBcs = {
 	...bcs,
@@ -60,14 +76,19 @@ const rtdBcs = {
 	CallArg,
 	Command,
 	CompressedSignature,
+	Data,
 	GasData,
 	Intent,
 	IntentMessage,
 	IntentScope,
 	IntentVersion,
+	MoveObject,
+	MoveObjectType,
+	MovePackage,
 	MultiSig,
 	MultiSigPkMap,
 	MultiSigPublicKey,
+	Object: ObjectInner,
 	ObjectArg,
 	ObjectDigest,
 	Owner,
@@ -85,7 +106,9 @@ const rtdBcs = {
 	TransactionEffects,
 	TransactionExpiration,
 	TransactionKind,
+	TypeOrigin,
 	TypeTag,
+	UpgradeInfo,
 };
 export {
 	pureBcsSchemaFromTypeName,

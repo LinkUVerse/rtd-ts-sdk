@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { fromBase64, toBase64 } from 'rtd-bcs';
-import { blake2b } from '@noble/hashes/blake2b';
-import { bytesToHex } from '@noble/hashes/utils';
+import { blake2b } from '@noble/hashes/blake2.js';
+import { bytesToHex } from '@noble/hashes/utils.js';
 
 import { bcs } from '../bcs/index.js';
 import { normalizeRtdAddress, RTD_ADDRESS_LENGTH } from '../utils/rtd-types.js';

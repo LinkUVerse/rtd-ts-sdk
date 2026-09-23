@@ -1,14 +1,17 @@
 // Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { fromBase64, toBase58 } from 'rtd-bcs';
-import { ed25519 } from '@noble/curves/ed25519';
+import { fromBase64, fromHex, toBase58 } from 'rtd-bcs';
+import { ed25519 } from '@noble/curves/ed25519.js';
 import { describe, expect, it } from 'vitest';
 
-import { decodeRtdPrivateKey } from '../../../src/cryptography/keypair';
-import { Ed25519Keypair } from '../../../src/keypairs/ed25519';
-import { Transaction } from '../../../src/transactions';
-import { verifyPersonalMessageSignature, verifyTransactionSignature } from '../../../src/verify';
+import { decodeRtdPrivateKey } from '../../../src/cryptography/keypair.js';
+import { Ed25519Keypair } from '../../../src/keypairs/ed25519/index.js';
+import { Transaction } from '../../../src/transactions/index.js';
+import {
+	verifyPersonalMessageSignature,
+	verifyTransactionSignature,
+} from '../../../src/verify/index.js';
 
 const VALID_SECRET_KEY = 'mdqVWeFekT7pqy5T49+tV12jO0m+ESW7ki4zSU9JiCg=';
 const PRIVATE_KEY_SIZE = 32;
@@ -17,17 +20,17 @@ const PRIVATE_KEY_SIZE = 32;
 const TEST_CASES = [
 	[
 		'film crazy soon outside stand loop subway crumble thrive popular green nuclear struggle pistol arm wife phrase warfare march wheat nephew ask sunny firm',
-		'rtdprivkey1qrwsjvr6gwaxmsvxk4cfun99ra8uwxg3c9pl0nhle7xxpe4s80y05ctazer',
+		'rtdprivkey1qrwsjvr6gwaxmsvxk4cfun99ra8uwxg3c9pl0nhle7xxpe4s80y057s5v43',
 		'0xa2d14fad60c56049ecf75246a481934691214ce413e6a8ae2fe6834c173a6133',
 	],
 	[
 		'require decline left thought grid priority false tiny gasp angle royal system attack beef setup reward aunt skill wasp tray vital bounce inflict level',
-		'rtdprivkey1qzdvpa77ct272ultqcy20dkw78dysnfyg90fhcxkdm60el0qht9mvzlsh4j',
+		'rtdprivkey1qzdvpa77ct272ultqcy20dkw78dysnfyg90fhcxkdm60el0qht9mvyyeeeq',
 		'0x1ada6e6f3f3e4055096f606c746690f1108fcc2ca479055cc434a3e1d3f758aa',
 	],
 	[
 		'organ crash swim stick traffic remember army arctic mesh slice swear summer police vast chaos cradle squirrel hood useless evidence pet hub soap lake',
-		'rtdprivkey1qqqscjyyr64jea849dfv9cukurqj2swx0m3rr4hr7sw955jy07tzgcde5ut',
+		'rtdprivkey1qqqscjyyr64jea849dfv9cukurqj2swx0m3rr4hr7sw955jy07tzg7ks6se',
 		'0xe69e896ca10f5a77732769803cc2b5707f0ab9d4407afb5e4b4464b89769af14',
 	],
 ];
@@ -105,6 +108,19 @@ describe('ed25519-keypair', () => {
 		expect(() => {
 			Ed25519Keypair.deriveKeypair('aaa');
 		}).toThrow('Invalid mnemonic');
+	});
+
+	it('deriveKeypairFromSeed accepts Uint8Array and produces same result as hex string', () => {
+		const seedHex =
+			'000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f';
+		const seedBytes = fromHex(seedHex);
+
+		const keypairFromHex = Ed25519Keypair.deriveKeypairFromSeed(seedHex);
+		const keypairFromBytes = Ed25519Keypair.deriveKeypairFromSeed(seedBytes);
+
+		expect(keypairFromBytes.getPublicKey().toBase64()).toEqual(
+			keypairFromHex.getPublicKey().toBase64(),
+		);
 	});
 
 	it('signs Transactions', async () => {

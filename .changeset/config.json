@@ -8,10 +8,9 @@
 	"baseBranch": "main",
 	"updateInternalDependencies": "minor",
 	"privatePackages": false,
-	"ignore": [
-		"rtd-sdk-docs"
-	],
+	"ignore": [],
 	"___experimentalUnsafeOptions_WILL_CHANGE_IN_PATCH": {
-		"onlyUpdatePeerDependentsWhenOutOfRange": true
+		"onlyUpdatePeerDependentsWhenOutOfRange": true,
+		"updateInternalDependents": "always"
 	}
 }

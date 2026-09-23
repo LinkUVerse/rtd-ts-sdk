@@ -1,14 +1,16 @@
 // Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import type { ObjectOwner } from 'rtd-typescript/client';
+import type { ObjectOwner } from 'rtd-typescript/jsonRpc';
 import type { Transaction, TransactionObjectArgument } from 'rtd-typescript/transactions';
 
 import type { KioskClient } from '../client/kiosk-client.js';
 import type { ObjectArgument } from './index.js';
 
+import { RTD_FRAMEWORK_ADDRESS } from 'rtd-typescript/utils';
+
 /** The Transfer Policy module. */
-export const TRANSFER_POLICY_MODULE = '0x2::transfer_policy';
+export const TRANSFER_POLICY_MODULE = `${RTD_FRAMEWORK_ADDRESS}::transfer_policy`;
 
 /** Name of the event emitted when a TransferPolicy for T is created. */
 export const TRANSFER_POLICY_CREATED_EVENT = `${TRANSFER_POLICY_MODULE}::TransferPolicyCreated`;
@@ -54,8 +56,6 @@ export type TransferPolicyCreated = {
 // e.g. `if(!'my_key' in ruleParams!) throw new Error("Can't resolve that rule!")`
 export type RuleResolvingParams = {
 	transaction: Transaction;
-	/** @deprecated use transaction instead */
-	transactionBlock: Transaction;
 	itemType: string;
 	itemId: string;
 	price: string;

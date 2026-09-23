@@ -1,8 +1,16 @@
-# Copyright (c) Wenchuan Tech, Inc.
+# Copyright (c) LinkU Labs, Inc.
 # SPDX-License-Identifier: Apache-2.0
 
 query defaultRtdnsName($address: RtdAddress!) {
 	address(address: $address) {
-		defaultRtdnsName
+		defaultNameRecord {
+			domain
+		}
+	}
+}
+
+query resolveNameServiceAddress($name: String!) {
+	address(name: $name) {
+		address
 	}
 }

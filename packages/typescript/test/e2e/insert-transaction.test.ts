@@ -3,12 +3,12 @@
 
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { Transaction, TransactionResult } from '../../src/transactions';
-import { Commands } from '../../src/transactions/Commands';
-import type { TransactionDataBuilder } from '../../src/transactions/TransactionData';
-import type { BuildTransactionOptions } from '../../src/transactions/resolve';
-import { normalizeRtdObjectId } from '../../src/utils';
-import { publishPackage, setup, TestToolbox } from './utils/setup';
+import { Transaction, TransactionResult } from '../../src/transactions/index.js';
+import { TransactionCommands } from '../../src/transactions/Commands.js';
+import type { TransactionDataBuilder } from '../../src/transactions/TransactionData.js';
+import type { BuildTransactionOptions } from '../../src/transactions/resolve.js';
+import { normalizeRtdObjectId } from '../../src/utils/index.js';
+import { setup, TestToolbox } from './utils/setup.js';
 
 export const RTD_CLOCK_OBJECT_ID = normalizeRtdObjectId('0x6');
 
@@ -18,17 +18,9 @@ describe('TransactionData.insertTransaction', () => {
 	let sharedObjectId: string;
 
 	beforeAll(async () => {
-		const { packageId: pkgId, publishTxn } = await publishPackage('serializer');
-		packageId = pkgId;
-
-		// Find the shared object created during publish
-		const sharedObject = publishTxn.effects?.created!.filter(
-			(o) =>
-				typeof o.owner === 'object' &&
-				'Shared' in o.owner &&
-				o.owner.Shared.initial_shared_version !== undefined,
-		)[0];
-		sharedObjectId = sharedObject!.reference.objectId;
+		const initToolbox = await setup();
+		packageId = await initToolbox.getPackage('test_data');
+		sharedObjectId = initToolbox.getSharedObject('test_data', 'MutableShared')!;
 	});
 
 	beforeEach(async () => {
@@ -82,7 +74,7 @@ describe('TransactionData.insertTransaction', () => {
 
 		// Add placeholder intent
 		mainTx.add(
-			Commands.Intent({
+			TransactionCommands.Intent({
 				name: MERGE_INTENT,
 				inputs: {},
 				data: { transactionToMerge: replacementTxData },
@@ -96,16 +88,13 @@ describe('TransactionData.insertTransaction', () => {
 		});
 
 		// Execute the merged transaction - should work with deduplicated clock input
-		const result = await toolbox.client.signAndExecuteTransaction({
+		const result = await toolbox.keypair.signAndExecuteTransaction({
 			transaction: mainTx,
-			signer: toolbox.keypair,
-			options: {
-				showEffects: true,
-			},
+			client: toolbox.grpcClient,
 		});
 
 		// Verify execution succeeded
-		expect(result.effects?.status.status).toBe('success');
+		expect(result.Transaction?.effects?.status.success).toBe(true);
 	});
 
 	it('should execute transaction with coin splits merged', async () => {
@@ -151,7 +140,7 @@ describe('TransactionData.insertTransaction', () => {
 
 		// Add placeholder
 		mainTx.add(
-			Commands.Intent({
+			TransactionCommands.Intent({
 				name: MERGE_INTENT,
 				inputs: {},
 				data: { transactionToMerge: replacementTx.getData() },
@@ -159,16 +148,13 @@ describe('TransactionData.insertTransaction', () => {
 		);
 
 		// Execute
-		const result = await toolbox.client.signAndExecuteTransaction({
+		const result = await toolbox.keypair.signAndExecuteTransaction({
 			transaction: mainTx,
-			signer: toolbox.keypair,
-			options: {
-				showEffects: true,
-			},
+			client: toolbox.grpcClient,
 		});
 
 		// Verify success
-		expect(result.effects?.status.status).toBe('success');
+		expect(result.Transaction?.effects?.status.success).toBe(true);
 	});
 
 	it('should deduplicate same coin object used in both transactions', async () => {
@@ -214,7 +200,7 @@ describe('TransactionData.insertTransaction', () => {
 
 		// Add placeholder
 		mainTx.add(
-			Commands.Intent({
+			TransactionCommands.Intent({
 				name: MERGE_INTENT,
 				inputs: {},
 				data: { transactionToMerge: replacementTx.getData() },
@@ -222,16 +208,13 @@ describe('TransactionData.insertTransaction', () => {
 		);
 
 		// Execute - should work because the coin input is deduplicated
-		const result = await toolbox.client.signAndExecuteTransaction({
+		const result = await toolbox.keypair.signAndExecuteTransaction({
 			transaction: mainTx,
-			signer: toolbox.keypair,
-			options: {
-				showEffects: true,
-			},
+			client: toolbox.grpcClient,
 		});
 
 		// Verify success
-		expect(result.effects?.status.status).toBe('success');
+		expect(result.Transaction?.effects?.status.success).toBe(true);
 	});
 
 	it('should upgrade shared object from immutable to mutable when merging', async () => {
@@ -277,7 +260,7 @@ describe('TransactionData.insertTransaction', () => {
 
 		// Add placeholder
 		mainTx.add(
-			Commands.Intent({
+			TransactionCommands.Intent({
 				name: MERGE_INTENT,
 				inputs: {},
 				data: { transactionToMerge: replacementTx.getData() },
@@ -291,16 +274,13 @@ describe('TransactionData.insertTransaction', () => {
 		});
 
 		// Execute - should work with the shared object upgraded to mutable
-		const result = await toolbox.client.signAndExecuteTransaction({
+		const result = await toolbox.keypair.signAndExecuteTransaction({
 			transaction: mainTx,
-			signer: toolbox.keypair,
-			options: {
-				showEffects: true,
-			},
+			client: toolbox.grpcClient,
 		});
 
 		// Verify success - proves the mutability upgrade worked
-		expect(result.effects?.status.status).toBe('success');
+		expect(result.Transaction?.effects?.status.success).toBe(true);
 	});
 
 	it('should execute transaction with replaceCommandWithTransaction using NestedResult resultIndex', async () => {
@@ -342,7 +322,7 @@ describe('TransactionData.insertTransaction', () => {
 
 		// Add placeholder intent that will be replaced, mapping to NestedResult[0, 1] (coin2)
 		const [placeholder] = mainTx.add(
-			Commands.Intent({
+			TransactionCommands.Intent({
 				name: PLACEHOLDER,
 				inputs: {},
 				data: {
@@ -358,16 +338,13 @@ describe('TransactionData.insertTransaction', () => {
 		mainTx.transferObjects([placeholder], toolbox.address());
 
 		// Execute
-		const result = await toolbox.client.signAndExecuteTransaction({
+		const result = await toolbox.keypair.signAndExecuteTransaction({
 			transaction: mainTx,
-			signer: toolbox.keypair,
-			options: {
-				showEffects: true,
-			},
+			client: toolbox.grpcClient,
 		});
 
 		// Verify success
-		expect(result.effects?.status.status).toBe('success');
+		expect(result.Transaction?.effects?.status.success).toBe(true);
 	});
 
 	it('should execute transaction with replaceCommandWithTransaction using NestedResult[0,0] mapped to Result', async () => {
@@ -407,7 +384,7 @@ describe('TransactionData.insertTransaction', () => {
 
 		// Add placeholder intent, mapping to NestedResult[0, 0] (the single split coin)
 		const [placeholder] = mainTx.add(
-			Commands.Intent({
+			TransactionCommands.Intent({
 				name: PLACEHOLDER,
 				inputs: {},
 				data: {
@@ -423,15 +400,12 @@ describe('TransactionData.insertTransaction', () => {
 		mainTx.transferObjects([placeholder], toolbox.address());
 
 		// Execute
-		const result2 = await toolbox.client.signAndExecuteTransaction({
+		const result2 = await toolbox.keypair.signAndExecuteTransaction({
 			transaction: mainTx,
-			signer: toolbox.keypair,
-			options: {
-				showEffects: true,
-			},
+			client: toolbox.grpcClient,
 		});
 
 		// Verify success
-		expect(result2.effects?.status.status).toBe('success');
+		expect(result2.Transaction?.effects?.status.success).toBe(true);
 	});
 });

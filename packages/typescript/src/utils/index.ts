@@ -1,8 +1,9 @@
 // Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-export { formatAddress, formatDigest } from './format.js';
+export { formatAddress, formatDigest, parseToUnits, parseToMist } from './format.js';
 export {
+	isValidStructTag,
 	isValidRtdAddress,
 	isValidRtdObjectId,
 	isValidTransactionDigest,
@@ -13,18 +14,7 @@ export {
 	RTD_ADDRESS_LENGTH,
 } from './rtd-types.js';
 
-export {
-	fromB64,
-	toB64,
-	fromHEX,
-	toHex,
-	toHEX,
-	fromHex,
-	fromBase64,
-	toBase64,
-	fromBase58,
-	toBase58,
-} from 'rtd-bcs';
+export { toHex, fromHex, fromBase64, toBase64, fromBase58, toBase58 } from 'rtd-bcs';
 export { isValidRtdNSName, normalizeRtdNSName } from './rtdns.js';
 
 export {
@@ -38,6 +28,8 @@ export {
 	RTD_TYPE_ARG,
 	RTD_SYSTEM_STATE_OBJECT_ID,
 	RTD_RANDOM_OBJECT_ID,
+	RTD_COIN_REGISTRY_OBJECT_ID,
+	RTD_DENY_LIST_OBJECT_ID,
 } from './constants.js';
 
 export { isValidNamedPackage, isValidNamedType } from './move-registry.js';

@@ -1,65 +1,226 @@
 // Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { fromBase64 } from 'rtd-bcs';
+import { fromBase58, fromBase64, type InferBcsInput } from 'rtd-bcs';
 
-import { bcs } from '../bcs/index.js';
+import { bcs, TypeTagSerializer } from '../bcs/index.js';
 import type {
+	DevInspectResults,
+	DryRunTransactionBlockResponse,
+	EventId,
+	ExecutionStatus as JsonRpcExecutionStatus,
 	ObjectOwner,
+	ObjectResponseError,
 	RtdMoveAbilitySet,
+	RtdMoveAbort,
 	RtdMoveNormalizedType,
 	RtdMoveVisibility,
 	RtdObjectChange,
 	RtdObjectData,
+	RtdObjectDataFilter,
 	RtdTransactionBlockResponse,
 	TransactionEffects,
 } from './types/index.js';
+import {
+	resolveEventFilter,
+	resolvePagination,
+	resolveTransactionFilter,
+	validateTransactionQuery,
+} from '../client/query-filters.js';
+import { raceSignal } from '../client/mvr.js';
 import { Transaction } from '../transactions/Transaction.js';
-import { jsonRpcClientResolveTransactionPlugin } from './json-rpc-resolver.js';
+import { computeGasBudget, coreClientResolveTransactionPlugin } from '../client/core-resolver.js';
 import { TransactionDataBuilder } from '../transactions/TransactionData.js';
 import { chunk } from 'rtd-utils';
-import { normalizeRtdAddress } from '../utils/rtd-types.js';
-import { Experimental_CoreClient } from '../experimental/core.js';
-import type { Experimental_RtdClientTypes } from '../experimental/types.js';
-import { ObjectError } from '../experimental/errors.js';
-import { parseTransactionBcs, parseTransactionEffectsBcs } from '../experimental/index.js';
+import { normalizeRtdAddress, normalizeStructTag } from '../utils/rtd-types.js';
+import { deriveDynamicFieldID } from '../utils/dynamic-fields.js';
+import { RTD_FRAMEWORK_ADDRESS, RTD_SYSTEM_ADDRESS } from '../utils/constants.js';
+import { CoreClient } from '../client/core.js';
+import type { RtdClientTypes } from '../client/types.js';
+import { ObjectError, TransactionError } from '../client/errors.js';
+import {
+	formatMoveAbortMessage,
+	parseTransactionBcs,
+	parseTransactionEffectsBcs,
+} from '../client/index.js';
 import type { RtdJsonRpcClient } from './client.js';
+import { JsonRpcError } from './errors.js';
 
-export class JSONRpcCoreClient extends Experimental_CoreClient {
+const MAX_GAS = 50_000_000_000;
+
+function mapJsonRpcObjectError(
+	response: ObjectResponseError,
+	requestedObjectId?: string,
+): ObjectError {
+	switch (response.code) {
+		case 'notExists':
+			return new ObjectError(response.code, `Object ${response.object_id} does not exist`, {
+				cause: response,
+				reason: 'notFound',
+				objectId: requestedObjectId ?? response.object_id,
+			});
+		case 'dynamicFieldNotFound':
+			return new ObjectError(
+				response.code,
+				`Dynamic field not found for object ${response.parent_object_id}`,
+				{
+					cause: response,
+					reason: 'notFound',
+					objectId: requestedObjectId ?? response.parent_object_id,
+				},
+			);
+		case 'deleted':
+			return new ObjectError(response.code, `Object ${response.object_id} has been deleted`, {
+				cause: response,
+				reason: 'deleted',
+				objectId: requestedObjectId ?? response.object_id,
+			});
+		case 'displayError':
+			return new ObjectError(response.code, `Display error: ${response.error}`, {
+				cause: response,
+				reason: 'unknown',
+				objectId: requestedObjectId,
+			});
+		case 'unknown':
+		default:
+			return new ObjectError(
+				response.code,
+				`Unknown error while loading object${requestedObjectId ? ` ${requestedObjectId}` : ''}`,
+				{
+					cause: response,
+					reason: 'unknown',
+					objectId: requestedObjectId,
+				},
+			);
+	}
+}
+
+function isJsonRpcTransactionNotFound(error: unknown, digest: string): boolean {
+	if (!(error instanceof JsonRpcError) || error.code !== -32602) return false;
+
+	return (
+		error.message === `Invalid Params: Transaction ${digest} not found` ||
+		error.message === `Could not find the referenced transaction [TransactionDigest(${digest})].`
+	);
+}
+
+function parseJsonRpcExecutionStatus(
+	status: JsonRpcExecutionStatus,
+	abortError?: RtdMoveAbort | null,
+): RtdClientTypes.ExecutionStatus {
+	if (status.status === 'success') {
+		return { success: true, error: null };
+	}
+
+	const rawMessage = status.error ?? 'Unknown';
+
+	if (abortError) {
+		const commandMatch = rawMessage.match(/in command (\d+)/);
+		const command = commandMatch ? parseInt(commandMatch[1], 10) : undefined;
+
+		const instructionMatch = rawMessage.match(/instruction:\s*(\d+)/);
+		const instruction = instructionMatch ? parseInt(instructionMatch[1], 10) : undefined;
+
+		const moduleParts = abortError.module_id?.split('::') ?? [];
+		const pkg = moduleParts[0] ? normalizeRtdAddress(moduleParts[0]) : undefined;
+		const module = moduleParts[1];
+
+		return {
+			success: false,
+			error: {
+				$kind: 'MoveAbort',
+				message: formatMoveAbortMessage({
+					command,
+					location:
+						pkg && module
+							? {
+									package: pkg,
+									module,
+									functionName: abortError.function ?? undefined,
+									instruction,
+								}
+							: undefined,
+					abortCode: String(abortError.error_code ?? 0),
+					cleverError: abortError.line != null ? { lineNumber: abortError.line } : undefined,
+				}),
+				command,
+				MoveAbort: {
+					abortCode: String(abortError.error_code ?? 0),
+					location: abortError.module_id
+						? {
+								package: normalizeRtdAddress(abortError.module_id.split('::')[0] ?? ''),
+								module: abortError.module_id.split('::')[1] ?? '',
+								functionName: abortError.function ?? undefined,
+								instruction,
+							}
+						: undefined,
+				},
+			},
+		};
+	}
+
+	return {
+		success: false,
+		error: {
+			$kind: 'Unknown',
+			message: rawMessage,
+			Unknown: null,
+		},
+	};
+}
+
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+ * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
+export class JSONRpcCoreClient extends CoreClient {
 	#jsonRpcClient: RtdJsonRpcClient;
 
+	/**
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+	 */
 	constructor({
 		jsonRpcClient,
 		mvr,
 	}: {
 		jsonRpcClient: RtdJsonRpcClient;
-		mvr?: Experimental_RtdClientTypes.MvrOptions;
+		mvr?: RtdClientTypes.MvrOptions;
 	}) {
 		super({ network: jsonRpcClient.network, base: jsonRpcClient, mvr });
 		this.#jsonRpcClient = jsonRpcClient;
 	}
 
-	async getObjects(options: Experimental_RtdClientTypes.GetObjectsOptions) {
+	/**
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+	 */
+	async getObjects<Include extends RtdClientTypes.ObjectInclude = {}>(
+		options: RtdClientTypes.GetObjectsOptions<Include>,
+	) {
 		const batches = chunk(options.objectIds, 50);
-		const results: Experimental_RtdClientTypes.GetObjectsResponse['objects'] = [];
-
+		const results: RtdClientTypes.GetObjectsResponse<Include>['objects'] = [];
 		for (const batch of batches) {
 			const objects = await this.#jsonRpcClient.multiGetObjects({
 				ids: batch,
 				options: {
 					showOwner: true,
 					showType: true,
-					showBcs: true,
-					showPreviousTransaction: true,
+					showBcs: options.include?.content || options.include?.objectBcs ? true : false,
+					showPreviousTransaction:
+						options.include?.previousTransaction || options.include?.objectBcs ? true : false,
+					showStorageRebate: options.include?.objectBcs ?? false,
+					showContent: options.include?.json ?? false,
+					showDisplay: options.include?.display ?? false,
 				},
 				signal: options.signal,
 			});
 
 			for (const [idx, object] of objects.entries()) {
 				if (object.error) {
-					results.push(ObjectError.fromResponse(object.error, batch[idx]));
+					results.push(mapJsonRpcObjectError(object.error, batch[idx]));
 				} else {
-					results.push(parseObject(object.data!));
+					results.push(parseObject(object.data!, options.include));
 				}
 			}
 		}
@@ -68,37 +229,63 @@ export class JSONRpcCoreClient extends Experimental_CoreClient {
 			objects: results,
 		};
 	}
-	async getOwnedObjects(options: Experimental_RtdClientTypes.GetOwnedObjectsOptions) {
+	/**
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+	 */
+	async listOwnedObjects<Include extends RtdClientTypes.ObjectInclude = {}>(
+		options: RtdClientTypes.ListOwnedObjectsOptions<Include>,
+	) {
+		let filter: RtdObjectDataFilter | null = null;
+		if (options.type) {
+			const parts = options.type.split('::');
+			if (parts.length === 1) {
+				filter = { Package: options.type };
+			} else if (parts.length === 2) {
+				filter = { MoveModule: { package: parts[0], module: parts[1] } };
+			} else {
+				filter = { StructType: options.type };
+			}
+		}
+
 		const objects = await this.#jsonRpcClient.getOwnedObjects({
-			owner: options.address,
+			owner: options.owner,
 			limit: options.limit,
 			cursor: options.cursor,
 			options: {
 				showOwner: true,
 				showType: true,
-				showBcs: true,
-				showPreviousTransaction: true,
+				showBcs: options.include?.content || options.include?.objectBcs ? true : false,
+				showPreviousTransaction:
+					options.include?.previousTransaction || options.include?.objectBcs ? true : false,
+				showStorageRebate: options.include?.objectBcs ?? false,
+				showContent: options.include?.json ?? false,
+				showDisplay: options.include?.display ?? false,
 			},
-			filter: options.type ? { StructType: options.type } : null,
+			filter,
 			signal: options.signal,
 		});
 
 		return {
 			objects: objects.data.map((result) => {
 				if (result.error) {
-					throw ObjectError.fromResponse(result.error);
+					throw mapJsonRpcObjectError(result.error);
 				}
 
-				return parseObject(result.data!);
+				return parseObject(result.data!, options.include);
 			}),
 			hasNextPage: objects.hasNextPage,
 			cursor: objects.nextCursor ?? null,
 		};
 	}
 
-	async getCoins(options: Experimental_RtdClientTypes.GetCoinsOptions) {
+	/**
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+	 */
+	async listCoins(options: RtdClientTypes.ListCoinsOptions) {
 		const coins = await this.#jsonRpcClient.getCoins({
-			owner: options.address,
+			owner: options.owner,
 			coinType: options.coinType,
 			limit: options.limit,
 			cursor: options.cursor,
@@ -106,165 +293,562 @@ export class JSONRpcCoreClient extends Experimental_CoreClient {
 		});
 
 		return {
-			objects: coins.data.map((coin) => {
-				return {
-					id: coin.coinObjectId,
-					version: coin.version,
-					digest: coin.digest,
-					balance: coin.balance,
-					type: `0x2::coin::Coin<${coin.coinType}>`,
-					content: Promise.resolve(
-						Coin.serialize({
-							id: coin.coinObjectId,
-							balance: {
-								value: coin.balance,
-							},
-						}).toBytes(),
-					),
-					owner: {
-						$kind: 'ObjectOwner' as const,
-						ObjectOwner: options.address,
-					},
-					previousTransaction: coin.previousTransaction,
-				};
-			}),
+			objects: coins.data.map((coin): RtdClientTypes.Coin => ({
+				objectId: coin.coinObjectId,
+				version: coin.version,
+				digest: coin.digest,
+				balance: coin.balance,
+				type: normalizeStructTag(`0x2::coin::Coin<${coin.coinType}>`),
+				owner: {
+					$kind: 'AddressOwner' as const,
+					AddressOwner: options.owner,
+				},
+			})),
 			hasNextPage: coins.hasNextPage,
 			cursor: coins.nextCursor ?? null,
 		};
 	}
 
-	async getBalance(options: Experimental_RtdClientTypes.GetBalanceOptions) {
+	/**
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+	 */
+	async getBalance(options: RtdClientTypes.GetBalanceOptions) {
 		const balance = await this.#jsonRpcClient.getBalance({
-			owner: options.address,
+			owner: options.owner,
 			coinType: options.coinType,
 			signal: options.signal,
 		});
 
+		const addressBalance = balance.fundsInAddressBalance ?? '0';
+		const coinBalance = String(BigInt(balance.totalBalance) - BigInt(addressBalance));
+
 		return {
 			balance: {
-				coinType: balance.coinType,
+				coinType: normalizeStructTag(balance.coinType),
 				balance: balance.totalBalance,
+				coinBalance,
+				addressBalance,
 			},
 		};
 	}
-	async getAllBalances(options: Experimental_RtdClientTypes.GetAllBalancesOptions) {
+	/**
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+	 */
+	async getCoinMetadata(
+		options: RtdClientTypes.GetCoinMetadataOptions,
+	): Promise<RtdClientTypes.GetCoinMetadataResponse> {
+		const coinType = (
+			await this.mvr.resolveType({ type: options.coinType, signal: options.signal })
+		).type;
+
+		const result = await this.#jsonRpcClient.getCoinMetadata({
+			coinType,
+			signal: options.signal,
+		});
+
+		if (!result) {
+			return { coinMetadata: null };
+		}
+
+		return {
+			coinMetadata: {
+				id: result.id ?? null,
+				decimals: result.decimals,
+				name: result.name,
+				symbol: result.symbol,
+				description: result.description,
+				iconUrl: result.iconUrl ?? null,
+			},
+		};
+	}
+
+	/**
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+	 */
+	async listBalances(options: RtdClientTypes.ListBalancesOptions) {
 		const balances = await this.#jsonRpcClient.getAllBalances({
-			owner: options.address,
+			owner: options.owner,
 			signal: options.signal,
 		});
 
 		return {
-			balances: balances.map((balance) => ({
-				coinType: balance.coinType,
-				balance: balance.totalBalance,
-			})),
+			balances: balances.map((balance) => {
+				const addressBalance = balance.fundsInAddressBalance ?? '0';
+				const coinBalance = String(BigInt(balance.totalBalance) - BigInt(addressBalance));
+				return {
+					coinType: normalizeStructTag(balance.coinType),
+					balance: balance.totalBalance,
+					coinBalance,
+					addressBalance,
+				};
+			}),
 			hasNextPage: false,
 			cursor: null,
 		};
 	}
-	async getTransaction(options: Experimental_RtdClientTypes.GetTransactionOptions) {
-		const transaction = await this.#jsonRpcClient.getTransactionBlock({
-			digest: options.digest,
-			options: {
-				showRawInput: true,
-				showObjectChanges: true,
-				showRawEffects: true,
-				showEvents: true,
-				showEffects: true,
-				showBalanceChanges: true,
-			},
-			signal: options.signal,
-		});
+	/**
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+	 */
+	async getTransaction<Include extends RtdClientTypes.TransactionInclude = {}>(
+		options: RtdClientTypes.GetTransactionOptions<Include>,
+	): Promise<RtdClientTypes.TransactionResult<Include>> {
+		try {
+			const transaction = await this.#jsonRpcClient.getTransactionBlock({
+				digest: options.digest,
+				options: {
+					// showRawInput is always needed to extract signatures from SenderSignedData
+					showRawInput: true,
+					// showEffects is always needed to get status
+					showEffects: true,
+					showObjectChanges: options.include?.objectTypes ?? false,
+					showRawEffects: options.include?.effects ?? false,
+					showEvents: options.include?.events ?? false,
+					showBalanceChanges: options.include?.balanceChanges ?? false,
+				},
+				signal: options.signal,
+			});
 
-		return {
-			transaction: parseTransaction(transaction),
-		};
+			return parseTransaction(transaction, options.include);
+		} catch (error) {
+			if (isJsonRpcTransactionNotFound(error, options.digest)) {
+				throw new TransactionError('notFound', options.digest, { cause: error });
+			}
+			throw error;
+		}
 	}
-	async executeTransaction(options: Experimental_RtdClientTypes.ExecuteTransactionOptions) {
+	/**
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+	 */
+	async executeTransaction<Include extends RtdClientTypes.TransactionInclude = {}>(
+		options: RtdClientTypes.ExecuteTransactionOptions<Include>,
+	): Promise<RtdClientTypes.TransactionResult<Include>> {
 		const transaction = await this.#jsonRpcClient.executeTransactionBlock({
 			transactionBlock: options.transaction,
 			signature: options.signatures,
 			options: {
-				showRawEffects: true,
-				showEvents: true,
-				showObjectChanges: true,
+				// showRawInput is always needed to extract signatures from SenderSignedData
 				showRawInput: true,
+				// showEffects is always needed to get status
 				showEffects: true,
-				showBalanceChanges: true,
+				showRawEffects: options.include?.effects ?? false,
+				showEvents: options.include?.events ?? false,
+				showObjectChanges: options.include?.objectTypes ?? false,
+				showBalanceChanges: options.include?.balanceChanges ?? false,
 			},
 			signal: options.signal,
 		});
 
-		return {
-			transaction: parseTransaction(transaction),
-		};
+		return parseTransaction(transaction, options.include);
 	}
-	async dryRunTransaction(options: Experimental_RtdClientTypes.DryRunTransactionOptions) {
+	/**
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+	 */
+	async simulateTransaction<Include extends RtdClientTypes.SimulateTransactionInclude = {}>(
+		options: RtdClientTypes.SimulateTransactionOptions<Include>,
+	): Promise<RtdClientTypes.SimulateTransactionResult<Include>> {
+		if (!(options.transaction instanceof Uint8Array)) {
+			await options.transaction.build({ client: this, onlyTransactionKind: true });
+		}
+
 		const tx = Transaction.from(options.transaction);
-		const result = await this.#jsonRpcClient.dryRunTransactionBlock({
-			transactionBlock: options.transaction,
-			signal: options.signal,
-		});
+
+		const data =
+			options.transaction instanceof Uint8Array
+				? null
+				: TransactionDataBuilder.restore(options.transaction.getData());
+
+		const transactionBytes = data
+			? data.build({
+					overrides: {
+						gasData: {
+							budget: data.gasData.budget ?? String(MAX_GAS),
+							price:
+								data.gasData.price ??
+								String(await this.#jsonRpcClient.getReferenceGasPrice({ signal: options.signal })),
+							payment: data.gasData.payment ?? [],
+						},
+					},
+				})
+			: (options.transaction as Uint8Array);
+
+		const sender = tx.getData().sender ?? normalizeRtdAddress('0x0');
+		const checksDisabled = options.checksEnabled === false;
+
+		let dryRunResult: DryRunTransactionBlockResponse | null = null;
+		try {
+			dryRunResult = await this.#jsonRpcClient.dryRunTransactionBlock({
+				transactionBlock: transactionBytes,
+				signal: options.signal,
+			});
+		} catch (e) {
+			if (!checksDisabled) {
+				throw e;
+			}
+		}
+
+		let devInspectResult: DevInspectResults | null = null;
+		if (options.include?.commandResults || checksDisabled) {
+			try {
+				devInspectResult = await this.#jsonRpcClient.devInspectTransactionBlock({
+					sender,
+					transactionBlock: tx,
+					signal: options.signal,
+				});
+			} catch {}
+		}
+
+		const dryRunFailed = !dryRunResult || dryRunResult.effects.status.status !== 'success';
+		const effectsSource =
+			checksDisabled && dryRunFailed && devInspectResult
+				? devInspectResult
+				: (dryRunResult ?? devInspectResult);
+		if (!effectsSource) {
+			throw new Error('simulateTransaction failed: no results from dryRun or devInspect');
+		}
 
 		const { effects, objectTypes } = parseTransactionEffectsJson({
-			effects: result.effects,
-			objectChanges: result.objectChanges,
+			effects: effectsSource.effects,
+			objectChanges: (!dryRunFailed ? dryRunResult?.objectChanges : null) ?? [],
 		});
 
-		return {
-			transaction: {
-				digest: await tx.getDigest(),
-				epoch: null,
-				effects,
-				objectTypes: Promise.resolve(objectTypes),
-				signatures: [],
-				transaction: parseTransactionBcs(options.transaction),
-				balanceChanges: result.balanceChanges.map((change) => ({
-					coinType: change.coinType,
-					address: parseOwnerAddress(change.owner)!,
-					amount: change.amount,
-				})),
-			},
+		let parsedTransaction: RtdClientTypes.TransactionData | undefined;
+		if (options.include?.transaction) {
+			parsedTransaction = parseTransactionBcs(transactionBytes);
+			if (data && !dryRunFailed && effects.gasUsed) {
+				if (!data.gasData.budget) {
+					parsedTransaction.gasData.budget = computeGasBudget(effects.gasUsed);
+				}
+			}
+		}
+
+		const transactionData: RtdClientTypes.Transaction<Include> = {
+			digest: TransactionDataBuilder.getDigestFromBytes(transactionBytes),
+			epoch: null,
+			timestampMs: null,
+			checkpoint: null,
+			status: effects.status,
+			effects: (options.include?.effects
+				? effects
+				: undefined) as RtdClientTypes.Transaction<Include>['effects'],
+			objectTypes: (options.include?.objectTypes
+				? objectTypes
+				: undefined) as RtdClientTypes.Transaction<Include>['objectTypes'],
+			signatures: [],
+			transaction: (parsedTransaction ??
+				undefined) as RtdClientTypes.Transaction<Include>['transaction'],
+			bcs: (options.include?.bcs
+				? transactionBytes
+				: undefined) as RtdClientTypes.Transaction<Include>['bcs'],
+			balanceChanges: (options.include?.balanceChanges && dryRunResult && !dryRunFailed
+				? dryRunResult.balanceChanges.map((change) => ({
+						coinType: normalizeStructTag(change.coinType),
+						address: parseOwnerAddress(change.owner)!,
+						amount: change.amount,
+					}))
+				: undefined) as RtdClientTypes.Transaction<Include>['balanceChanges'],
+			events: (options.include?.events
+				? (effectsSource.events?.map((event) => ({
+						packageId: event.packageId,
+						module: event.transactionModule,
+						sender: event.sender,
+						eventType: event.type,
+						bcs: 'bcs' in event ? fromBase64(event.bcs) : new Uint8Array(),
+						json: (event.parsedJson as Record<string, unknown>) ?? null,
+					})) ?? [])
+				: undefined) as RtdClientTypes.Transaction<Include>['events'],
 		};
+
+		let commandResults: RtdClientTypes.CommandResult[] | undefined;
+		if (options.include?.commandResults && devInspectResult?.results) {
+			commandResults = devInspectResult.results.map((result) => ({
+				returnValues: (result.returnValues ?? []).map(([bytes]) => ({
+					bcs: new Uint8Array(bytes),
+				})),
+				mutatedReferences: (result.mutableReferenceOutputs ?? []).map(([, bytes]) => ({
+					bcs: new Uint8Array(bytes),
+				})),
+			}));
+		}
+
+		return effects.status.success
+			? {
+					$kind: 'Transaction',
+					Transaction: transactionData,
+					commandResults:
+						commandResults as RtdClientTypes.SimulateTransactionResult<Include>['commandResults'],
+				}
+			: {
+					$kind: 'FailedTransaction',
+					FailedTransaction: transactionData,
+					commandResults:
+						commandResults as RtdClientTypes.SimulateTransactionResult<Include>['commandResults'],
+				};
 	}
-	async getReferenceGasPrice(options?: Experimental_RtdClientTypes.GetReferenceGasPriceOptions) {
+	/**
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+	 */
+	async getReferenceGasPrice(options?: RtdClientTypes.GetReferenceGasPriceOptions) {
 		const referenceGasPrice = await this.#jsonRpcClient.getReferenceGasPrice({
 			signal: options?.signal,
 		});
+
 		return {
 			referenceGasPrice: String(referenceGasPrice),
 		};
 	}
 
-	async getDynamicFields(options: Experimental_RtdClientTypes.GetDynamicFieldsOptions) {
+	/**
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+	 */
+	async getProtocolConfig(
+		options?: RtdClientTypes.GetProtocolConfigOptions,
+	): Promise<RtdClientTypes.GetProtocolConfigResponse> {
+		const result = await this.#jsonRpcClient.getProtocolConfig({ signal: options?.signal });
+
+		const attributes: Record<string, string | null> = {};
+		for (const [key, value] of Object.entries(result.attributes)) {
+			if (value === null) {
+				attributes[key] = null;
+			} else if ('u16' in value) {
+				attributes[key] = value.u16;
+			} else if ('u32' in value) {
+				attributes[key] = value.u32;
+			} else if ('u64' in value) {
+				attributes[key] = value.u64;
+			} else if ('f64' in value) {
+				attributes[key] = value.f64;
+			} else if ('bool' in value) {
+				attributes[key] = value.bool;
+			} else {
+				const entries = Object.entries(value);
+				attributes[key] = entries.length === 1 ? String(entries[0][1]) : JSON.stringify(value);
+			}
+		}
+
+		return {
+			protocolConfig: {
+				protocolVersion: result.protocolVersion,
+				featureFlags: { ...result.featureFlags },
+				attributes,
+			},
+		};
+	}
+
+	/**
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+	 */
+	async getCurrentSystemState(
+		options?: RtdClientTypes.GetCurrentSystemStateOptions,
+	): Promise<RtdClientTypes.GetCurrentSystemStateResponse> {
+		const systemState = await this.#jsonRpcClient.getLatestRtdSystemState({
+			signal: options?.signal,
+		});
+
+		return {
+			systemState: {
+				systemStateVersion: systemState.systemStateVersion,
+				epoch: systemState.epoch,
+				protocolVersion: systemState.protocolVersion,
+				referenceGasPrice: systemState.referenceGasPrice?.toString() ?? (null as never),
+				epochStartTimestampMs: systemState.epochStartTimestampMs,
+				safeMode: systemState.safeMode,
+				safeModeStorageRewards: systemState.safeModeStorageRewards,
+				safeModeComputationRewards: systemState.safeModeComputationRewards,
+				safeModeStorageRebates: systemState.safeModeStorageRebates,
+				safeModeNonRefundableStorageFee: systemState.safeModeNonRefundableStorageFee,
+				parameters: {
+					epochDurationMs: systemState.epochDurationMs,
+					stakeSubsidyStartEpoch: systemState.stakeSubsidyStartEpoch,
+					maxValidatorCount: systemState.maxValidatorCount,
+					minValidatorJoiningStake: systemState.minValidatorJoiningStake,
+					validatorLowStakeThreshold: systemState.validatorLowStakeThreshold,
+					validatorLowStakeGracePeriod: systemState.validatorLowStakeGracePeriod,
+				},
+				storageFund: {
+					totalObjectStorageRebates: systemState.storageFundTotalObjectStorageRebates,
+					nonRefundableBalance: systemState.storageFundNonRefundableBalance,
+				},
+				stakeSubsidy: {
+					balance: systemState.stakeSubsidyBalance,
+					distributionCounter: systemState.stakeSubsidyDistributionCounter,
+					currentDistributionAmount: systemState.stakeSubsidyCurrentDistributionAmount,
+					stakeSubsidyPeriodLength: systemState.stakeSubsidyPeriodLength,
+					stakeSubsidyDecreaseRate: systemState.stakeSubsidyDecreaseRate,
+				},
+			},
+		};
+	}
+
+	/**
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+	 */
+	async listDynamicFields(options: RtdClientTypes.ListDynamicFieldsOptions) {
 		const dynamicFields = await this.#jsonRpcClient.getDynamicFields({
 			parentId: options.parentId,
 			limit: options.limit,
 			cursor: options.cursor,
+			signal: options.signal,
 		});
 
 		return {
-			dynamicFields: dynamicFields.data.map((dynamicField) => {
+			dynamicFields: dynamicFields.data.map((dynamicField): RtdClientTypes.DynamicFieldEntry => {
+				const isDynamicObject = dynamicField.type === 'DynamicObject';
+				const fullType = isDynamicObject
+					? `0x2::dynamic_field::Field<0x2::dynamic_object_field::Wrapper<${dynamicField.name.type}>, 0x2::object::ID>`
+					: `0x2::dynamic_field::Field<${dynamicField.name.type}, ${dynamicField.objectType}>`;
+
+				const bcsBytes = fromBase64(dynamicField.bcsName);
+				const derivedNameType = isDynamicObject
+					? `0x2::dynamic_object_field::Wrapper<${dynamicField.name.type}>`
+					: dynamicField.name.type;
 				return {
-					id: dynamicField.objectId,
-					type: dynamicField.objectType,
+					$kind: isDynamicObject ? 'DynamicObject' : 'DynamicField',
+					fieldId: deriveDynamicFieldID(options.parentId, derivedNameType, bcsBytes),
+					type: normalizeStructTag(fullType),
 					name: {
 						type: dynamicField.name.type,
-						bcs: fromBase64(dynamicField.bcsName),
+						bcs: bcsBytes,
 					},
-				};
+					valueType: dynamicField.objectType,
+					childId: isDynamicObject ? dynamicField.objectId : undefined,
+				} as RtdClientTypes.DynamicFieldEntry;
 			}),
 			hasNextPage: dynamicFields.hasNextPage,
 			cursor: dynamicFields.nextCursor,
 		};
 	}
 
-	async verifyZkLoginSignature(options: Experimental_RtdClientTypes.VerifyZkLoginSignatureOptions) {
+	/**
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+	 */
+	async listTransactions<Include extends RtdClientTypes.TransactionInclude = {}>(
+		options: RtdClientTypes.ListTransactionsOptions<Include>,
+	): Promise<RtdClientTypes.ListTransactionsResponse<Include>> {
+		const filter = options.filter
+			? await resolveTransactionFilter(this.mvr, options.filter, options.signal)
+			: undefined;
+
+		// Transaction cursors are digests, and bounds are interpreted relative to the
+		// traversal direction
+		const pagination = resolvePagination(options);
+		const { descending, after, before } = pagination;
+		validateTransactionQuery(filter, pagination);
+
+		const page = await this.#jsonRpcClient.queryTransactionBlocks({
+			filter:
+				filter &&
+				(filter.$kind === 'sender'
+					? { FromAddress: filter.sender }
+					: {
+							MoveFunction: {
+								package: filter.package,
+								module: filter.module ?? null,
+								function: filter.function ?? null,
+							},
+						}),
+			cursor: after ?? before,
+			limit: pagination.limit,
+			order: descending ? 'descending' : 'ascending',
+			options: {
+				// showRawInput is always needed to extract signatures from SenderSignedData
+				showRawInput: true,
+				// showEffects is always needed to get status
+				showEffects: true,
+				showObjectChanges: options.include?.objectTypes ?? false,
+				showRawEffects: options.include?.effects ?? false,
+				showEvents: options.include?.events ?? false,
+				showBalanceChanges: options.include?.balanceChanges ?? false,
+			},
+			signal: options.signal,
+		});
+
+		return {
+			transactions: page.data.map((transaction) => parseTransaction(transaction, options.include)),
+			hasNextPage: page.hasNextPage,
+			startCursor: page.data[0]?.digest ?? null,
+			endCursor: page.data.length
+				? (page.nextCursor ?? page.data[page.data.length - 1].digest)
+				: null,
+		};
+	}
+
+	/**
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+	 */
+	async listEvents(
+		options: RtdClientTypes.ListEventsOptions,
+	): Promise<RtdClientTypes.ListEventsResponse> {
+		const filter = options.filter
+			? await resolveEventFilter(this.mvr, options.filter, options.signal)
+			: undefined;
+		// Event cursors are event ids, and bounds are interpreted relative to the
+		// traversal direction
+		const { descending, after, before, limit } = resolvePagination(options);
+		const cursor = after ?? before;
+
+		const page = await this.#jsonRpcClient.queryEvents({
+			query: !filter
+				? { All: [] }
+				: filter.$kind === 'sender'
+					? { Sender: filter.sender }
+					: filter.$kind === 'emitModule'
+						? { MoveModule: { package: filter.package, module: filter.module } }
+						: filter.$kind === 'eventTypeModule'
+							? { MoveEventModule: { package: filter.package, module: filter.module } }
+							: { MoveEventType: filter.eventType },
+			cursor: cursor ? parseEventCursor(cursor) : undefined,
+			limit,
+			order: descending ? 'descending' : 'ascending',
+			signal: options.signal,
+		});
+
+		return {
+			events: page.data.map((event): RtdClientTypes.EventEntry => ({
+				packageId: normalizeRtdAddress(event.packageId),
+				module: event.transactionModule,
+				sender: normalizeRtdAddress(event.sender),
+				eventType: normalizeStructTag(event.type),
+				bcs: event.bcsEncoding === 'base58' ? fromBase58(event.bcs) : fromBase64(event.bcs),
+				json: (event.parsedJson as Record<string, unknown>) ?? null,
+				// queryEvents responses do not include checkpoint information
+				checkpoint: null,
+				transactionDigest: event.id.txDigest,
+				eventIndex: Number(event.id.eventSeq),
+			})),
+			hasNextPage: page.hasNextPage,
+			startCursor: page.data.length ? JSON.stringify(page.data[0].id) : null,
+			endCursor:
+				page.data.length && page.nextCursor
+					? JSON.stringify(page.nextCursor)
+					: page.data.length
+						? JSON.stringify(page.data[page.data.length - 1].id)
+						: null,
+		};
+	}
+
+	/**
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+	 */
+	async verifyZkLoginSignature(options: RtdClientTypes.VerifyZkLoginSignatureOptions) {
 		const result = await this.#jsonRpcClient.verifyZkLoginSignature({
+			signal: options.signal,
 			bytes: options.bytes,
 			signature: options.signature,
 			intentScope: options.intentScope,
-			author: options.author,
+			author: options.address,
 		});
 
 		return {
@@ -273,10 +857,14 @@ export class JSONRpcCoreClient extends Experimental_CoreClient {
 		};
 	}
 
+	/**
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+	 */
 	async defaultNameServiceName(
-		options: Experimental_RtdClientTypes.DefaultNameServiceNameOptions,
-	): Promise<Experimental_RtdClientTypes.DefaultNameServiceNameResponse> {
-		const name = (await this.#jsonRpcClient.resolveNameServiceNames(options)).data[0];
+		options: RtdClientTypes.DefaultNameServiceNameOptions,
+	): Promise<RtdClientTypes.DefaultNameServiceNameResponse> {
+		const name = (await this.#jsonRpcClient.resolveNameServiceNames(options)).data[0] ?? null;
 		return {
 			data: {
 				name,
@@ -284,22 +872,46 @@ export class JSONRpcCoreClient extends Experimental_CoreClient {
 		};
 	}
 
-	resolveTransactionPlugin() {
-		return jsonRpcClientResolveTransactionPlugin(this.#jsonRpcClient);
+	/**
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+	 */
+	async resolveNameServiceAddress(
+		options: RtdClientTypes.ResolveNameServiceAddressOptions,
+	): Promise<RtdClientTypes.ResolveNameServiceAddressResponse> {
+		return {
+			address: await this.#jsonRpcClient.resolveNameServiceAddress(options),
+		};
 	}
 
+	/**
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+	 */
+	resolveTransactionPlugin() {
+		return coreClientResolveTransactionPlugin;
+	}
+
+	/**
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+	 */
 	async getMoveFunction(
-		options: Experimental_RtdClientTypes.GetMoveFunctionOptions,
-	): Promise<Experimental_RtdClientTypes.GetMoveFunctionResponse> {
+		options: RtdClientTypes.GetMoveFunctionOptions,
+	): Promise<RtdClientTypes.GetMoveFunctionResponse> {
+		const resolvedPackageId = (
+			await this.mvr.resolvePackage({ package: options.packageId, signal: options.signal })
+		).package;
 		const result = await this.#jsonRpcClient.getNormalizedMoveFunction({
-			package: (await this.mvr.resolvePackage({ package: options.packageId })).package,
+			package: resolvedPackageId,
 			module: options.moduleName,
 			function: options.name,
+			signal: options.signal,
 		});
 
 		return {
 			function: {
-				packageId: normalizeRtdAddress(options.packageId),
+				packageId: normalizeRtdAddress(resolvedPackageId),
 				moduleName: options.moduleName,
 				name: options.name,
 				visibility: parseVisibility(result.visibility),
@@ -313,23 +925,138 @@ export class JSONRpcCoreClient extends Experimental_CoreClient {
 			},
 		};
 	}
+
+	/**
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+	 */
+	async getChainIdentifier(
+		options?: RtdClientTypes.GetChainIdentifierOptions,
+	): Promise<RtdClientTypes.GetChainIdentifierResponse> {
+		// The result is cached and shared across callers, so the underlying request must
+		// not carry any single caller's signal. Isolate cancellation per-caller instead.
+		const cached = this.cache.read(['chainIdentifier'], async () => {
+			const checkpoint = await this.#jsonRpcClient.getCheckpoint({ id: '0' });
+			return {
+				chainIdentifier: checkpoint.digest,
+			};
+		});
+
+		return raceSignal(Promise.resolve(cached), options?.signal);
+	}
 }
 
-function parseObject(object: RtdObjectData): Experimental_RtdClientTypes.ObjectResponse {
+function serializeObjectToBcs(object: RtdObjectData): Uint8Array | undefined {
+	if (object.bcs?.dataType !== 'moveObject') {
+		return undefined;
+	}
+
+	try {
+		// Normalize the type string to ensure consistent address formatting (0x2 vs 0x00...02)
+		const typeStr = normalizeStructTag(object.bcs.type);
+		let moveObjectType: InferBcsInput<typeof bcs.MoveObjectType>;
+
+		// Normalize constants for comparison
+		const normalizedRtdFramework = normalizeRtdAddress(RTD_FRAMEWORK_ADDRESS);
+		const gasCoinType = normalizeStructTag(
+			`${RTD_FRAMEWORK_ADDRESS}::coin::Coin<${RTD_FRAMEWORK_ADDRESS}::rtd::RTD>`,
+		);
+		const stakedRtdType = normalizeStructTag(`${RTD_SYSTEM_ADDRESS}::staking_pool::StakedRtd`);
+		const coinPrefix = `${normalizedRtdFramework}::coin::Coin<`;
+
+		if (typeStr === gasCoinType) {
+			moveObjectType = { GasCoin: null };
+		} else if (typeStr === stakedRtdType) {
+			moveObjectType = { StakedRtd: null };
+		} else if (typeStr.startsWith(coinPrefix)) {
+			const innerTypeMatch = typeStr.match(
+				new RegExp(
+					`${normalizedRtdFramework.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}::coin::Coin<(.+)>$`,
+				),
+			);
+			if (innerTypeMatch) {
+				const innerTypeTag = TypeTagSerializer.parseFromStr(innerTypeMatch[1], true);
+				moveObjectType = { Coin: innerTypeTag };
+			} else {
+				throw new Error('Failed to parse Coin type');
+			}
+		} else {
+			const typeTag = TypeTagSerializer.parseFromStr(typeStr, true);
+			if (typeof typeTag !== 'object' || !('struct' in typeTag)) {
+				throw new Error('Expected struct type tag');
+			}
+			moveObjectType = { Other: typeTag.struct };
+		}
+
+		const contents = fromBase64(object.bcs.bcsBytes);
+		const owner = convertOwnerToBcs(object.owner!);
+
+		return bcs.Object.serialize({
+			data: {
+				Move: {
+					type: moveObjectType,
+					hasPublicTransfer: object.bcs.hasPublicTransfer,
+					version: object.bcs.version,
+					contents,
+				},
+			},
+			owner,
+			previousTransaction: object.previousTransaction!,
+			storageRebate: object.storageRebate!,
+		}).toBytes();
+	} catch {
+		// If serialization fails, return undefined
+		return undefined;
+	}
+}
+
+function parseObject<Include extends RtdClientTypes.ObjectInclude = {}>(
+	object: RtdObjectData,
+	include?: Include,
+): RtdClientTypes.Object<Include> {
+	const bcsContent =
+		object.bcs?.dataType === 'moveObject' ? fromBase64(object.bcs.bcsBytes) : undefined;
+
+	const objectBcs = include?.objectBcs ? serializeObjectToBcs(object) : undefined;
+
+	// Package objects have type "package" which is not a struct tag, so don't normalize it
+	const type =
+		object.type && object.type.includes('::')
+			? normalizeStructTag(object.type)
+			: (object.type ?? '');
+
+	const jsonContent =
+		include?.json && object.content?.dataType === 'moveObject'
+			? (object.content.fields as Record<string, unknown>)
+			: include?.json
+				? null
+				: undefined;
+
+	const displayData = include?.display
+		? object.display?.data != null
+			? { output: object.display.data as Record<string, unknown>, errors: null }
+			: null
+		: undefined;
+
 	return {
-		id: object.objectId,
+		objectId: object.objectId,
 		version: object.version,
 		digest: object.digest,
-		type: object.type!,
-		content: Promise.resolve(
-			object.bcs?.dataType === 'moveObject' ? fromBase64(object.bcs.bcsBytes) : new Uint8Array(),
-		),
+		type,
+		content: (include?.content
+			? bcsContent
+			: undefined) as RtdClientTypes.Object<Include>['content'],
 		owner: parseOwner(object.owner!),
-		previousTransaction: object.previousTransaction ?? null,
+		previousTransaction: (include?.previousTransaction
+			? (object.previousTransaction ?? undefined)
+			: undefined) as RtdClientTypes.Object<Include>['previousTransaction'],
+		objectBcs: objectBcs as RtdClientTypes.Object<Include>['objectBcs'],
+		json: jsonContent as RtdClientTypes.Object<Include>['json'],
+		display: displayData as RtdClientTypes.Object<Include>['display'],
 	};
 }
 
-function parseOwner(owner: ObjectOwner): Experimental_RtdClientTypes.ObjectOwner {
+function parseOwner(owner: ObjectOwner): RtdClientTypes.ObjectOwner {
 	if (owner === 'Immutable') {
 		return {
 			$kind: 'Immutable',
@@ -373,6 +1100,37 @@ function parseOwner(owner: ObjectOwner): Experimental_RtdClientTypes.ObjectOwner
 	throw new Error(`Unknown owner type: ${JSON.stringify(owner)}`);
 }
 
+function convertOwnerToBcs(owner: ObjectOwner) {
+	if (owner === 'Immutable') {
+		return { Immutable: null };
+	}
+
+	if ('AddressOwner' in owner) {
+		return { AddressOwner: owner.AddressOwner };
+	}
+
+	if ('ObjectOwner' in owner) {
+		return { ObjectOwner: owner.ObjectOwner };
+	}
+
+	if ('Shared' in owner) {
+		return {
+			Shared: { initialSharedVersion: owner.Shared.initial_shared_version },
+		};
+	}
+
+	if (typeof owner === 'object' && owner !== null && 'ConsensusAddressOwner' in owner) {
+		return {
+			ConsensusAddressOwner: {
+				startVersion: owner.ConsensusAddressOwner.start_version,
+				owner: owner.ConsensusAddressOwner.owner,
+			},
+		};
+	}
+
+	throw new Error(`Unknown owner type: ${JSON.stringify(owner)}`);
+}
+
 function parseOwnerAddress(owner: ObjectOwner): string | null {
 	if (owner === 'Immutable') {
 		return null;
@@ -397,49 +1155,123 @@ function parseOwnerAddress(owner: ObjectOwner): string | null {
 	throw new Error(`Unknown owner type: ${JSON.stringify(owner)}`);
 }
 
-function parseTransaction(
-	transaction: RtdTransactionBlockResponse,
-): Experimental_RtdClientTypes.TransactionResponse {
-	const parsedTx = bcs.SenderSignedData.parse(fromBase64(transaction.rawTransaction!))[0];
-	const objectTypes: Record<string, string> = {};
-
-	transaction.objectChanges?.forEach((change) => {
-		if (change.type !== 'published') {
-			objectTypes[change.objectId] = change.objectType;
+function parseEventCursor(cursor: string): EventId {
+	try {
+		const parsed = JSON.parse(cursor) as EventId;
+		if (typeof parsed?.txDigest !== 'string' || typeof parsed?.eventSeq !== 'string') {
+			throw new Error('malformed event cursor');
 		}
-	});
-
-	const bytes = bcs.TransactionData.serialize(parsedTx.intentMessage.value).toBytes();
-
-	const data = TransactionDataBuilder.restore({
-		version: 2,
-		sender: parsedTx.intentMessage.value.V1.sender,
-		expiration: parsedTx.intentMessage.value.V1.expiration,
-		gasData: parsedTx.intentMessage.value.V1.gasData,
-		inputs: parsedTx.intentMessage.value.V1.kind.ProgrammableTransaction!.inputs,
-		commands: parsedTx.intentMessage.value.V1.kind.ProgrammableTransaction!.commands,
-	});
-
-	return {
-		digest: transaction.digest,
-		epoch: transaction.effects?.executedEpoch ?? null,
-		effects: parseTransactionEffectsBcs(new Uint8Array(transaction.rawEffects!)),
-		objectTypes: Promise.resolve(objectTypes),
-		transaction: {
-			...data,
-			bcs: bytes,
-		},
-		signatures: parsedTx.txSignatures,
-		balanceChanges:
-			transaction.balanceChanges?.map((change) => ({
-				coinType: change.coinType,
-				address: parseOwnerAddress(change.owner)!,
-				amount: change.amount,
-			})) ?? [],
-	};
+		return parsed;
+	} catch {
+		throw new Error(`Invalid event cursor: ${cursor}`);
+	}
 }
 
-function parseTransactionEffectsJson({
+function parseTransaction<Include extends RtdClientTypes.TransactionInclude = {}>(
+	transaction: RtdTransactionBlockResponse,
+	include?: Include,
+): RtdClientTypes.TransactionResult<Include> {
+	const objectTypes: Record<string, string> = {};
+
+	if (include?.objectTypes) {
+		transaction.objectChanges?.forEach((change) => {
+			if (change.type !== 'published') {
+				objectTypes[change.objectId] = normalizeStructTag(change.objectType);
+			}
+		});
+	}
+
+	let transactionData: RtdClientTypes.TransactionData | undefined;
+	let signatures: string[] = [];
+	let bcsBytes: Uint8Array | undefined;
+
+	if (transaction.rawTransaction) {
+		const parsedTx = bcs.SenderSignedData.parse(fromBase64(transaction.rawTransaction))[0];
+		// System transactions, including genesis, carry a placeholder signature that gRPC and
+		// GraphQL report as-is.
+		signatures = parsedTx.txSignatures;
+
+		if (include?.transaction || include?.bcs) {
+			const bytes = bcs.TransactionData.serialize(parsedTx.intentMessage.value).toBytes();
+
+			if (include?.bcs) {
+				bcsBytes = bytes;
+			}
+
+			if (include?.transaction) {
+				const data = TransactionDataBuilder.restore({
+					version: 2,
+					sender: parsedTx.intentMessage.value.V1.sender,
+					expiration: parsedTx.intentMessage.value.V1.expiration,
+					gasData: parsedTx.intentMessage.value.V1.gasData,
+					inputs: parsedTx.intentMessage.value.V1.kind.ProgrammableTransaction!.inputs,
+					commands: parsedTx.intentMessage.value.V1.kind.ProgrammableTransaction!.commands,
+				});
+				transactionData = { ...data };
+			}
+		}
+	}
+
+	// Get status from JSON-RPC response
+	const status: RtdClientTypes.ExecutionStatus = transaction.effects?.status
+		? parseJsonRpcExecutionStatus(transaction.effects.status, transaction.effects.abortError)
+		: {
+				success: false,
+				error: {
+					$kind: 'Unknown',
+					message: 'Unknown',
+					Unknown: null,
+				},
+			};
+
+	const effectsBytes = transaction.rawEffects ? new Uint8Array(transaction.rawEffects) : null;
+
+	const result: RtdClientTypes.Transaction<Include> = {
+		digest: transaction.digest,
+		epoch: transaction.effects?.executedEpoch ?? null,
+		timestampMs: transaction.timestampMs == null ? null : Number(transaction.timestampMs),
+		checkpoint: transaction.checkpoint ?? null,
+		status,
+		effects: (include?.effects && effectsBytes
+			? parseTransactionEffectsBcs(effectsBytes)
+			: undefined) as RtdClientTypes.Transaction<Include>['effects'],
+		objectTypes: (include?.objectTypes
+			? objectTypes
+			: undefined) as RtdClientTypes.Transaction<Include>['objectTypes'],
+		transaction: transactionData as RtdClientTypes.Transaction<Include>['transaction'],
+		bcs: bcsBytes as RtdClientTypes.Transaction<Include>['bcs'],
+		signatures,
+		balanceChanges: (include?.balanceChanges
+			? (transaction.balanceChanges?.map((change) => ({
+					coinType: normalizeStructTag(change.coinType),
+					address: parseOwnerAddress(change.owner)!,
+					amount: change.amount,
+				})) ?? [])
+			: undefined) as RtdClientTypes.Transaction<Include>['balanceChanges'],
+		events: (include?.events
+			? (transaction.events?.map((event) => ({
+					packageId: event.packageId,
+					module: event.transactionModule,
+					sender: event.sender,
+					eventType: event.type,
+					bcs: 'bcs' in event ? fromBase64(event.bcs) : new Uint8Array(),
+					json: (event.parsedJson as Record<string, unknown>) ?? null,
+				})) ?? [])
+			: undefined) as RtdClientTypes.Transaction<Include>['events'],
+	};
+
+	return status.success
+		? {
+				$kind: 'Transaction',
+				Transaction: result,
+			}
+		: {
+				$kind: 'FailedTransaction',
+				FailedTransaction: result,
+			};
+}
+
+export function parseTransactionEffectsJson({
 	bytes,
 	effects,
 	objectChanges,
@@ -448,18 +1280,18 @@ function parseTransactionEffectsJson({
 	effects: TransactionEffects;
 	objectChanges: RtdObjectChange[] | null;
 }): {
-	effects: Experimental_RtdClientTypes.TransactionEffects;
+	effects: RtdClientTypes.TransactionEffects;
 	objectTypes: Record<string, string>;
 } {
-	const changedObjects: Experimental_RtdClientTypes.ChangedObject[] = [];
-	const unchangedConsensusObjects: Experimental_RtdClientTypes.UnchangedConsensusObject[] = [];
+	const changedObjects: RtdClientTypes.ChangedObject[] = [];
+	const unchangedConsensusObjects: RtdClientTypes.UnchangedConsensusObject[] = [];
 	const objectTypes: Record<string, string> = {};
 
 	objectChanges?.forEach((change) => {
 		switch (change.type) {
 			case 'published':
 				changedObjects.push({
-					id: change.packageId,
+					objectId: change.packageId,
 					inputState: 'DoesNotExist',
 					inputVersion: null,
 					inputDigest: null,
@@ -473,7 +1305,7 @@ function parseTransactionEffectsJson({
 				break;
 			case 'transferred':
 				changedObjects.push({
-					id: change.objectId,
+					objectId: change.objectId,
 					inputState: 'Exists',
 					inputVersion: change.version,
 					inputDigest: change.digest,
@@ -487,11 +1319,11 @@ function parseTransactionEffectsJson({
 					outputOwner: parseOwner(change.recipient),
 					idOperation: 'None',
 				});
-				objectTypes[change.objectId] = change.objectType;
+				objectTypes[change.objectId] = normalizeStructTag(change.objectType);
 				break;
 			case 'mutated':
 				changedObjects.push({
-					id: change.objectId,
+					objectId: change.objectId,
 					inputState: 'Exists',
 					inputVersion: change.previousVersion,
 					inputDigest: null,
@@ -502,11 +1334,11 @@ function parseTransactionEffectsJson({
 					outputOwner: parseOwner(change.owner),
 					idOperation: 'None',
 				});
-				objectTypes[change.objectId] = change.objectType;
+				objectTypes[change.objectId] = normalizeStructTag(change.objectType);
 				break;
 			case 'deleted':
 				changedObjects.push({
-					id: change.objectId,
+					objectId: change.objectId,
 					inputState: 'Exists',
 					inputVersion: change.version,
 					inputDigest: effects.deleted?.find((d) => d.objectId === change.objectId)?.digest ?? null,
@@ -517,11 +1349,11 @@ function parseTransactionEffectsJson({
 					outputOwner: null,
 					idOperation: 'Deleted',
 				});
-				objectTypes[change.objectId] = change.objectType;
+				objectTypes[change.objectId] = normalizeStructTag(change.objectType);
 				break;
 			case 'wrapped':
 				changedObjects.push({
-					id: change.objectId,
+					objectId: change.objectId,
 					inputState: 'Exists',
 					inputVersion: change.version,
 					inputDigest: null,
@@ -539,11 +1371,11 @@ function parseTransactionEffectsJson({
 					},
 					idOperation: 'None',
 				});
-				objectTypes[change.objectId] = change.objectType;
+				objectTypes[change.objectId] = normalizeStructTag(change.objectType);
 				break;
 			case 'created':
 				changedObjects.push({
-					id: change.objectId,
+					objectId: change.objectId,
 					inputState: 'DoesNotExist',
 					inputVersion: null,
 					inputDigest: null,
@@ -554,38 +1386,58 @@ function parseTransactionEffectsJson({
 					outputOwner: parseOwner(change.owner),
 					idOperation: 'Created',
 				});
-				objectTypes[change.objectId] = change.objectType;
+				objectTypes[change.objectId] = normalizeStructTag(change.objectType);
 				break;
 		}
 	});
+
+	// When the transaction has no gas object (system transactions, or gas paid
+	// from an address balance), the RPC substitutes a placeholder ref with the
+	// 0x0 object id rather than omitting the field.
+	const hasGasObject =
+		normalizeRtdAddress(effects.gasObject.reference.objectId) !== normalizeRtdAddress('0x0');
+
+	let lamportVersion: string | null = null;
+	if (hasGasObject) {
+		lamportVersion = effects.gasObject.reference.version;
+	} else {
+		// Written objects are all assigned the lamport version, so recover it
+		// from the changed objects when the gas object can't provide it.
+		for (const change of changedObjects) {
+			if (
+				change.outputVersion &&
+				(lamportVersion === null || BigInt(change.outputVersion) > BigInt(lamportVersion))
+			) {
+				lamportVersion = change.outputVersion;
+			}
+		}
+	}
 
 	return {
 		objectTypes,
 		effects: {
 			bcs: bytes ?? null,
-			digest: effects.transactionDigest,
 			version: 2,
-			status:
-				effects.status.status === 'success'
-					? { success: true, error: null }
-					: { success: false, error: effects.status.error! },
+			status: parseJsonRpcExecutionStatus(effects.status, effects.abortError),
 			gasUsed: effects.gasUsed,
 			transactionDigest: effects.transactionDigest,
-			gasObject: {
-				id: effects.gasObject?.reference.objectId,
-				inputState: 'Exists',
-				inputVersion: null,
-				inputDigest: null,
-				inputOwner: null,
-				outputState: 'ObjectWrite',
-				outputVersion: effects.gasObject.reference.version,
-				outputDigest: effects.gasObject.reference.digest,
-				outputOwner: parseOwner(effects.gasObject.owner),
-				idOperation: 'None',
-			},
+			gasObject: hasGasObject
+				? {
+						objectId: effects.gasObject.reference.objectId,
+						inputState: 'Exists',
+						inputVersion: null,
+						inputDigest: null,
+						inputOwner: null,
+						outputState: 'ObjectWrite',
+						outputVersion: effects.gasObject.reference.version,
+						outputDigest: effects.gasObject.reference.digest,
+						outputOwner: parseOwner(effects.gasObject.owner),
+						idOperation: 'None',
+					}
+				: null,
 			eventsDigest: effects.eventsDigest ?? null,
 			dependencies: effects.dependencies ?? [],
-			lamportVersion: effects.gasObject.reference.version,
+			lamportVersion,
 			changedObjects,
 			unchangedConsensusObjects,
 			auxiliaryDataDigest: null,
@@ -593,18 +1445,7 @@ function parseTransactionEffectsJson({
 	};
 }
 
-const Balance = bcs.struct('Balance', {
-	value: bcs.u64(),
-});
-
-const Coin = bcs.struct('Coin', {
-	id: bcs.Address,
-	balance: Balance,
-});
-
-function parseNormalizedRtdMoveType(
-	type: RtdMoveNormalizedType,
-): Experimental_RtdClientTypes.OpenSignature {
+function parseNormalizedRtdMoveType(type: RtdMoveNormalizedType): RtdClientTypes.OpenSignature {
 	if (typeof type !== 'string') {
 		if ('Reference' in type) {
 			return {
@@ -629,7 +1470,7 @@ function parseNormalizedRtdMoveType(
 
 function parseNormalizedRtdMoveTypeBody(
 	type: RtdMoveNormalizedType,
-): Experimental_RtdClientTypes.OpenSignatureBody {
+): RtdClientTypes.OpenSignatureBody {
 	switch (type) {
 		case 'Address':
 			return { $kind: 'address' };
@@ -680,7 +1521,7 @@ function parseNormalizedRtdMoveTypeBody(
 	throw new Error(`Unknown type: ${JSON.stringify(type)}`);
 }
 
-function parseAbilities(abilitySet: RtdMoveAbilitySet): Experimental_RtdClientTypes.Ability[] {
+function parseAbilities(abilitySet: RtdMoveAbilitySet): RtdClientTypes.Ability[] {
 	return abilitySet.abilities.map((ability) => {
 		switch (ability) {
 			case 'Copy':
@@ -697,7 +1538,7 @@ function parseAbilities(abilitySet: RtdMoveAbilitySet): Experimental_RtdClientTy
 	});
 }
 
-function parseVisibility(visibility: RtdMoveVisibility): Experimental_RtdClientTypes.Visibility {
+function parseVisibility(visibility: RtdMoveVisibility): RtdClientTypes.Visibility {
 	switch (visibility) {
 		case 'Public':
 			return 'public';

@@ -4,7 +4,6 @@
 export {
 	type JsonRpcTransport,
 	type JsonRpcTransportRequestOptions,
-	type JsonRpcTransportSubscribeOptions,
 	type HttpHeaders,
 	type JsonRpcHTTPTransportOptions,
 	JsonRpcHTTPTransport,
@@ -18,3 +17,4 @@ export {
 	RtdJsonRpcClient,
 } from './client.js';
 export { RtdHTTPStatusError, RtdHTTPTransportError, JsonRpcError } from './errors.js';
+export { getJsonRpcFullnodeUrl } from './network.js';

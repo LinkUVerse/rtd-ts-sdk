@@ -1,11 +1,13 @@
 // Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-// eslint-disable-next-line import/no-cycle
 export {
 	verifySignature,
 	verifyPersonalMessageSignature,
 	verifyTransactionSignature,
+	isValidSignature,
+	isValidPersonalMessageSignature,
+	isValidTransactionSignature,
 	publicKeyFromRawBytes,
 	publicKeyFromRtdBytes,
 } from './verify.js';

@@ -1,7 +1,7 @@
 // Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import type { PaginationArguments, RtdClient } from 'rtd-typescript/client';
+import type { RtdClientTypes } from 'rtd-typescript/client';
 
 import {
 	FLOOR_PRICE_RULE_ADDRESS,
@@ -18,13 +18,51 @@ import {
 	queryTransferPolicy,
 	queryTransferPolicyCapsByType,
 } from '../query/transfer-policy.js';
-import { Network } from '../types/index.js';
 import type {
 	FetchKioskOptions,
 	KioskClientOptions,
+	KioskCompatibleClient,
 	KioskData,
+	KioskPaginationArguments,
 	OwnedKiosks,
 } from '../types/index.js';
+
+export type KioskExtensionOptions<Name extends string = 'kiosk'> = {
+	name?: Name;
+	packageIds?: BaseRulePackageIds;
+};
+
+/**
+ * Creates a kiosk client extension that can be used with `client.$extend()`.
+ *
+ * @example
+ * ```ts
+ * import { RtdGrpcClient } from 'rtd-typescript/grpc';
+ * import { kiosk } from 'rtd-kiosk';
+ *
+ * const client = new RtdGrpcClient({
+ *   baseUrl: 'https://fullnode.mainnet.rtd.life:443',
+ *   network: 'mainnet',
+ * }).$extend(kiosk());
+ *
+ * const ownedKiosks = await client.kiosk.getOwnedKiosks({ address: '0x...' });
+ * ```
+ */
+export function kiosk<const Name extends string = 'kiosk'>({
+	name = 'kiosk' as Name,
+	packageIds,
+}: KioskExtensionOptions<Name> = {}) {
+	return {
+		name,
+		register: (client: KioskCompatibleClient) => {
+			return new KioskClient({
+				client,
+				network: client.network,
+				packageIds,
+			});
+		},
+	};
+}
 
 /**
  * A Client that allows you to interact with kiosk.
@@ -33,8 +71,8 @@ import type {
  * If you pass packageIds, all functionality will be managed using these packages.
  */
 export class KioskClient {
-	client: RtdClient;
-	network: Network;
+	client: KioskCompatibleClient;
+	network: RtdClientTypes.Network;
 	rules: TransferPolicyRule[];
 	packageIds?: BaseRulePackageIds;
 
@@ -62,7 +100,7 @@ export class KioskClient {
 		pagination,
 	}: {
 		address: string;
-		pagination?: PaginationArguments<string>;
+		pagination?: KioskPaginationArguments;
 	}): Promise<OwnedKiosks> {
 		const personalPackageId =
 			this.packageIds?.personalKioskRulePackageId || PERSONAL_KIOSK_RULE_ADDRESS[this.network];
@@ -145,7 +183,7 @@ export class KioskClient {
 
 		/// Check existence of rule based on network and throw an error if it's not found.
 		/// We always have a fallback for testnet or mainnet.
-		if (!rules[rule] && network !== Network.MAINNET && network !== Network.TESTNET) {
+		if (!rules[rule] && network !== 'mainnet' && network !== 'testnet') {
 			throw new Error(`Missing packageId for rule ${rule}`);
 		}
 

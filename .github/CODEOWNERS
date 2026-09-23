@@ -1,0 +1,3 @@
+packages/ @LinkUVerse/sdk-reviewers
+packages/kiosk @LinkUVerse/kiosk-sdk-reviewers
+packages/wallet-standard @LinkUVerse/wallet-kit-reviewers

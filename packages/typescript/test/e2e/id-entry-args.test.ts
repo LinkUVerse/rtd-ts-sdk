@@ -3,8 +3,8 @@
 
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { Transaction } from '../../src/transactions';
-import { setup, TestToolbox } from './utils/setup';
+import { Transaction } from '../../src/transactions/index.js';
+import { setup, TestToolbox } from './utils/setup.js';
 
 describe('Test ID as args to entry functions', () => {
 	let toolbox: TestToolbox;
@@ -12,40 +12,34 @@ describe('Test ID as args to entry functions', () => {
 
 	beforeAll(async () => {
 		toolbox = await setup();
-		packageId = await toolbox.getPackage('id_entry_args');
+		packageId = await toolbox.getPackage('test_data');
 	});
 
 	it('Test ID as arg to entry functions', async () => {
 		const tx = new Transaction();
 		tx.moveCall({
-			target: `${packageId}::test::test_id`,
+			target: `${packageId}::id_test::test_id`,
 			arguments: [tx.pure.id('0x000000000000000000000000c2b5625c221264078310a084df0a3137956d20ee')],
 		});
-		const result = await toolbox.client.signAndExecuteTransaction({
-			signer: toolbox.keypair,
+		const result = await toolbox.keypair.signAndExecuteTransaction({
+			client: toolbox.grpcClient,
 			transaction: tx,
-			options: {
-				showEffects: true,
-			},
 		});
-		await toolbox.client.waitForTransaction({ digest: result.digest });
-		expect(result.effects?.status.status).toEqual('success');
+		await toolbox.grpcClient.core.waitForTransaction({ result });
+		expect(result.Transaction?.effects?.status.success).toEqual(true);
 	});
 
-	it('Test ID as arg to entry functions', async () => {
+	it('Test ID as arg to entry functions (non-mut)', async () => {
 		const tx = new Transaction();
 		tx.moveCall({
-			target: `${packageId}::test::test_id_non_mut`,
+			target: `${packageId}::id_test::test_id_non_mut`,
 			arguments: [tx.pure.id('0x000000000000000000000000c2b5625c221264078310a084df0a3137956d20ee')],
 		});
-		const result = await toolbox.client.signAndExecuteTransaction({
-			signer: toolbox.keypair,
+		const result = await toolbox.keypair.signAndExecuteTransaction({
+			client: toolbox.grpcClient,
 			transaction: tx,
-			options: {
-				showEffects: true,
-			},
 		});
-		await toolbox.client.waitForTransaction({ digest: result.digest });
-		expect(result.effects?.status.status).toEqual('success');
+		await toolbox.grpcClient.core.waitForTransaction({ result });
+		expect(result.Transaction?.effects?.status.success).toEqual(true);
 	});
 });

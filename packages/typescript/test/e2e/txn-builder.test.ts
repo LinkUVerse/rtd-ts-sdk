@@ -3,11 +3,11 @@
 
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { bcs } from '../../src/bcs';
-import { RtdClient, RtdObjectChangeCreated, RtdTransactionBlockResponse } from '../../src/client';
-import type { Keypair } from '../../src/cryptography';
-import { Transaction } from '../../src/transactions';
-import { normalizeRtdObjectId, RTD_SYSTEM_STATE_OBJECT_ID } from '../../src/utils';
+import { bcs } from '../../src/bcs/index.js';
+import { RtdObjectChangeCreated } from '../../src/jsonRpc/index.js';
+import type { Keypair } from '../../src/cryptography/index.js';
+import { Transaction } from '../../src/transactions/index.js';
+import { normalizeRtdObjectId, RTD_SYSTEM_STATE_OBJECT_ID } from '../../src/utils/index.js';
 import {
 	DEFAULT_GAS_BUDGET,
 	DEFAULT_RECIPIENT,
@@ -15,25 +15,20 @@ import {
 	setup,
 	TestToolbox,
 	upgradePackage,
-} from './utils/setup';
+} from './utils/setup.js';
+import { ClientWithCoreApi } from '../../src/client/index.js';
 
 export const RTD_CLOCK_OBJECT_ID = normalizeRtdObjectId('0x6');
 
 describe('Transaction Builders', () => {
 	let toolbox: TestToolbox;
 	let packageId: string;
-	let publishTxn: RtdTransactionBlockResponse;
 	let sharedObjectId: string;
 
 	beforeAll(async () => {
-		({ packageId, publishTxn } = await publishPackage('serializer'));
-		const sharedObject = publishTxn.effects?.created!.filter(
-			(o) =>
-				typeof o.owner === 'object' &&
-				'Shared' in o.owner &&
-				o.owner.Shared.initial_shared_version !== undefined,
-		)[0];
-		sharedObjectId = sharedObject!.reference.objectId;
+		const initToolbox = await setup();
+		packageId = await initToolbox.getPackage('test_data');
+		sharedObjectId = initToolbox.getSharedObject('test_data', 'MutableShared')!;
 	});
 
 	beforeEach(async () => {
@@ -49,7 +44,7 @@ describe('Transaction Builders', () => {
 			bcs.u64().serialize(DEFAULT_GAS_BUDGET * 2),
 		]);
 		tx.transferObjects([coin], toolbox.address());
-		await validateTransaction(toolbox.client, toolbox.keypair, tx);
+		await validateTransaction(toolbox.grpcClient, toolbox.keypair, tx);
 	});
 
 	it('MergeCoins', async () => {
@@ -57,7 +52,7 @@ describe('Transaction Builders', () => {
 		const [coin_0, coin_1] = coins.data;
 		const tx = new Transaction();
 		tx.mergeCoins(coin_0.coinObjectId, [coin_1.coinObjectId]);
-		await validateTransaction(toolbox.client, toolbox.keypair, tx);
+		await validateTransaction(toolbox.grpcClient, toolbox.keypair, tx);
 	});
 
 	it('MoveCall', async () => {
@@ -69,7 +64,7 @@ describe('Transaction Builders', () => {
 			typeArguments: ['0x2::rtd::RTD'],
 			arguments: [tx.object(coin_0.coinObjectId), tx.pure.u64(DEFAULT_GAS_BUDGET * 2)],
 		});
-		await validateTransaction(toolbox.client, toolbox.keypair, tx);
+		await validateTransaction(toolbox.grpcClient, toolbox.keypair, tx);
 	});
 
 	it(
@@ -94,7 +89,7 @@ describe('Transaction Builders', () => {
 				],
 			});
 
-			await validateTransaction(toolbox.client, toolbox.keypair, tx);
+			await validateTransaction(toolbox.grpcClient, toolbox.keypair, tx);
 		},
 	);
 
@@ -102,13 +97,13 @@ describe('Transaction Builders', () => {
 		const tx = new Transaction();
 		const coin = tx.splitCoins(tx.gas, [1]);
 		tx.transferObjects([coin], DEFAULT_RECIPIENT);
-		await validateTransaction(toolbox.client, toolbox.keypair, tx);
+		await validateTransaction(toolbox.grpcClient, toolbox.keypair, tx);
 	});
 
 	it('TransferObjects gas object', async () => {
 		const tx = new Transaction();
 		tx.transferObjects([tx.gas], DEFAULT_RECIPIENT);
-		await validateTransaction(toolbox.client, toolbox.keypair, tx);
+		await validateTransaction(toolbox.grpcClient, toolbox.keypair, tx);
 	});
 
 	it('TransferObject', async () => {
@@ -117,7 +112,7 @@ describe('Transaction Builders', () => {
 		const coin_0 = coins.data[2];
 
 		tx.transferObjects([coin_0.coinObjectId], DEFAULT_RECIPIENT);
-		await validateTransaction(toolbox.client, toolbox.keypair, tx);
+		await validateTransaction(toolbox.grpcClient, toolbox.keypair, tx);
 	});
 
 	it('Move Shared Object Call with mixed usage of mutable and immutable references', async () => {
@@ -130,20 +125,43 @@ describe('Transaction Builders', () => {
 			target: `${packageId}::serializer_tests::set_value`,
 			arguments: [tx.object(sharedObjectId)],
 		});
-		await validateTransaction(toolbox.client, toolbox.keypair, tx);
+		await validateTransaction(toolbox.grpcClient, toolbox.keypair, tx);
 	});
 
 	it('Move Shared Object Call by Value', async () => {
+		// Create a new MutableShared object for this test since we'll delete it
+		// (we don't want to delete the shared one that other tests use)
+		const createTx = new Transaction();
+		createTx.moveCall({
+			target: `${packageId}::serializer_tests::create_mutable_shared`,
+		});
+		const { digest } = await toolbox.jsonRpcClient.signAndExecuteTransaction({
+			transaction: createTx,
+			signer: toolbox.keypair,
+		});
+		const createResult = await toolbox.jsonRpcClient.waitForTransaction({
+			digest,
+			options: { showEffects: true },
+		});
+
+		// Get the newly created shared object ID
+		const createdObj = createResult.effects?.created?.find(
+			(o) => typeof o.owner === 'object' && 'Shared' in o.owner,
+		);
+		expect(createdObj).toBeDefined();
+		const newSharedObjectId = createdObj!.reference.objectId;
+
+		// Now test delete_value with the new object
 		const tx = new Transaction();
 		tx.moveCall({
 			target: `${packageId}::serializer_tests::value`,
-			arguments: [tx.object(sharedObjectId)],
+			arguments: [tx.object(newSharedObjectId)],
 		});
 		tx.moveCall({
 			target: `${packageId}::serializer_tests::delete_value`,
-			arguments: [tx.object(sharedObjectId)],
+			arguments: [tx.object(newSharedObjectId)],
 		});
-		await validateTransaction(toolbox.client, toolbox.keypair, tx);
+		await validateTransaction(toolbox.grpcClient, toolbox.keypair, tx);
 	});
 
 	it('immutable clock', async () => {
@@ -152,7 +170,7 @@ describe('Transaction Builders', () => {
 			target: `${packageId}::serializer_tests::use_clock`,
 			arguments: [tx.object(RTD_CLOCK_OBJECT_ID)],
 		});
-		await validateTransaction(toolbox.client, toolbox.keypair, tx);
+		await validateTransaction(toolbox.grpcClient, toolbox.keypair, tx);
 	});
 
 	it(
@@ -196,7 +214,7 @@ describe('Transaction Builders', () => {
 				target: `${packageId}::serializer_tests::set_value`,
 				arguments: [callOrigTx.object(sharedObjectId)],
 			});
-			await validateTransaction(toolbox.client, toolbox.keypair, callOrigTx);
+			await validateTransaction(toolbox.grpcClient, toolbox.keypair, callOrigTx);
 
 			// Step 4. Make sure the behaviour of the upgrade package matches
 			// the newly introduced function
@@ -242,21 +260,18 @@ describe('Transaction Builders', () => {
 
 		tx.transferObjects([coin3], toolbox.keypair.toRtdAddress());
 
-		await validateTransaction(toolbox.client, toolbox.keypair, tx);
+		await validateTransaction(toolbox.grpcClient, toolbox.keypair, tx);
 	});
 });
 
-async function validateTransaction(client: RtdClient, signer: Keypair, tx: Transaction) {
+async function validateTransaction(client: ClientWithCoreApi, signer: Keypair, tx: Transaction) {
 	tx.setSenderIfNotSet(signer.getPublicKey().toRtdAddress());
 	const localDigest = await tx.getDigest({ client });
-	const result = await client.signAndExecuteTransaction({
-		signer,
+	const result = await signer.signAndExecuteTransaction({
+		client,
 		transaction: tx,
-		options: {
-			showEffects: true,
-		},
 	});
-	await client.waitForTransaction({ digest: result.digest });
-	expect(localDigest).toEqual(result.digest);
-	expect(result.effects?.status.status).toEqual('success');
+	await client.core.waitForTransaction({ result });
+	expect(localDigest).toEqual(result.Transaction!.digest);
+	expect(result.Transaction?.effects?.status.success).toEqual(true);
 }

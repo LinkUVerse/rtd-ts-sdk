@@ -1,4 +1,4 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 import { defineConfig } from 'vitest/config';
@@ -14,8 +14,8 @@ export default defineConfig({
 	},
 	resolve: {
 		alias: {
-			'@linku/bcs': new URL('../bcs/src', import.meta.url).pathname,
-			'@linku/utils': new URL('../utils/src', import.meta.url).pathname,
+			'rtd-bcs': new URL('../bcs/src', import.meta.url).pathname,
+			'rtd-utils': new URL('../utils/src', import.meta.url).pathname,
 		},
 	},
 });

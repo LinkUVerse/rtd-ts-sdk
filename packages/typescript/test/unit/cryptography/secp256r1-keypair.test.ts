@@ -2,17 +2,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { fromBase64, toBase58, toBase64 } from 'rtd-bcs';
-import { secp256r1 } from '@noble/curves/p256';
-import { sha256 } from '@noble/hashes/sha256';
+import { p256 as secp256r1 } from '@noble/curves/nist.js';
 import { describe, expect, it } from 'vitest';
 
-import { decodeRtdPrivateKey } from '../../../src/cryptography/keypair';
+import { decodeRtdPrivateKey } from '../../../src/cryptography/keypair.js';
 import {
 	DEFAULT_SECP256R1_DERIVATION_PATH,
 	Secp256r1Keypair,
-} from '../../../src/keypairs/secp256r1';
-import { Transaction } from '../../../src/transactions';
-import { verifyPersonalMessageSignature, verifyTransactionSignature } from '../../../src/verify';
+} from '../../../src/keypairs/secp256r1/index.js';
+import { Transaction } from '../../../src/transactions/index.js';
+import {
+	verifyPersonalMessageSignature,
+	verifyTransactionSignature,
+} from '../../../src/verify/index.js';
 
 const VALID_SECP256R1_SECRET_KEY = [
 	66, 37, 141, 205, 161, 76, 241, 17, 198, 2, 184, 151, 27, 140, 200, 67, 233, 30, 70, 202, 144, 81,
@@ -36,17 +38,17 @@ export const INVALID_SECP256R1_PUBLIC_KEY = Uint8Array.from(Array(PRIVATE_KEY_SI
 const TEST_CASES = [
 	[
 		'act wing dilemma glory episode region allow mad tourist humble muffin oblige',
-		'rtdprivkey1qgj6vet4rstf2p00j860xctkg4fyqqq5hxgu4mm0eg60fq787ujnqs5wc8q',
+		'rtdprivkey1qgj6vet4rstf2p00j860xctkg4fyqqq5hxgu4mm0eg60fq787ujnqk08ktj',
 		'0x4a822457f1970468d38dae8e63fb60eefdaa497d74d781f581ea2d137ec36f3a',
 	],
 	[
 		'flag rebel cabbage captain minimum purpose long already valley horn enrich salt',
-		'rtdprivkey1qgmgr6dza8slgxn0rcxcy47xeas9l565cc5q440ngdzr575rc2356gzlq7a',
+		'rtdprivkey1qgmgr6dza8slgxn0rcxcy47xeas9l565cc5q440ngdzr575rc2356wekwj0',
 		'0xcd43ecb9dd32249ff5748f5e4d51855b01c9b1b8bbe7f8638bb8ab4cb463b920',
 	],
 	[
 		'area renew bar language pudding trial small host remind supreme cabbage era',
-		'rtdprivkey1qt2gsye4dyn0lxey0ht6d5f2ada7ew9044a49y2f3mymy2uf0hr55jmfze3',
+		'rtdprivkey1qt2gsye4dyn0lxey0ht6d5f2ada7ew9044a49y2f3mymy2uf0hr555qqv4r',
 		'0x0d9047b7e7b698cc09c955ea97b0c68c2be7fb3aebeb59edcc84b1fb87e0f28e',
 	],
 ];
@@ -73,7 +75,7 @@ describe('secp256r1-keypair', () => {
 		const secretKey = fromBase64(secret_key_base64);
 		expect(() => {
 			Secp256r1Keypair.fromSecretKey(secretKey);
-		}).toThrow('invalid private key: expected ui8a of size 32, got object');
+		}).toThrow('Field.fromBytes: expected 32 bytes, got 31');
 	});
 
 	it('generate keypair from random seed', () => {
@@ -86,37 +88,21 @@ describe('secp256r1-keypair', () => {
 	it('signature of data is valid', async () => {
 		const keypair = new Secp256r1Keypair();
 		const signData = new TextEncoder().encode('hello world');
-
-		const msgHash = sha256(signData);
 		const sig = await keypair.sign(signData);
-		expect(
-			secp256r1.verify(
-				secp256r1.Signature.fromCompact(sig),
-				msgHash,
-				keypair.getPublicKey().toRawBytes(),
-			),
-		).toBeTruthy();
+		expect(secp256r1.verify(sig, signData, keypair.getPublicKey().toRawBytes())).toBeTruthy();
 	});
 
 	it('signature of data is same as rust implementation', async () => {
 		const secret_key = new Uint8Array(VALID_SECP256R1_SECRET_KEY);
 		const keypair = Secp256r1Keypair.fromSecretKey(secret_key);
 		const signData = new TextEncoder().encode('Hello, world!');
-
-		const msgHash = sha256(signData);
 		const sig = await keypair.sign(signData);
 
 		// Assert the signature is the same as the rust implementation.
 		expect(Buffer.from(sig).toString('hex')).toEqual(
 			'26d84720652d8bc4ddd1986434a10b3b7b69f0e35a17c6a5987e6d1cba69652f4384a342487642df5e44592d304bea0ceb0fae2e347fa3cec5ce1a8144cfbbb2',
 		);
-		expect(
-			secp256r1.verify(
-				secp256r1.Signature.fromCompact(sig),
-				msgHash,
-				keypair.getPublicKey().toRawBytes(),
-			),
-		).toBeTruthy();
+		expect(secp256r1.verify(sig, signData, keypair.getPublicKey().toRawBytes())).toBeTruthy();
 	});
 
 	it('invalid mnemonics to derive secp256r1 keypair', () => {

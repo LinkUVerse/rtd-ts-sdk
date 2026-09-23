@@ -1,15 +1,19 @@
 // Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import path from 'path';
 import type { ContainerRuntimeClient } from 'testcontainers';
 import { getContainerRuntimeClient } from 'testcontainers';
 import { retry } from 'ts-retry-promise';
-import { expect, inject } from 'vitest';
-import { WebSocket } from 'ws';
+import { expect, inject, it, test } from 'vitest';
 
-import type { RtdObjectChangePublished } from '../../../src/client/index.js';
-import { getFullnodeUrl, RtdClient, RtdHTTPTransport } from '../../../src/client/index.js';
+import type { RtdObjectChangePublished } from '../../../src/jsonRpc/index.js';
+import {
+	getJsonRpcFullnodeUrl,
+	RtdJsonRpcClient,
+	JsonRpcHTTPTransport,
+} from '../../../src/jsonRpc/index.js';
+import { RtdGrpcClient } from '../../../src/grpc/index.js';
+import { RtdGraphQLClient } from '../../../src/graphql/index.js';
 import type { Keypair } from '../../../src/cryptography/index.js';
 import {
 	FaucetRateLimitError,
@@ -18,10 +22,14 @@ import {
 } from '../../../src/faucet/index.js';
 import { Ed25519Keypair } from '../../../src/keypairs/ed25519/index.js';
 import { Transaction, UpgradePolicy } from '../../../src/transactions/index.js';
-import { RTD_TYPE_ARG } from '../../../src/utils/index.js';
+import { RTD_TYPE_ARG, normalizeRtdAddress } from '../../../src/utils/index.js';
+import type { ClientWithCoreApi } from '../../../src/client/core.js';
+import type { RtdClientTypes } from '../../../src/client/types.js';
+import { SerialQueue } from '../../../src/transactions/executor/queue.js';
+import type { PrePublishedPackage } from './prePublish.js';
 
 const DEFAULT_FAUCET_URL = import.meta.env.FAUCET_URL ?? getFaucetHost('localnet');
-const DEFAULT_FULLNODE_URL = import.meta.env.FULLNODE_URL ?? getFullnodeUrl('localnet');
+const DEFAULT_FULLNODE_URL = import.meta.env.FULLNODE_URL ?? getJsonRpcFullnodeUrl('localnet');
 
 const RTD_TOOLS_CONTAINER_ID = inject('rtdToolsContainerId');
 
@@ -32,67 +40,39 @@ export const DEFAULT_RECIPIENT_2 =
 export const DEFAULT_GAS_BUDGET = 10000000;
 export const DEFAULT_SEND_AMOUNT = 1000;
 
-class TestPackageRegistry {
-	static registries: Map<string, TestPackageRegistry> = new Map();
+const prePublishedPackages = inject('prePublishedPackages') as
+	Record<string, PrePublishedPackage> | undefined;
 
-	static forUrl(url: string) {
-		if (!this.registries.has(url)) {
-			this.registries.set(url, new TestPackageRegistry());
-		}
-		return this.registries.get(url)!;
-	}
-
-	#packages: Map<string, string>;
-	#pendingPublishes: Map<string, Promise<string>>;
-
-	constructor() {
-		this.#packages = new Map();
-		this.#pendingPublishes = new Map();
-	}
-
-	async getPackage(name: string, toolbox?: TestToolbox) {
-		// Return cached package if available
-		if (this.#packages.has(name)) {
-			return this.#packages.get(name)!;
-		}
-
-		// If a publish is already in progress, wait for it
-		if (this.#pendingPublishes.has(name)) {
-			return await this.#pendingPublishes.get(name)!;
-		}
-
-		// Start a new publish and track it
-		const publishPromise = (async () => {
-			try {
-				const { packageId } = await publishPackage(name, toolbox);
-				this.#packages.set(name, packageId);
-				return packageId;
-			} finally {
-				// Clean up the pending promise once done
-				this.#pendingPublishes.delete(name);
-			}
-		})();
-
-		this.#pendingPublishes.set(name, publishPromise);
-		return await publishPromise;
-	}
+export interface SignerConfig {
+	coins?: bigint[];
+	addressBalance?: bigint;
 }
 
 export class TestToolbox {
 	keypair: Ed25519Keypair;
-	client: RtdClient;
-	registry: TestPackageRegistry;
+	jsonRpcClient: RtdJsonRpcClient;
+	grpcClient: RtdGrpcClient;
+	graphqlClient: RtdGraphQLClient;
 	configPath: string;
 
 	constructor(keypair: Ed25519Keypair, url: string = DEFAULT_FULLNODE_URL, configPath: string) {
 		this.keypair = keypair;
-		this.client = new RtdClient({
-			transport: new RtdHTTPTransport({
+		this.jsonRpcClient = new RtdJsonRpcClient({
+			network: 'localnet',
+			transport: new JsonRpcHTTPTransport({
 				url,
-				WebSocketConstructor: WebSocket as never,
 			}),
 		});
-		this.registry = TestPackageRegistry.forUrl(url);
+		this.grpcClient = new RtdGrpcClient({
+			network: 'localnet',
+			baseUrl: url,
+		});
+		// GraphQL port is injected by vitest setup
+		const graphqlPort = inject('graphqlPort');
+		this.graphqlClient = new RtdGraphQLClient({
+			network: 'localnet',
+			url: `http://127.0.0.1:${graphqlPort}/graphql`,
+		});
 		this.configPath = configPath;
 	}
 
@@ -101,22 +81,80 @@ export class TestToolbox {
 	}
 
 	async getGasObjectsOwnedByAddress() {
-		return await this.client.getCoins({
+		return await this.jsonRpcClient.getCoins({
 			owner: this.address(),
 			coinType: RTD_TYPE_ARG,
 		});
 	}
 
 	public async getActiveValidators() {
-		return (await this.client.getLatestRtdSystemState()).activeValidators;
+		return (await this.jsonRpcClient.getLatestRtdSystemState()).activeValidators;
 	}
 
-	public async getPackage(path: string) {
-		return this.registry.getPackage(path, this);
+	public getPackage(name: string, options?: { normalized?: boolean }): string {
+		const { normalized = true } = options ?? {};
+
+		const info = prePublishedPackages?.[name];
+		if (!info) {
+			throw new Error(
+				`Package "${name}" not found. Add it to PACKAGES_TO_PREPUBLISH in prePublish.ts`,
+			);
+		}
+
+		if (normalized) {
+			return info.packageId;
+		}
+		// Strip leading zeros for JSON RPC compatibility
+		return info.packageId.replace(/^(0x)(0+)/, '0x');
 	}
 
-	async mintNft(name: string = 'Test NFT') {
-		const packageId = await this.getPackage('demo-bear');
+	/**
+	 * Get a shared object ID from a pre-published package.
+	 * Returns undefined if the package wasn't pre-published or doesn't have the specified shared object.
+	 */
+	public getSharedObject(packageName: string, typeName: string): string | undefined {
+		return prePublishedPackages?.[packageName]?.sharedObjects?.[typeName];
+	}
+
+	public getPublisherObjectId(packageName: string): string | undefined {
+		return prePublishedPackages?.[packageName]?.publisherObjectId;
+	}
+
+	public getPublisherKeypair(packageName: string): Ed25519Keypair | undefined {
+		const secretKey = prePublishedPackages?.[packageName]?.publisherSecretKey;
+		if (!secretKey) return undefined;
+		return Ed25519Keypair.fromSecretKey(secretKey);
+	}
+
+	/**
+	 * Wait for a transaction to be indexed by all three clients (JSON-RPC, gRPC, GraphQL).
+	 * Same API as `client.core.waitForTransaction`.
+	 */
+	async waitForTransaction<Include extends RtdClientTypes.TransactionInclude = {}>(
+		options: RtdClientTypes.WaitForTransactionOptions<Include>,
+	): Promise<RtdClientTypes.TransactionResult<Include>> {
+		const [result] = await Promise.all([
+			this.grpcClient.core.waitForTransaction(options),
+			this.jsonRpcClient.core.waitForTransaction(options),
+			this.graphqlClient.core.waitForTransaction(options),
+		]);
+		return result;
+	}
+
+	/**
+	 * Execute a transaction using gRPC and wait for it across all three clients.
+	 * Same API as `client.core.signAndExecuteTransaction`.
+	 */
+	async signAndExecuteTransaction<Include extends RtdClientTypes.TransactionInclude = {}>(
+		options: RtdClientTypes.SignAndExecuteTransactionOptions<Include>,
+	) {
+		const result = await this.grpcClient.core.signAndExecuteTransaction(options);
+		await this.waitForTransaction({ result });
+		return result;
+	}
+
+	mintNft(name: string = 'Test NFT') {
+		const packageId = this.getPackage('test_data');
 		return (tx: Transaction) => {
 			return tx.moveCall({
 				target: `${packageId}::demo_bear::new`,
@@ -124,24 +162,247 @@ export class TestToolbox {
 			});
 		};
 	}
+
+	/**
+	 * Get a funded signer with specific coin and address balance amounts.
+	 *
+	 * @example
+	 * const { keypair, address } = await toolbox.getSigner({
+	 *   coins: [200_000_000n], addressBalance: 50_000_000n,
+	 * });
+	 */
+	#funderKeypair?: Ed25519Keypair;
+	#funderQueue = new SerialQueue();
+
+	async getSigner(config: SignerConfig): Promise<{ keypair: Ed25519Keypair; address: string }> {
+		return this.#funderQueue.runTask(async () => {
+			if (!this.#funderKeypair) {
+				this.#funderKeypair = Ed25519Keypair.generate();
+			}
+
+			const totalNeeded =
+				(config.coins ?? []).reduce((a, b) => a + b, 0n) +
+				(config.addressBalance ?? 0n) +
+				100_000_000n;
+			await requestAndWaitForFaucet(
+				this.#funderKeypair.getPublicKey().toRtdAddress(),
+				this.grpcClient,
+				totalNeeded,
+			);
+
+			const keypair = new Ed25519Keypair();
+			const address = keypair.getPublicKey().toRtdAddress();
+			const tx = new Transaction();
+
+			for (const amount of config.coins ?? []) {
+				const [coin] = tx.splitCoins(tx.gas, [amount]);
+				tx.transferObjects([coin], address);
+			}
+			if (config.addressBalance && config.addressBalance > 0n) {
+				const [depositCoin] = tx.splitCoins(tx.gas, [config.addressBalance]);
+				tx.moveCall({
+					target: '0x2::coin::send_funds',
+					typeArguments: ['0x2::rtd::RTD'],
+					arguments: [depositCoin, tx.pure.address(address)],
+				});
+			}
+
+			const result = await this.grpcClient.core.signAndExecuteTransaction({
+				transaction: tx,
+				signer: this.#funderKeypair,
+			});
+			if (result.$kind !== 'Transaction') {
+				throw new Error(
+					`getSigner tx failed: ${result.FailedTransaction.status.error?.message ?? 'unknown error'}`,
+				);
+			}
+			await this.waitForTransaction({ digest: result.Transaction.digest });
+
+			return { keypair, address };
+		});
+	}
+
+	/**
+	 * Test that all three client implementations (JSON RPC, gRPC, GraphQL) return the same data
+	 * for a given query. This ensures consistency across the different transport layers.
+	 *
+	 * @param queryFn - Function that takes a client and returns a promise with the query result
+	 * @param normalize - Optional function to normalize results before comparison (e.g., to ignore cursor differences)
+	 * @param options - Options to skip the test entirely, or to refetch on mismatch: for queries of
+	 *   live chain state (e.g. system state around a localnet epoch boundary), the state can advance
+	 *   between the three transport reads, so a strict single-shot comparison is flaky. `attempts`
+	 *   refetches the whole read set until the transports agree; a genuine transport inconsistency
+	 *   still fails on every attempt.
+	 */
+	async expectAllClientsReturnSameData<T, N = T>(
+		queryFn: (client: ClientWithCoreApi, kind: 'jsonrpc' | 'grpc' | 'graphql') => Promise<T>,
+		normalize?: (result: T) => N,
+		options?: {
+			skip?: boolean;
+			attempts?: number;
+			exclude?: Array<'jsonrpc' | 'grpc' | 'graphql'>;
+		},
+	) {
+		if (options?.skip) {
+			test.skip('all clients return same data', () => {});
+			return;
+		}
+
+		const clients = (
+			[
+				['jsonrpc', this.jsonRpcClient],
+				['grpc', this.grpcClient],
+				['graphql', this.graphqlClient],
+			] as const
+		).filter(([kind]) => !options?.exclude?.includes(kind));
+
+		const attempts = options?.attempts ?? 1;
+		for (let attempt = 1; ; attempt++) {
+			const results = await Promise.all(
+				clients.map(async ([kind, client]) => {
+					const result = await queryFn(client, kind);
+					return [kind, normalize ? normalize(result) : result] as const;
+				}),
+			);
+
+			try {
+				const [[, first]] = results;
+				for (const [, result] of results.slice(1)) {
+					expect(result).toEqual(first);
+				}
+				return;
+			} catch (error) {
+				if (attempt >= attempts) throw error;
+				// Let the chain settle before refetching all transports.
+				await new Promise((resolve) => setTimeout(resolve, 500));
+			}
+		}
+	}
 }
 
-export function getClient(url = DEFAULT_FULLNODE_URL): RtdClient {
-	return new RtdClient({
-		transport: new RtdHTTPTransport({
+/**
+ * Creates a test helper function that runs tests against all three client implementations.
+ * This should be called at module level with a getter function that will return the toolbox or clients.
+ *
+ * @param getClients - A function that returns clients. Can be either:
+ *   - () => TestToolbox (for localnet tests using the standard test setup)
+ *   - () => { jsonRpc: Client, grpc: Client, graphql: Client } (for custom client configurations like testnet)
+ * @returns A function that creates test cases for all clients
+ */
+export function createTestWithAllClients(
+	getClients:
+		| (() => TestToolbox)
+		| (() => {
+				jsonRpc: ClientWithCoreApi;
+				grpc: ClientWithCoreApi;
+				graphql: ClientWithCoreApi;
+		  }),
+) {
+	return function testWithAllClients(
+		testName: string,
+		testFn: (client: ClientWithCoreApi, kind: 'jsonrpc' | 'grpc' | 'graphql') => Promise<void>,
+		options?: { skip?: Array<'jsonrpc' | 'grpc' | 'graphql'> | boolean; only?: boolean },
+	) {
+		// If skip is true, skip all tests
+		if (options?.skip === true) {
+			test.skip(`[JSON RPC] ${testName}`, () => {});
+			test.skip(`[gRPC] ${testName}`, () => {});
+			test.skip(`[GraphQL] ${testName}`, () => {});
+			return;
+		}
+
+		const skipArray = Array.isArray(options?.skip) ? options.skip : [];
+
+		// Helper to get the clients from either format
+		const clients = () => {
+			const result = getClients();
+			if ('jsonRpcClient' in result) {
+				// It's a TestToolbox
+				return {
+					jsonRpc: result.jsonRpcClient,
+					grpc: result.grpcClient,
+					graphql: result.graphqlClient,
+				};
+			}
+			// It's already in the correct format
+			return result;
+		};
+
+		if (!skipArray.includes('jsonrpc')) {
+			(options?.only ? it.only : it)(`[JSON RPC] ${testName}`, async () => {
+				await testFn(clients().jsonRpc, 'jsonrpc');
+			});
+		} else {
+			test.skip(`[JSON RPC] ${testName}`, () => {});
+		}
+
+		if (!skipArray.includes('grpc')) {
+			(options?.only ? it.only : it)(`[gRPC] ${testName}`, async () => {
+				await testFn(clients().grpc, 'grpc');
+			});
+		} else {
+			test.skip(`[gRPC] ${testName}`, () => {});
+		}
+
+		if (!skipArray.includes('graphql')) {
+			(options?.only ? it.only : it)(`[GraphQL] ${testName}`, async () => {
+				await testFn(clients().graphql, 'graphql');
+			});
+		} else {
+			test.skip(`[GraphQL] ${testName}`, () => {});
+		}
+	};
+}
+
+export function getClient(url = DEFAULT_FULLNODE_URL): RtdJsonRpcClient {
+	return new RtdJsonRpcClient({
+		network: 'localnet',
+		transport: new JsonRpcHTTPTransport({
 			url,
-			WebSocketConstructor: WebSocket as never,
 		}),
 	});
+}
+
+async function requestAndWaitForFaucet(
+	address: string,
+	client: RtdGrpcClient,
+	minBalance?: bigint,
+) {
+	const request = async () => {
+		const response = await retry(
+			async () => await requestRtdFromFaucetV2({ host: DEFAULT_FAUCET_URL, recipient: address }),
+			{
+				backoff: 'EXPONENTIAL',
+				timeout: 1000 * 60,
+				retryIf: (error: any) => !(error instanceof FaucetRateLimitError),
+			},
+		);
+		const digest = response.coins_sent?.[0]?.transferTxDigest;
+		if (digest) {
+			await client.core.waitForTransaction({ digest });
+		}
+	};
+
+	await request();
+
+	if (minBalance) {
+		const maxAttempts = 10;
+		for (let attempt = 0; attempt < maxAttempts; attempt++) {
+			const { balance } = await client.core.getBalance({ owner: address });
+			if (BigInt(balance.balance) >= minBalance) return;
+			await request();
+		}
+		throw new Error(
+			`Failed to reach minimum balance ${minBalance} for ${address} after ${maxAttempts} faucet requests`,
+		);
+	}
 }
 
 export async function setup(options: { graphQLURL?: string; rpcURL?: string } = {}) {
 	const keypair = Ed25519Keypair.generate();
 	const address = keypair.getPublicKey().toRtdAddress();
 
-	const configDir = path.join('/test-data', `${Math.random().toString(36).substring(2, 15)}`);
-	await execRtdTools(['mkdir', '-p', configDir]);
-	const configPath = path.join(configDir, 'client.yaml');
+	const configPath = '/test-data/localnet-client.yaml';
 	return setupWithFundedAddress(keypair, address, configPath, options);
 }
 
@@ -151,8 +412,7 @@ export async function setupWithFundedAddress(
 	configPath: string,
 	{ rpcURL }: { graphQLURL?: string; rpcURL?: string } = {},
 ) {
-	const client = getClient(rpcURL ?? DEFAULT_FULLNODE_URL);
-	await retry(
+	const faucetResponse = await retry(
 		async () => await requestRtdFromFaucetV2({ host: DEFAULT_FAUCET_URL, recipient: address }),
 		{
 			backoff: 'EXPONENTIAL',
@@ -164,23 +424,15 @@ export async function setupWithFundedAddress(
 		},
 	);
 
-	await retry(
-		async () => {
-			const balance = await client.getBalance({ owner: address });
+	const toolbox = new TestToolbox(keypair, rpcURL, configPath);
 
-			if (balance.totalBalance === '0') {
-				throw new Error('Balance is still 0');
-			}
-		},
-		{
-			backoff: () => 3000,
-			timeout: 60 * 1000,
-			retryIf: () => true,
-		},
-	);
+	// Wait for the faucet transaction on all clients to ensure indexers have caught up
+	const digest = faucetResponse.coins_sent?.[0]?.transferTxDigest;
+	if (digest) {
+		await toolbox.waitForTransaction({ digest });
+	}
 
-	await execRtdTools(['rtd', 'client', '--yes', '--client.config', configPath]);
-	return new TestToolbox(keypair, rpcURL, configPath);
+	return toolbox;
 }
 
 export async function publishPackage(packageName: string, toolbox?: TestToolbox) {
@@ -189,8 +441,7 @@ export async function publishPackage(packageName: string, toolbox?: TestToolbox)
 		toolbox = await setup();
 	}
 
-	// Retry build with exponential backoff to handle concurrent builds
-	const buildResult = await retry(
+	return await retry(
 		async () => {
 			const result = await execRtdTools([
 				'rtd',
@@ -199,15 +450,15 @@ export async function publishPackage(packageName: string, toolbox?: TestToolbox)
 				toolbox.configPath,
 				'build',
 				'--dump-bytecode-as-base64',
+				'--build-env',
+				'testnet',
 				'--path',
 				`/test-data/${packageName}`,
 			]);
 
 			if (!result.stdout.includes('{')) {
-				// Include the actual output in the error so retry logic can check it
-				const buildOutput = result.stdout + '\n' + (result.stderr || '');
-				console.error(`Build failed for ${packageName}:`, buildOutput);
-				throw new Error(`Failed to build package: ${buildOutput}`);
+				console.error(result.stdout);
+				throw new Error('Failed to publish package');
 			}
 
 			let resultJson;
@@ -216,60 +467,50 @@ export async function publishPackage(packageName: string, toolbox?: TestToolbox)
 					result.stdout.slice(result.stdout.indexOf('{'), result.stdout.lastIndexOf('}') + 1),
 				);
 			} catch (error) {
-				console.error('Failed to parse build output:', error);
-				throw new Error(`Failed to parse build output: ${result.stdout}`);
+				console.error(error);
+				throw new Error('Failed to publish package');
 			}
 
-			return resultJson;
+			const { modules, dependencies } = resultJson;
+
+			const tx = new Transaction();
+			const cap = tx.publish({
+				modules,
+				dependencies,
+			});
+
+			// Transfer the upgrade capability to the sender so they can upgrade the package later if they want.
+			tx.transferObjects([cap], tx.pure.address(toolbox.address()));
+
+			const { digest } = await toolbox.jsonRpcClient.signAndExecuteTransaction({
+				transaction: tx,
+				signer: toolbox.keypair,
+			});
+
+			const publishTxn = await toolbox.jsonRpcClient.waitForTransaction({
+				digest: digest,
+				options: { showObjectChanges: true, showEffects: true },
+			});
+
+			expect(publishTxn.effects?.status.status).toEqual('success');
+
+			const packageId = normalizeRtdAddress(
+				((publishTxn.objectChanges?.filter(
+					(a) => a.type === 'published',
+				) as RtdObjectChangePublished[]) ?? [])[0]?.packageId,
+			);
+
+			expect(packageId).toBeTypeOf('string');
+
+			return { packageId, publishTxn };
 		},
 		{
 			backoff: 'EXPONENTIAL',
-			timeout: 3 * 60 * 1000, // 3 minutes total timeout
-			retries: 10,
-			retryIf: (error: unknown) => {
-				// Retry on directory conflicts (os error 39)
-				const errorMsg = (error as Error)?.message || error?.toString() || '';
-				const isDirectoryConflict =
-					errorMsg.includes('Directory not empty') || errorMsg.includes('os error 39');
-				if (isDirectoryConflict) {
-					console.warn(`Detected build directory conflict for ${packageName}, will retry...`);
-				}
-				return isDirectoryConflict;
-			},
-			logger: (msg) => console.warn(`Retrying package build for ${packageName}: ${msg}`),
+			timeout: 1000 * 60 * 3,
+			retries: 3,
+			logger: (msg) => console.warn('Retrying package publish: ' + msg),
 		},
 	);
-
-	const { modules, dependencies } = buildResult;
-
-	const tx = new Transaction();
-	const cap = tx.publish({
-		modules,
-		dependencies,
-	});
-
-	// Transfer the upgrade capability to the sender so they can upgrade the package later if they want.
-	tx.transferObjects([cap], tx.pure.address(toolbox.address()));
-
-	const { digest } = await toolbox.client.signAndExecuteTransaction({
-		transaction: tx,
-		signer: toolbox.keypair,
-	});
-
-	const publishTxn = await toolbox.client.waitForTransaction({
-		digest: digest,
-		options: { showObjectChanges: true, showEffects: true },
-	});
-
-	expect(publishTxn.effects?.status.status).toEqual('success');
-
-	const packageId = ((publishTxn.objectChanges?.filter(
-		(a) => a.type === 'published',
-	) as RtdObjectChangePublished[]) ?? [])[0]?.packageId.replace(/^(0x)(0+)/, '0x') as string;
-
-	expect(packageId).toBeTypeOf('string');
-
-	return { packageId, publishTxn };
 }
 
 export async function upgradePackage(
@@ -289,6 +530,8 @@ export async function upgradePackage(
 		toolbox.configPath,
 		'build',
 		'--dump-bytecode-as-base64',
+		'--build-env',
+		'testnet',
 		'--path',
 		`/test-data/${packageName}`,
 	]);
@@ -321,7 +564,7 @@ export async function upgradePackage(
 		arguments: [cap, receipt],
 	});
 
-	const result = await toolbox.client.signAndExecuteTransaction({
+	const result = await toolbox.jsonRpcClient.signAndExecuteTransaction({
 		transaction: tx,
 		signer: toolbox.keypair,
 		options: {
@@ -343,7 +586,7 @@ export function getRandomAddresses(n: number): string[] {
 }
 
 export async function payRtd(
-	client: RtdClient,
+	client: RtdJsonRpcClient,
 	signer: Keypair,
 	numRecipients: number = 1,
 	recipients?: string[],
@@ -388,7 +631,7 @@ export async function payRtd(
 }
 
 export async function executePayRtdNTimes(
-	client: RtdClient,
+	client: RtdJsonRpcClient,
 	signer: Keypair,
 	nTimes: number,
 	numRecipientsPerTxn: number = 1,
@@ -404,6 +647,55 @@ export async function executePayRtdNTimes(
 }
 
 const client = await getContainerRuntimeClient();
+
+/**
+ * Run a `rtd keytool` command with an isolated keystore to avoid concurrent write conflicts.
+ * Retries on failure since concurrent keytool calls can cause panics in the rtd binary.
+ * Returns the parsed JSON output.
+ */
+export async function execKeytool(
+	args: string[],
+	maxRetries = 3,
+): Promise<Record<string, unknown>> {
+	for (let attempt = 0; attempt < maxRetries; attempt++) {
+		const keystorePath = `/tmp/keystore-${Math.random().toString(36).slice(2)}.keystore`;
+		await execRtdTools(['bash', '-c', `echo '[]' > ${keystorePath}`]);
+		const result = await execRtdTools([
+			'rtd',
+			'keytool',
+			'--keystore-path',
+			keystorePath,
+			'--json',
+			...args,
+		]);
+		try {
+			return parseKeytoolJson(result.stdout);
+		} catch (e) {
+			if (attempt === maxRetries - 1) throw e;
+			// Wait before retrying - concurrent keytool calls can cause crashes
+			await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt + 1)));
+		}
+	}
+	throw new Error('unreachable');
+}
+
+/**
+ * Parse JSON output from `rtd keytool --json` commands.
+ * The output may contain debug lines before the JSON object, so we find the last
+ * top-level JSON object by looking for `\n{` at the start of a line.
+ */
+export function parseKeytoolJson(stdout: string): Record<string, unknown> {
+	// Find the last JSON object starting at the beginning of a line
+	const jsonStart = stdout.lastIndexOf('\n{');
+	if (jsonStart !== -1) {
+		return JSON.parse(stdout.slice(jsonStart + 1));
+	}
+	// If the output starts with '{', try parsing directly
+	if (stdout.trimStart().startsWith('{')) {
+		return JSON.parse(stdout.trimStart());
+	}
+	throw new Error(`No JSON object found in keytool output: ${stdout.slice(0, 200)}`);
+}
 
 export async function execRtdTools(
 	command: string[],

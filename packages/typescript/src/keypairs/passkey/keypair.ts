@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { toBase64 } from 'rtd-bcs';
-import { secp256r1 } from '@noble/curves/p256';
-import { blake2b } from '@noble/hashes/blake2b';
-import { sha256 } from '@noble/hashes/sha256';
-import { randomBytes } from '@noble/hashes/utils';
+import { p256 as secp256r1 } from '@noble/curves/nist.js';
+import { blake2b } from '@noble/hashes/blake2.js';
+import { sha256 } from '@noble/hashes/sha2.js';
+import { randomBytes } from '@noble/hashes/utils.js';
 
 import { PasskeyAuthenticator } from '../../bcs/bcs.js';
 import type { IntentScope, SignatureWithBytes } from '../../cryptography/index.js';
@@ -39,7 +39,7 @@ export type BrowserPasswordProviderOptions = Pick<
 
 export interface PasskeyProvider {
 	create(): Promise<RegistrationCredential>;
-	get(challenge: Uint8Array): Promise<AuthenticationCredential>;
+	get(challenge: Uint8Array, credentialId?: Uint8Array): Promise<AuthenticationCredential>;
 }
 
 // Default browser implementation
@@ -80,12 +80,15 @@ export class BrowserPasskeyProvider implements PasskeyProvider {
 		})) as RegistrationCredential;
 	}
 
-	async get(challenge: Uint8Array): Promise<AuthenticationCredential> {
+	async get(challenge: Uint8Array, credentialId?: Uint8Array): Promise<AuthenticationCredential> {
 		return (await navigator.credentials.get({
 			publicKey: {
 				challenge: challenge as BufferSource,
 				userVerification: this.#options.authenticatorSelection?.userVerification || 'required',
 				timeout: this.#options.timeout ?? 60000,
+				...(credentialId && {
+					allowCredentials: [{ type: 'public-key' as const, id: credentialId as BufferSource }],
+				}),
 			},
 		})) as AuthenticationCredential;
 	}
@@ -98,6 +101,7 @@ export class BrowserPasskeyProvider implements PasskeyProvider {
 export class PasskeyKeypair extends Signer {
 	private publicKey: Uint8Array;
 	private provider: PasskeyProvider;
+	private credentialId?: Uint8Array;
 
 	/**
 	 * Get the key scheme of passkey,
@@ -120,10 +124,20 @@ export class PasskeyKeypair extends Signer {
 	 * If there are existing passkey wallet, use `signAndRecover` to identify the correct
 	 * public key and then initialize the instance. See usage in `signAndRecover`.
 	 */
-	constructor(publicKey: Uint8Array, provider: PasskeyProvider) {
+	constructor(publicKey: Uint8Array, provider: PasskeyProvider, credentialId?: Uint8Array) {
 		super();
 		this.publicKey = publicKey;
 		this.provider = provider;
+		this.credentialId = credentialId;
+	}
+
+	/**
+	 * Return the credential ID for this passkey, if available.
+	 * The credential ID is captured when creating a new passkey via `getPasskeyInstance`
+	 * and can be used to constrain which credential the browser selects during signing.
+	 */
+	getCredentialId(): Uint8Array | undefined {
+		return this.credentialId;
 	}
 
 	/**
@@ -143,9 +157,9 @@ export class PasskeyKeypair extends Signer {
 		} else {
 			const derSPKI = credential.response.getPublicKey()!;
 			const pubkeyUncompressed = parseDerSPKI(new Uint8Array(derSPKI));
-			const pubkey = secp256r1.ProjectivePoint.fromHex(pubkeyUncompressed);
-			const pubkeyCompressed = pubkey.toRawBytes(true);
-			return new PasskeyKeypair(pubkeyCompressed, provider);
+			const pubkey = secp256r1.Point.fromBytes(pubkeyUncompressed);
+			const pubkeyCompressed = pubkey.toBytes(true);
+			return new PasskeyKeypair(pubkeyCompressed, provider, new Uint8Array(credential.rawId));
 		}
 	}
 
@@ -162,7 +176,7 @@ export class PasskeyKeypair extends Signer {
 	 */
 	async sign(data: Uint8Array) {
 		// asks the passkey to sign over challenge as the data.
-		const credential = await this.provider.get(data);
+		const credential = await this.provider.get(data, this.credentialId);
 
 		// parse authenticatorData (as bytes), clientDataJSON (decoded as string).
 		const authenticatorData = new Uint8Array(credential.response.authenticatorData);
@@ -170,9 +184,12 @@ export class PasskeyKeypair extends Signer {
 		const decoder = new TextDecoder();
 		const clientDataJSONString: string = decoder.decode(clientDataJSON);
 
-		// parse the signature from DER format, normalize and convert to compressed format (33 bytes).
-		const sig = secp256r1.Signature.fromDER(new Uint8Array(credential.response.signature));
-		const normalized = sig.normalizeS().toCompactRawBytes();
+		const sig = secp256r1.Signature.fromBytes(new Uint8Array(credential.response.signature), 'der');
+		const normalizedSig = sig.hasHighS()
+			? new secp256r1.Signature(sig.r, secp256r1.Point.Fn.neg(sig.s))
+			: sig;
+
+		const normalized = normalizedSig.toBytes('compact');
 
 		if (
 			normalized.length !== PASSKEY_SIGNATURE_SIZE ||
@@ -242,7 +259,7 @@ export class PasskeyKeypair extends Signer {
 	 * const testMessage2 = new TextEncoder().encode('Hello world 2!');
 	 * const possiblePks2 = await PasskeyKeypair.signAndRecover(provider, testMessage2);
 	 * const commonPk = findCommonPublicKey(possiblePks, possiblePks2);
-	 * const signer = new PasskeyKeypair(provider, commonPk.toRawBytes());
+	 * const signer = new PasskeyKeypair(commonPk.toRawBytes(), provider);
 	 * ```
 	 *
 	 * @param provider - the passkey provider.
@@ -255,14 +272,15 @@ export class PasskeyKeypair extends Signer {
 	): Promise<PublicKey[]> {
 		const credential = await provider.get(message);
 		const fullMessage = messageFromAssertionResponse(credential.response);
-		const sig = secp256r1.Signature.fromDER(new Uint8Array(credential.response.signature));
+		const sig = secp256r1.Signature.fromBytes(new Uint8Array(credential.response.signature), 'der');
 
 		const res = [];
+		const msgHash = sha256(fullMessage);
 		for (let i = 0; i < 4; i++) {
 			const s = sig.addRecoveryBit(i);
 			try {
-				const pubkey = s.recoverPublicKey(sha256(fullMessage));
-				const pk = new PasskeyPublicKey(pubkey.toRawBytes(true));
+				const pubkey = s.recoverPublicKey(msgHash);
+				const pk = new PasskeyPublicKey(pubkey.toBytes(true));
 				res.push(pk);
 			} catch {
 				continue;

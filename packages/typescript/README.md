@@ -4,10 +4,9 @@ For more complete docs, visit the [Rtd TypeScript SDK docs](https://sdk.linkuver
 
 # Rtd TypeScript SDK
 
-This is the Rtd TypeScript SDK built on the Rtd
-[JSON RPC API](https://github.com/LinkUVerse/rtd/blob/main/docs/content/references/rtd-api.mdx). It
-provides utility classes and functions for applications to sign transactions and interact with the
-Rtd network.
+This is the Rtd TypeScript SDK providing utility classes and functions for applications to sign
+transactions and interact with the Rtd network. It supports multiple communication protocols
+including gRPC (recommended), GraphQL, and JSON RPC (deprecated).
 
 ## Building Locally
 
@@ -17,7 +16,7 @@ To get started you need to install [pnpm](https://pnpm.io/), then run the follow
 # Install all dependencies
 $ pnpm install
 
-# Run `build` for the TypeScript SDK if you're in the `sdk/typescript` project
+# Run `build` for the TypeScript SDK if you're in the `sdk/rtd` project
 $ pnpm run build
 
 # Run `sdk build` for the TypeScript SDK if you're in the root of `rtd` repo
@@ -30,7 +29,7 @@ $ pnpm sdk build
 
 You can view the generated [Type Doc](https://typedoc.org/) for the
 [current release of the SDK](https://www.npmjs.com/package/rtd-typescript) at
-http://typescript-sdk-docs.s3-website-us-east-1.amazonaws.com/.
+https://sdk.linkuverse.com/typedoc/index.html.
 
 For the latest docs for the `main` branch, run `pnpm doc` and open the
 [doc/index.html](doc/index.html) in your browser.
@@ -73,52 +72,61 @@ VITE_FAUCET_URL='https://faucet.devnet.rtd.life:443/v2/gas' VITE_FULLNODE_URL='h
 
 ## Connecting to Rtd Network
 
-The `SuiClient` class provides a connection to the JSON-RPC Server and should be used for all
-read-only operations. The default URLs to connect with the RPC server are:
+The `RtdGrpcClient` class provides a connection to the Rtd network via gRPC and is the recommended
+client for all operations. The default URLs to connect with the gRPC server are:
 
 - local: http://127.0.0.1:9000
-- Devnet: https://fullnode.devnet.rtd.life
+- Devnet: https://fullnode.devnet.rtd.life:443
+- Testnet: https://fullnode.testnet.rtd.life:443
+- Mainnet: https://fullnode.mainnet.rtd.life:443
 
 ```typescript
-import { getFullnodeUrl, SuiClient } from 'rtd-typescript/client';
+import { RtdGrpcClient } from 'rtd-typescript/grpc';
 
 // create a client connected to devnet
-const client = new SuiClient({ url: getFullnodeUrl('devnet') });
+const client = new RtdGrpcClient({
+	network: 'devnet',
+	baseUrl: 'https://fullnode.devnet.rtd.life:443',
+});
 
 // get coins owned by an address
-await client.getCoins({
+await client.listCoins({
 	owner: '0xcc2bd176a478baea9a0de7a24cd927661cc6e860d5bacecb9a138ef20dbab231',
 });
 ```
 
 For local development, you can run `cargo run --bin --with-faucet --force-regenesis` to spin up a
 local network with a local validator, a fullnode, and a faucet server. Refer to
-[this guide](https://docs.rtd.life/build/rtd-local-network) for more information.
+[this guide](https://docs.rtd.io/build/rtd-local-network) for more information.
 
 ```typescript
-import { getFullnodeUrl, SuiClient } from 'rtd-typescript/client';
+import { RtdGrpcClient } from 'rtd-typescript/grpc';
 
-// create a client connected to devnet
-const client = new SuiClient({ url: getFullnodeUrl('localnet') });
+// create a client connected to localnet
+const client = new RtdGrpcClient({
+	network: 'localnet',
+	baseUrl: 'http://127.0.0.1:9000',
+});
 
 // get coins owned by an address
-await client.getCoins({
+await client.listCoins({
 	owner: '0xcc2bd176a478baea9a0de7a24cd927661cc6e860d5bacecb9a138ef20dbab231',
 });
 ```
 
-You can also construct your own in custom connections, with the URL for your own fullnode
+You can also construct your own RtdGrpcClient connections with the URL for your own fullnode:
 
 ```typescript
-import { getFullnodeUrl, SuiClient } from 'rtd-typescript/client';
+import { RtdGrpcClient } from 'rtd-typescript/grpc';
 
-// create a client connected to devnet
-const client = new SuiClient({
-	url: 'https://fullnode.devnet.rtd.life',
+// create a client connected to your own fullnode
+const client = new RtdGrpcClient({
+	network: 'devnet',
+	baseUrl: 'https://your-fullnode.example.com:443',
 });
 
 // get coins owned by an address
-await client.getCoins({
+await client.listCoins({
 	owner: '0xcc2bd176a478baea9a0de7a24cd927661cc6e860d5bacecb9a138ef20dbab231',
 });
 ```
@@ -126,12 +134,12 @@ await client.getCoins({
 ## Getting coins from the faucet
 
 You can request rtd from the faucet when running against devnet or localnet. For testnet, visit
-faucet.rtd.life.
+faucet.rtd.io.
 
 ```typescript
-import { getFaucetHost, requestSuiFromFaucetV2 } from 'rtd-typescript/faucet';
+import { getFaucetHost, requestRtdFromFaucetV2 } from 'rtd-typescript/faucet';
 
-await requestSuiFromFaucetV2({
+await requestRtdFromFaucetV2({
 	host: getFaucetHost('devnet'),
 	recipient: '0xcc2bd176a478baea9a0de7a24cd927661cc6e860d5bacecb9a138ef20dbab231',
 });
@@ -140,19 +148,20 @@ await requestSuiFromFaucetV2({
 ## Writing APIs
 
 For a primer for building transactions, refer to
-[this guide](https://docs.rtd.life/build/prog-trans-ts-sdk).
+[this guide](https://docs.rtd.io/build/prog-trans-ts-sdk).
 
 ### Transfer Object
 
 ```typescript
-import { getFullnodeUrl, SuiClient } from 'rtd-typescript/client';
+import { RtdGrpcClient } from 'rtd-typescript/grpc';
 import { Ed25519Keypair } from 'rtd-typescript/keypairs/ed25519';
 import { Transaction } from 'rtd-typescript/transactions';
 
 // Generate a new Ed25519 Keypair
 const keypair = new Ed25519Keypair();
-const client = new SuiClient({
-	url: getFullnodeUrl('testnet'),
+const client = new RtdGrpcClient({
+	network: 'testnet',
+	baseUrl: 'https://fullnode.testnet.rtd.life:443',
 });
 
 const tx = new Transaction();
@@ -172,19 +181,20 @@ console.log({ result });
 To transfer `1000` MIST to another address:
 
 ```typescript
-import { getFullnodeUrl, SuiClient } from 'rtd-typescript/client';
+import { RtdGrpcClient } from 'rtd-typescript/grpc';
 import { Ed25519Keypair } from 'rtd-typescript/keypairs/ed25519';
 import { Transaction } from 'rtd-typescript/transactions';
 
 // Generate a new Ed25519 Keypair
 const keypair = new Ed25519Keypair();
-const client = new SuiClient({
-	url: getFullnodeUrl('testnet'),
+const client = new RtdGrpcClient({
+	network: 'testnet',
+	baseUrl: 'https://fullnode.testnet.rtd.life:443',
 });
 
 const tx = new Transaction();
 const [coin] = tx.splitCoins(tx.gas, [1000]);
-tx.transferObjects([coin], keypair.getPublicKey().toSuiAddress());
+tx.transferObjects([coin], keypair.getPublicKey().toRtdAddress());
 const result = await client.signAndExecuteTransaction({
 	signer: keypair,
 	transaction: tx,
@@ -195,14 +205,15 @@ console.log({ result });
 ### Merge coins
 
 ```typescript
-import { getFullnodeUrl, SuiClient } from 'rtd-typescript/client';
+import { RtdGrpcClient } from 'rtd-typescript/grpc';
 import { Ed25519Keypair } from 'rtd-typescript/keypairs/ed25519';
 import { Transaction } from 'rtd-typescript/transactions';
 
 // Generate a new Ed25519 Keypair
 const keypair = new Ed25519Keypair();
-const client = new SuiClient({
-	url: getFullnodeUrl('testnet'),
+const client = new RtdGrpcClient({
+	network: 'testnet',
+	baseUrl: 'https://fullnode.testnet.rtd.life:443',
 });
 
 const tx = new Transaction();
@@ -219,15 +230,17 @@ console.log({ result });
 ### Move Call
 
 ```typescript
-import { getFullnodeUrl, SuiClient } from 'rtd-typescript/client';
+import { RtdGrpcClient } from 'rtd-typescript/grpc';
 import { Ed25519Keypair } from 'rtd-typescript/keypairs/ed25519';
 import { Transaction } from 'rtd-typescript/transactions';
 
 // Generate a new Ed25519 Keypair
 const keypair = new Ed25519Keypair();
-const client = new SuiClient({
-	url: getFullnodeUrl('testnet'),
+const client = new RtdGrpcClient({
+	network: 'testnet',
+	baseUrl: 'https://fullnode.testnet.rtd.life:443',
 });
+
 const packageObjectId = '0x...';
 const tx = new Transaction();
 tx.moveCall({
@@ -246,16 +259,18 @@ console.log({ result });
 To publish a package:
 
 ```typescript
-import { getFullnodeUrl, SuiClient } from 'rtd-typescript/client';
+import { RtdGrpcClient } from 'rtd-typescript/grpc';
 import { Ed25519Keypair } from 'rtd-typescript/keypairs/ed25519';
 import { Transaction } from 'rtd-typescript/transactions';
+import { execSync } from 'child_process';
 
-const { execSync } = require('child_process');
 // Generate a new Ed25519 Keypair
 const keypair = new Ed25519Keypair();
-const client = new SuiClient({
-	url: getFullnodeUrl('testnet'),
+const client = new RtdGrpcClient({
+	network: 'testnet',
+	baseUrl: 'https://fullnode.testnet.rtd.life:443',
 });
+
 const { modules, dependencies } = JSON.parse(
 	execSync(`${cliPath} move build --dump-bytecode-as-base64 --path ${packagePath}`, {
 		encoding: 'utf-8',
@@ -266,7 +281,7 @@ const [upgradeCap] = tx.publish({
 	modules,
 	dependencies,
 });
-tx.transferObjects([upgradeCap], keypair.toSuiAddress());
+tx.transferObjects([upgradeCap], keypair.toRtdAddress());
 const result = await client.signAndExecuteTransaction({
 	signer: keypair,
 	transaction: tx,
@@ -282,11 +297,13 @@ Fetch objects owned by the address
 `0xcc2bd176a478baea9a0de7a24cd927661cc6e860d5bacecb9a138ef20dbab231`
 
 ```typescript
-import { getFullnodeUrl, SuiClient } from 'rtd-typescript/client';
+import { RtdGrpcClient } from 'rtd-typescript/grpc';
 
-const client = new SuiClient({
-	url: getFullnodeUrl('testnet'),
+const client = new RtdGrpcClient({
+	network: 'testnet',
+	baseUrl: 'https://fullnode.testnet.rtd.life:443',
 });
+
 const objects = await client.getOwnedObjects({
 	owner: '0xcc2bd176a478baea9a0de7a24cd927661cc6e860d5bacecb9a138ef20dbab231',
 });
@@ -298,18 +315,21 @@ Fetch object details for the object with id
 `0xe19739da1a701eadc21683c5b127e62b553e833e8a15a4f292f4f48b4afea3f2`
 
 ```typescript
-import { getFullnodeUrl, SuiClient } from 'rtd-typescript/client';
+import { RtdGrpcClient } from 'rtd-typescript/grpc';
 
-const client = new SuiClient({
-	url: getFullnodeUrl('testnet'),
+const client = new RtdGrpcClient({
+	network: 'testnet',
+	baseUrl: 'https://fullnode.testnet.rtd.life:443',
 });
-const txn = await client.getObject({
+
+const object = await client.getObject({
 	id: '0xcc2bd176a478baea9a0de7a24cd927661cc6e860d5bacecb9a138ef20dbab231',
 	// fetch the object content field
 	options: { showContent: true },
 });
+
 // You can also fetch multiple objects in one batch request
-const txns = await client.multiGetObjects({
+const objects = await client.multiGetObjects({
 	ids: [
 		'0xcc2bd176a478baea9a0de7a24cd927661cc6e860d5bacecb9a138ef20dbab231',
 		'0x9ad3de788483877fe348aef7f6ba3e52b9cfee5f52de0694d36b16a6b50c1429',
@@ -324,11 +344,13 @@ const txns = await client.multiGetObjects({
 Fetch transaction details from transaction digests:
 
 ```typescript
-import { getFullnodeUrl, SuiClient } from 'rtd-typescript/client';
+import { RtdGrpcClient } from 'rtd-typescript/grpc';
 
-const client = new SuiClient({
-	url: getFullnodeUrl('testnet'),
+const client = new RtdGrpcClient({
+	network: 'testnet',
+	baseUrl: 'https://fullnode.testnet.rtd.life:443',
 });
+
 const txn = await client.getTransactionBlock({
 	digest: '9XFneskU8tW7UxQf7tE5qFRfcN4FadtC2Z3HAZkgeETd=',
 	// only fetch the effects field
@@ -392,38 +414,44 @@ Fetch coins of type `0x65b0553a591d7b13376e03a408e112c706dc0909a79080c810b93b06f
 owned by an address:
 
 ```typescript
-import { getFullnodeUrl, SuiClient } from 'rtd-typescript/client';
+import { RtdGrpcClient } from 'rtd-typescript/grpc';
 
-const client = new SuiClient({
-	url: getFullnodeUrl('testnet'),
+const client = new RtdGrpcClient({
+	network: 'testnet',
+	baseUrl: 'https://fullnode.testnet.rtd.life:443',
 });
-const coins = await client.getCoins({
+
+const coins = await client.listCoins({
 	owner: '0xcc2bd176a478baea9a0de7a24cd927661cc6e860d5bacecb9a138ef20dbab231',
 	coinType: '0x65b0553a591d7b13376e03a408e112c706dc0909a79080c810b93b06f922c458::usdc::USDC',
 });
 ```
 
-Fetch all coin objects owned by an address:
+Fetch RTD coin objects owned by an address:
 
 ```typescript
-import { getFullnodeUrl, SuiClient } from 'rtd-typescript/client';
+import { RtdGrpcClient } from 'rtd-typescript/grpc';
 
-const client = new SuiClient({
-	url: getFullnodeUrl('testnet'),
+const client = new RtdGrpcClient({
+	network: 'testnet',
+	baseUrl: 'https://fullnode.testnet.rtd.life:443',
 });
-const allCoins = await client.getAllCoins({
+
+const rtdCoins = await client.listCoins({
 	owner: '0xcc2bd176a478baea9a0de7a24cd927661cc6e860d5bacecb9a138ef20dbab231',
 });
 ```
 
-Fetch the total coin balance for one coin type, owned by an address:
+Fetch the total coin balance for a coin type, owned by an address:
 
 ```typescript
-import { getFullnodeUrl, SuiClient } from 'rtd-typescript/client';
+import { RtdGrpcClient } from 'rtd-typescript/grpc';
 
-const client = new SuiClient({
-	url: getFullnodeUrl('testnet'),
+const client = new RtdGrpcClient({
+	network: 'testnet',
+	baseUrl: 'https://fullnode.testnet.rtd.life:443',
 });
+
 // If coin type is not specified, it defaults to 0x2::rtd::RTD
 const coinBalance = await client.getBalance({
 	owner: '0xcc2bd176a478baea9a0de7a24cd927661cc6e860d5bacecb9a138ef20dbab231',
@@ -437,13 +465,15 @@ Querying events created by transactions sent by account
 `0xcc2bd176a478baea9a0de7a24cd927661cc6e860d5bacecb9a138ef20dbab231`
 
 ```typescript
-import { getFullnodeUrl, SuiClient } from 'rtd-typescript/client';
+import { RtdGrpcClient } from 'rtd-typescript/grpc';
 
-const client = new SuiClient({
-	url: getFullnodeUrl('testnet'),
+const client = new RtdGrpcClient({
+	network: 'testnet',
+	baseUrl: 'https://fullnode.testnet.rtd.life:443',
 });
-const events = client.queryEvents({
-	query: { Sender: toolbox.address() },
+
+const events = await client.queryEvents({
+	query: { Sender: '0xcc2bd176a478baea9a0de7a24cd927661cc6e860d5bacecb9a138ef20dbab231' },
 	limit: 2,
 });
 ```

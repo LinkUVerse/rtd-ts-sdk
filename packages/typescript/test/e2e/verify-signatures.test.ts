@@ -3,13 +3,13 @@
 import { fromBase64 } from 'rtd-bcs';
 import { describe, expect, it } from 'vitest';
 
-import { RtdGraphQLClient } from '../../src/graphql';
-import { Ed25519Keypair } from '../../src/keypairs/ed25519';
-import { Secp256k1Keypair } from '../../src/keypairs/secp256k1';
-import { Secp256r1Keypair } from '../../src/keypairs/secp256r1';
-import { MultiSigPublicKey } from '../../src/multisig/publickey';
-import { verifyPersonalMessageSignature } from '../../src/verify';
-import { getClient } from './utils/setup';
+import { RtdGraphQLClient } from '../../src/graphql/index.js';
+import { Ed25519Keypair } from '../../src/keypairs/ed25519/index.js';
+import { Secp256k1Keypair } from '../../src/keypairs/secp256k1/index.js';
+import { Secp256r1Keypair } from '../../src/keypairs/secp256r1/index.js';
+import { MultiSigPublicKey } from '../../src/multisig/publickey.js';
+import { verifyPersonalMessageSignature } from '../../src/verify/index.js';
+import { getClient } from './utils/setup.js';
 
 const DEFAULT_GRAPHQL_URL = import.meta.env.GRAPHQL_URL ?? 'http://127.0.0.1:9125/graphql';
 
@@ -173,7 +173,7 @@ describe('Verify Signatures', () => {
 		});
 
 		describe('zkLogin signatures', () => {
-			const client = new RtdGraphQLClient({ url: DEFAULT_GRAPHQL_URL });
+			const client = new RtdGraphQLClient({ url: DEFAULT_GRAPHQL_URL, network: 'localnet' });
 			// this test assumes the localnet epoch is smaller than 3. it will fail if localnet has ran for too long and passed epoch 3.
 			// test case generated from `rtd keytool zk-login-insecure-sign-personal-message --data "hello" --max-epoch 3`
 			const bytes = fromBase64('aGVsbG8='); // the base64 encoding of "hello"

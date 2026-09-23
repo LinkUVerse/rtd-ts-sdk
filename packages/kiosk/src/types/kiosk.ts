@@ -1,17 +1,15 @@
 // Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import type {
-	PaginatedObjectsResponse,
-	RtdObjectData,
-	RtdObjectDataOptions,
-} from 'rtd-typescript/client';
 import type { TransactionArgument } from 'rtd-typescript/transactions';
 
 import type { ObjectArgument } from './index.js';
 
+import { RTD_FRAMEWORK_ADDRESS } from 'rtd-typescript/utils';
+import { RtdClientTypes } from 'rtd-typescript/client';
+
 /** The Kiosk module. */
-export const KIOSK_MODULE = '0x2::kiosk';
+export const KIOSK_MODULE = `${RTD_FRAMEWORK_ADDRESS}::kiosk`;
 
 /** The Kiosk type. */
 export const KIOSK_TYPE = `${KIOSK_MODULE}::Kiosk`;
@@ -90,6 +88,21 @@ export type KioskListing = {
 	price?: string;
 };
 
+export type KioskDisplay = {
+	data: Record<string, unknown> | null;
+	error: string | null;
+};
+
+export type ObjectWithDisplay = Omit<
+	RtdClientTypes.Object<{
+		content: true;
+		previousTransaction: true;
+	}>,
+	'display'
+> & {
+	display?: KioskDisplay;
+};
+
 /**
  * A dynamic field `Item { ID }` attached to the Kiosk.
  * Holds an Item `T`. The type of the item is known upfront.
@@ -105,8 +118,8 @@ export type KioskItem = {
 	listing?: KioskListing;
 	/** The ID of the kiosk the item is placed in */
 	kioskId: string;
-	/** Optional Kiosk Data */
-	data?: RtdObjectData;
+	/** Optional object data with display metadata */
+	data?: ObjectWithDisplay;
 };
 
 /** The overview type returned from `getKiosk` */
@@ -149,16 +162,16 @@ export type FetchKioskOptions = {
 	withKioskFields?: boolean;
 	/** Include the listing prices. */
 	withListingPrices?: boolean;
-	/** Include the objects for the Items in the kiosk. Defaults to `display` only. */
+	/** Include the objects for the Items in the kiosk. */
 	withObjects?: boolean;
-	/** Pass the data options for the objects, when fetching, in case you want to query other details. */
-	objectOptions?: RtdObjectDataOptions;
 };
 
 export type OwnedKiosks = {
 	kioskOwnerCaps: KioskOwnerCap[];
 	kioskIds: string[];
-} & Omit<PaginatedObjectsResponse, 'data'>;
+	nextCursor: string | null;
+	hasNextPage: boolean;
+};
 
 export type KioskOwnerCap = {
 	isPersonal?: boolean;

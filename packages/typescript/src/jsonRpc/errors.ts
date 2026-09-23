@@ -20,8 +20,16 @@ const CODE_TO_ERROR_TYPE: Record<number, string> = {
 	'-32002': 'TransactionExecutionClientError',
 };
 
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+ * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export class RtdHTTPTransportError extends Error {}
 
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+ * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export class JsonRpcError extends RtdHTTPTransportError {
 	code: number;
 	type: string;
@@ -33,6 +41,10 @@ export class JsonRpcError extends RtdHTTPTransportError {
 	}
 }
 
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+ * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export class RtdHTTPStatusError extends RtdHTTPTransportError {
 	status: number;
 	statusText: string;

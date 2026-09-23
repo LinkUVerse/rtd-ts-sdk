@@ -1,7 +1,8 @@
 // Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { ed25519 } from '@noble/curves/ed25519';
+import { toHex } from 'rtd-bcs';
+import { ed25519 } from '@noble/curves/ed25519.js';
 
 import {
 	decodeRtdPrivateKey,
@@ -46,7 +47,7 @@ export class Ed25519Keypair extends Keypair {
 				secretKey: keypair.secretKey.slice(0, 32),
 			};
 		} else {
-			const privateKey = ed25519.utils.randomPrivateKey();
+			const privateKey = ed25519.utils.randomSecretKey();
 			this.keypair = {
 				publicKey: ed25519.getPublicKey(privateKey),
 				secretKey: privateKey,
@@ -65,7 +66,7 @@ export class Ed25519Keypair extends Keypair {
 	 * Generate a new random Ed25519 keypair
 	 */
 	static generate(): Ed25519Keypair {
-		const secretKey = ed25519.utils.randomPrivateKey();
+		const secretKey = ed25519.utils.randomSecretKey();
 		return new Ed25519Keypair({
 			publicKey: ed25519.getPublicKey(secretKey),
 			secretKey,
@@ -89,8 +90,8 @@ export class Ed25519Keypair extends Keypair {
 		if (typeof secretKey === 'string') {
 			const decoded = decodeRtdPrivateKey(secretKey);
 
-			if (decoded.schema !== 'ED25519') {
-				throw new Error(`Expected a ED25519 keypair, got ${decoded.schema}`);
+			if (decoded.scheme !== 'ED25519') {
+				throw new Error(`Expected a ED25519 keypair, got ${decoded.scheme}`);
 			}
 
 			return this.fromSecretKey(decoded.secretKey, options);
@@ -166,14 +167,17 @@ export class Ed25519Keypair extends Keypair {
 	 *
 	 * If path is none, it will default to m/44'/784'/0'/0'/0', otherwise the path must
 	 * be compliant to SLIP-0010 in form m/44'/784'/{account_index}'/{change_index}'/{address_index}'.
+	 *
+	 * @param seed - The seed as a hex string or Uint8Array.
 	 */
-	static deriveKeypairFromSeed(seedHex: string, path?: string): Ed25519Keypair {
+	static deriveKeypairFromSeed(seed: string | Uint8Array, path?: string): Ed25519Keypair {
 		if (path == null) {
 			path = DEFAULT_ED25519_DERIVATION_PATH;
 		}
 		if (!isValidHardenedPath(path)) {
 			throw new Error('Invalid derivation path');
 		}
+		const seedHex = typeof seed === 'string' ? seed : toHex(seed);
 		const { key } = derivePath(path, seedHex);
 
 		return Ed25519Keypair.fromSecretKey(key);

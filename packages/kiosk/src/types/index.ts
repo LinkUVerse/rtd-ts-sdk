@@ -1,7 +1,7 @@
 // Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import type { RtdClient } from 'rtd-typescript/client';
+import type { ClientWithCoreApi, RtdClientTypes } from 'rtd-typescript/client';
 import type { TransactionObjectArgument } from 'rtd-typescript/transactions';
 
 import type { BaseRulePackageIds } from '../constants.js';
@@ -15,21 +15,17 @@ export * from './transfer-policy.js';
 export type ObjectArgument = string | TransactionObjectArgument;
 
 /**
- * A Network selector.
- * Kiosk SDK supports mainnet & testnet.
- * Pass `custom` for any other network (devnet, localnet).
- */
-export enum Network {
-	MAINNET = 'mainnet',
-	TESTNET = 'testnet',
-	CUSTOM = 'custom',
-}
-
-/**
  * The Client Options for Both KioskClient & TransferPolicyManager.
  */
 export type KioskClientOptions = {
-	client: RtdClient;
-	network: Network;
+	client: KioskCompatibleClient;
+	network: RtdClientTypes.Network;
 	packageIds?: BaseRulePackageIds;
+};
+
+export type KioskCompatibleClient = ClientWithCoreApi;
+
+export type KioskPaginationArguments = {
+	cursor?: string | null;
+	limit?: number | null;
 };

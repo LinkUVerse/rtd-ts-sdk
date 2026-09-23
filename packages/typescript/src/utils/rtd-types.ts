@@ -3,7 +3,7 @@
 
 import { fromBase58, splitGenericParameters } from 'rtd-bcs';
 
-import { isValidNamedPackage } from './move-registry.js';
+import { isValidNamedPackage } from './named-packages.js';
 
 const TX_DIGEST_LENGTH = 32;
 
@@ -32,6 +32,63 @@ export function isValidRtdObjectId(value: string): boolean {
 	return isValidRtdAddress(value);
 }
 
+const MOVE_IDENTIFIER_REGEX = /^[a-zA-Z][a-zA-Z0-9_]*$/;
+
+export function isValidMoveIdentifier(name: string): boolean {
+	return MOVE_IDENTIFIER_REGEX.test(name);
+}
+
+const PRIMITIVE_TYPE_TAGS = [
+	'bool',
+	'u8',
+	'u16',
+	'u32',
+	'u64',
+	'u128',
+	'u256',
+	'address',
+	'signer',
+];
+
+const VECTOR_TYPE_REGEX = /^vector<(.+)>$/;
+
+function isValidTypeTag(type: string): boolean {
+	if (PRIMITIVE_TYPE_TAGS.includes(type)) return true;
+
+	const vectorMatch = type.match(VECTOR_TYPE_REGEX);
+	if (vectorMatch) return isValidTypeTag(vectorMatch[1]);
+
+	if (type.includes('::')) return isValidStructTag(type);
+
+	return false;
+}
+
+function isValidParsedStructTag(tag: StructTag): boolean {
+	if (!isValidRtdAddress(tag.address) && !isValidNamedPackage(tag.address)) {
+		return false;
+	}
+
+	if (!isValidMoveIdentifier(tag.module) || !isValidMoveIdentifier(tag.name)) {
+		return false;
+	}
+
+	return tag.typeParams.every((param) => {
+		if (typeof param === 'string') {
+			return isValidTypeTag(param);
+		}
+		return isValidParsedStructTag(param);
+	});
+}
+
+export function isValidStructTag(type: string): boolean {
+	try {
+		const tag = parseStructTag(type);
+		return isValidParsedStructTag(tag);
+	} catch {
+		return false;
+	}
+}
+
 export type StructTag = {
 	address: string;
 	module: string;
@@ -40,18 +97,48 @@ export type StructTag = {
 };
 
 function parseTypeTag(type: string): string | StructTag {
+	if (type.startsWith('vector<')) {
+		if (!type.endsWith('>')) {
+			throw new Error(`Invalid type tag: ${type}`);
+		}
+		const inner = type.slice(7, -1);
+		if (!inner) {
+			throw new Error(`Invalid type tag: ${type}`);
+		}
+		const parsed = parseTypeTag(inner);
+		if (typeof parsed === 'string') {
+			return `vector<${parsed}>`;
+		}
+		return `vector<${normalizeStructTag(parsed)}>`;
+	}
+
 	if (!type.includes('::')) return type;
 
 	return parseStructTag(type);
 }
 
 export function parseStructTag(type: string): StructTag {
-	const [address, module] = type.split('::');
+	const parts = type.split('::');
+
+	if (parts.length < 3) {
+		throw new Error(`Invalid struct tag: ${type}`);
+	}
+
+	const [address, module] = parts;
+
+	if (!address || !module) {
+		throw new Error(`Invalid struct tag: ${type}`);
+	}
 
 	const isMvrPackage = isValidNamedPackage(address);
 
 	const rest = type.slice(address.length + module.length + 4);
 	const name = rest.includes('<') ? rest.slice(0, rest.indexOf('<')) : rest;
+
+	if (!name || (rest.includes('<') && !rest.endsWith('>'))) {
+		throw new Error(`Invalid struct tag: ${type}`);
+	}
+
 	const typeParams = rest.includes('<')
 		? splitGenericParameters(rest.slice(rest.indexOf('<') + 1, rest.lastIndexOf('>'))).map(
 				(typeParam) => parseTypeTag(typeParam.trim()),
@@ -67,6 +154,12 @@ export function parseStructTag(type: string): StructTag {
 }
 
 export function normalizeStructTag(type: string | StructTag): string {
+	if (typeof type === 'string' && type.startsWith('vector<')) {
+		throw new Error(
+			'normalizeStructTag does not support vector types. Use normalizeTypeTag instead.',
+		);
+	}
+
 	const { address, module, name, typeParams } =
 		typeof type === 'string' ? parseStructTag(type) : type;
 

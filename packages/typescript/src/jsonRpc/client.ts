@@ -3,8 +3,9 @@
 import { fromBase58, toBase64, toHex } from 'rtd-bcs';
 
 import type { Signer } from '../cryptography/index.js';
-import { Experimental_BaseClient } from '../experimental/client.js';
-import type { Experimental_RtdClientTypes } from '../experimental/types.js';
+import { BaseClient } from '../client/client.js';
+import type { RtdClientTypes } from '../client/types.js';
+import { isCoinReservationDigest } from '../utils/coin-reservation.js';
 import type { Transaction } from '../transactions/Transaction.js';
 import { isTransaction } from '../transactions/Transaction.js';
 import {
@@ -77,9 +78,6 @@ import type {
 	ResolvedNameServiceNames,
 	ResolveNameServiceAddressParams,
 	ResolveNameServiceNamesParams,
-	SubscribeEventParams,
-	SubscribeTransactionParams,
-	RtdEvent,
 	RtdMoveFunctionArgType,
 	RtdMoveNormalizedFunction,
 	RtdMoveNormalizedModule,
@@ -90,17 +88,19 @@ import type {
 	RtdSystemStateSummary,
 	RtdTransactionBlockResponse,
 	RtdTransactionBlockResponseQuery,
-	TransactionEffects,
 	TryGetPastObjectParams,
-	Unsubscribe,
 	ValidatorsApy,
 	VerifyZkLoginSignatureParams,
 	ZkLoginVerifyResult,
 } from './types/index.js';
 import { isValidNamedPackage } from '../utils/move-registry.js';
-import { hasMvrName } from '../experimental/mvr.js';
+import { hasMvrName } from '../client/mvr.js';
 import { JSONRpcCoreClient } from './core.js';
 
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+ * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface PaginationArguments<Cursor> {
 	/** Optional paging cursor */
 	cursor?: Cursor;
@@ -108,17 +108,23 @@ export interface PaginationArguments<Cursor> {
 	limit?: number | null;
 }
 
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+ * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface OrderArguments {
 	order?: Order | null;
 }
 
 /**
- * Configuration options for the RtdClient
+ * Configuration options for the RtdJsonRpcClient
  * You must provide either a `url` or a `transport`
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+ * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
  */
 export type RtdJsonRpcClientOptions = NetworkOrTransport & {
-	network?: Experimental_RtdClientTypes.Network;
-	mvr?: Experimental_RtdClientTypes.MvrOptions;
+	network: RtdClientTypes.Network;
+	mvr?: RtdClientTypes.MvrOptions;
 };
 
 type NetworkOrTransport =
@@ -131,16 +137,32 @@ type NetworkOrTransport =
 			url?: never;
 	  };
 
-const RTD_CLIENT_BRAND = Symbol.for('rtd-RtdClient') as never;
+const RTD_CLIENT_BRAND = Symbol.for('rtd-RtdJsonRpcClient') as never;
 
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+ * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export function isRtdJsonRpcClient(client: unknown): client is RtdJsonRpcClient {
 	return (
 		typeof client === 'object' && client !== null && (client as any)[RTD_CLIENT_BRAND] === true
 	);
 }
 
-export class RtdJsonRpcClient extends Experimental_BaseClient {
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+ * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
+export class RtdJsonRpcClient extends BaseClient {
+	/**
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+	 */
 	core: JSONRpcCoreClient;
+	/**
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+	 */
 	jsonRpc = this;
 	protected transport: JsonRpcTransport;
 
@@ -152,9 +174,11 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 	 * Establish a connection to a Rtd RPC endpoint
 	 *
 	 * @param options configuration options for the API Client
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
 	 */
 	constructor(options: RtdJsonRpcClientOptions) {
-		super({ network: options.network ?? 'unknown' });
+		super({ network: options.network });
 		this.transport = options.transport ?? new JsonRpcHTTPTransport({ url: options.url });
 		this.core = new JSONRpcCoreClient({
 			jsonRpcClient: this,
@@ -162,6 +186,10 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 		});
 	}
 
+	/**
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+	 */
 	async getRpcApiVersion({ signal }: { signal?: AbortSignal } = {}): Promise<string | undefined> {
 		const resp = await this.transport.request<{ info: { version: string } }>({
 			method: 'rpc.discover',
@@ -174,6 +202,8 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 
 	/**
 	 * Get all Coin<`coin_type`> objects owned by an address.
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
 	 */
 	async getCoins({
 		coinType,
@@ -190,34 +220,49 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 			coinType = (
 				await this.core.mvr.resolveType({
 					type: coinType,
+					signal,
 				})
 			).type;
 		}
 
-		return await this.transport.request({
+		const result: PaginatedCoins = await this.transport.request({
 			method: 'rtdx_getCoins',
 			params: [owner, coinType, cursor, limit],
 			signal: signal,
 		});
+
+		return {
+			...result,
+			data: result.data.filter((coin) => !isCoinReservationDigest(coin.digest)),
+		};
 	}
 
 	/**
 	 * Get all Coin objects owned by an address.
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
 	 */
 	async getAllCoins(input: GetAllCoinsParams): Promise<PaginatedCoins> {
 		if (!input.owner || !isValidRtdAddress(normalizeRtdAddress(input.owner))) {
 			throw new Error('Invalid Rtd address');
 		}
 
-		return await this.transport.request({
+		const result: PaginatedCoins = await this.transport.request({
 			method: 'rtdx_getAllCoins',
 			params: [input.owner, input.cursor, input.limit],
 			signal: input.signal,
 		});
+
+		return {
+			...result,
+			data: result.data.filter((coin) => !isCoinReservationDigest(coin.digest)),
+		};
 	}
 
 	/**
 	 * Get the total coin balance for one coin type, owned by the address owner.
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
 	 */
 	async getBalance({ owner, coinType, signal }: GetBalanceParams): Promise<CoinBalance> {
 		if (!owner || !isValidRtdAddress(normalizeRtdAddress(owner))) {
@@ -228,6 +273,7 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 			coinType = (
 				await this.core.mvr.resolveType({
 					type: coinType,
+					signal,
 				})
 			).type;
 		}
@@ -241,6 +287,8 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 
 	/**
 	 * Get the total coin balance for all coin types, owned by the address owner.
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
 	 */
 	async getAllBalances(input: GetAllBalancesParams): Promise<CoinBalance[]> {
 		if (!input.owner || !isValidRtdAddress(normalizeRtdAddress(input.owner))) {
@@ -255,12 +303,15 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 
 	/**
 	 * Fetch CoinMetadata for a given coin type
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
 	 */
 	async getCoinMetadata({ coinType, signal }: GetCoinMetadataParams): Promise<CoinMetadata | null> {
 		if (coinType && hasMvrName(coinType)) {
 			coinType = (
 				await this.core.mvr.resolveType({
 					type: coinType,
+					signal,
 				})
 			).type;
 		}
@@ -274,12 +325,15 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 
 	/**
 	 *  Fetch total supply for a coin
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
 	 */
 	async getTotalSupply({ coinType, signal }: GetTotalSupplyParams): Promise<CoinSupply> {
 		if (coinType && hasMvrName(coinType)) {
 			coinType = (
 				await this.core.mvr.resolveType({
 					type: coinType,
+					signal,
 				})
 			).type;
 		}
@@ -295,6 +349,8 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 	 * Invoke any RPC method
 	 * @param method the method to be invoked
 	 * @param args the arguments to be passed to the RPC request
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
 	 */
 	async call<T = unknown>(
 		method: string,
@@ -306,6 +362,8 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 
 	/**
 	 * Get Move function argument types like read, write and full access
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
 	 */
 	async getMoveFunctionArgTypes({
 		package: pkg,
@@ -317,6 +375,7 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 			pkg = (
 				await this.core.mvr.resolvePackage({
 					package: pkg,
+					signal,
 				})
 			).package;
 		}
@@ -331,6 +390,8 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 	/**
 	 * Get a map from module name to
 	 * structured representations of Move modules
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
 	 */
 	async getNormalizedMoveModulesByPackage({
 		package: pkg,
@@ -340,6 +401,7 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 			pkg = (
 				await this.core.mvr.resolvePackage({
 					package: pkg,
+					signal,
 				})
 			).package;
 		}
@@ -353,6 +415,8 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 
 	/**
 	 * Get a structured representation of Move module
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
 	 */
 	async getNormalizedMoveModule({
 		package: pkg,
@@ -363,6 +427,7 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 			pkg = (
 				await this.core.mvr.resolvePackage({
 					package: pkg,
+					signal,
 				})
 			).package;
 		}
@@ -376,6 +441,8 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 
 	/**
 	 * Get a structured representation of Move function
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
 	 */
 	async getNormalizedMoveFunction({
 		package: pkg,
@@ -387,6 +454,7 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 			pkg = (
 				await this.core.mvr.resolvePackage({
 					package: pkg,
+					signal,
 				})
 			).package;
 		}
@@ -400,6 +468,8 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 
 	/**
 	 * Get a structured representation of Move struct
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
 	 */
 	async getNormalizedMoveStruct({
 		package: pkg,
@@ -411,6 +481,7 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 			pkg = (
 				await this.core.mvr.resolvePackage({
 					package: pkg,
+					signal,
 				})
 			).package;
 		}
@@ -424,6 +495,8 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 
 	/**
 	 * Get all objects owned by an address
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
 	 */
 	async getOwnedObjects(input: GetOwnedObjectsParams): Promise<PaginatedObjectsResponse> {
 		if (!input.owner || !isValidRtdAddress(normalizeRtdAddress(input.owner))) {
@@ -442,6 +515,7 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 				package: (
 					await this.core.mvr.resolvePackage({
 						package: filter.MoveModule.package,
+						signal: input.signal,
 					})
 				).package,
 			};
@@ -449,6 +523,7 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 			filter.StructType = (
 				await this.core.mvr.resolveType({
 					type: filter.StructType,
+					signal: input.signal,
 				})
 			).type;
 		}
@@ -470,6 +545,8 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 
 	/**
 	 * Get details about an object
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
 	 */
 	async getObject(input: GetObjectParams): Promise<RtdObjectResponse> {
 		if (!input.id || !isValidRtdObjectId(normalizeRtdObjectId(input.id))) {
@@ -482,6 +559,10 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 		});
 	}
 
+	/**
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+	 */
 	async tryGetPastObject(input: TryGetPastObjectParams): Promise<ObjectRead> {
 		return await this.transport.request({
 			method: 'rtd_tryGetPastObject',
@@ -492,6 +573,8 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 
 	/**
 	 * Batch get details about a list of objects. If any of the object ids are duplicates the call will fail
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
 	 */
 	async multiGetObjects(input: MultiGetObjectsParams): Promise<RtdObjectResponse[]> {
 		input.ids.forEach((id) => {
@@ -513,6 +596,8 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 
 	/**
 	 * Get transaction blocks for a given query criteria
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
 	 */
 	async queryTransactionBlocks({
 		filter,
@@ -529,6 +614,7 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 					package: (
 						await this.core.mvr.resolvePackage({
 							package: filter.MoveFunction.package,
+							signal,
 						})
 					).package,
 				},
@@ -550,6 +636,10 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 		});
 	}
 
+	/**
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+	 */
 	async getTransactionBlock(
 		input: GetTransactionBlockParams,
 	): Promise<RtdTransactionBlockResponse> {
@@ -563,6 +653,10 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 		});
 	}
 
+	/**
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+	 */
 	async multiGetTransactionBlocks(
 		input: MultiGetTransactionBlocksParams,
 	): Promise<RtdTransactionBlockResponse[]> {
@@ -584,11 +678,14 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 		});
 	}
 
+	/**
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+	 */
 	async executeTransactionBlock({
 		transactionBlock,
 		signature,
 		options,
-		requestType,
 		signal,
 	}: ExecuteTransactionBlockParams): Promise<RtdTransactionBlockResponse> {
 		const result: RtdTransactionBlockResponse = await this.transport.request({
@@ -601,19 +698,13 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 			signal,
 		});
 
-		if (requestType === 'WaitForLocalExecution') {
-			try {
-				await this.waitForTransaction({
-					digest: result.digest,
-				});
-			} catch {
-				// Ignore error while waiting for transaction
-			}
-		}
-
 		return result;
 	}
 
+	/**
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+	 */
 	async signAndExecuteTransaction({
 		transaction,
 		signer,
@@ -647,6 +738,10 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 	 * Get total number of transactions
 	 */
 
+	/**
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+	 */
 	async getTotalTransactionBlocks({ signal }: { signal?: AbortSignal } = {}): Promise<bigint> {
 		const resp = await this.transport.request<string>({
 			method: 'rtd_getTotalTransactionBlocks',
@@ -658,6 +753,8 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 
 	/**
 	 * Getting the reference gas price for the network
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
 	 */
 	async getReferenceGasPrice({ signal }: GetReferenceGasPriceParams = {}): Promise<bigint> {
 		const resp = await this.transport.request<string>({
@@ -670,6 +767,8 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 
 	/**
 	 * Return the delegated stakes for an address
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
 	 */
 	async getStakes(input: GetStakesParams): Promise<DelegatedStake[]> {
 		if (!input.owner || !isValidRtdAddress(normalizeRtdAddress(input.owner))) {
@@ -684,6 +783,8 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 
 	/**
 	 * Return the delegated stakes queried by id.
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
 	 */
 	async getStakesByIds(input: GetStakesByIdsParams): Promise<DelegatedStake[]> {
 		input.stakedRtdIds.forEach((id) => {
@@ -700,6 +801,8 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 
 	/**
 	 * Return the latest system state content.
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
 	 */
 	async getLatestRtdSystemState({
 		signal,
@@ -713,6 +816,8 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 
 	/**
 	 * Get events for a given query criteria
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
 	 */
 	async queryEvents({
 		query,
@@ -727,6 +832,7 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 				MoveEventType: (
 					await this.core.mvr.resolveType({
 						type: query.MoveEventType,
+						signal,
 					})
 				).type,
 			};
@@ -740,6 +846,7 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 					package: (
 						await this.core.mvr.resolvePackage({
 							package: query.MoveEventModule.package,
+							signal,
 						})
 					).package,
 				},
@@ -754,6 +861,7 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 					package: (
 						await this.core.mvr.resolvePackage({
 							package: query.MoveModule.package,
+							signal,
 						})
 					).package,
 				},
@@ -768,47 +876,11 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 	}
 
 	/**
-	 * Subscribe to get notifications whenever an event matching the filter occurs
-	 *
-	 * @deprecated
-	 */
-	async subscribeEvent(
-		input: SubscribeEventParams & {
-			/** function to run when we receive a notification of a new event matching the filter */
-			onMessage: (event: RtdEvent) => void;
-		},
-	): Promise<Unsubscribe> {
-		return this.transport.subscribe({
-			method: 'rtdx_subscribeEvent',
-			unsubscribe: 'rtdx_unsubscribeEvent',
-			params: [input.filter],
-			onMessage: input.onMessage,
-			signal: input.signal,
-		});
-	}
-
-	/**
-	 * @deprecated
-	 */
-	async subscribeTransaction(
-		input: SubscribeTransactionParams & {
-			/** function to run when we receive a notification of a new event matching the filter */
-			onMessage: (event: TransactionEffects) => void;
-		},
-	): Promise<Unsubscribe> {
-		return this.transport.subscribe({
-			method: 'rtdx_subscribeTransaction',
-			unsubscribe: 'rtdx_unsubscribeTransaction',
-			params: [input.filter],
-			onMessage: input.onMessage,
-			signal: input.signal,
-		});
-	}
-
-	/**
 	 * Runs the transaction block in dev-inspect mode. Which allows for nearly any
 	 * transaction (or Move call) with any arguments. Detailed results are
 	 * provided, including both the transaction effects and any return values.
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
 	 */
 	async devInspectTransactionBlock(
 		input: DevInspectTransactionBlockParams,
@@ -841,6 +913,8 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 
 	/**
 	 * Dry run a transaction block and return the result.
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
 	 */
 	async dryRunTransactionBlock(
 		input: DryRunTransactionBlockParams,
@@ -857,6 +931,8 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 
 	/**
 	 * Return the list of dynamic field objects owned by an object
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
 	 */
 	async getDynamicFields(input: GetDynamicFieldsParams): Promise<DynamicFieldPage> {
 		if (!input.parentId || !isValidRtdObjectId(normalizeRtdObjectId(input.parentId))) {
@@ -871,6 +947,8 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 
 	/**
 	 * Return the dynamic field object information for a specified object
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
 	 */
 	async getDynamicFieldObject(input: GetDynamicFieldObjectParams): Promise<RtdObjectResponse> {
 		return await this.transport.request({
@@ -882,6 +960,8 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 
 	/**
 	 * Get the sequence number of the latest checkpoint that has been executed
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
 	 */
 	async getLatestCheckpointSequenceNumber({
 		signal,
@@ -896,6 +976,8 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 
 	/**
 	 * Returns information about a given checkpoint
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
 	 */
 	async getCheckpoint(input: GetCheckpointParams): Promise<Checkpoint> {
 		return await this.transport.request({
@@ -907,6 +989,8 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 
 	/**
 	 * Returns historical checkpoints paginated
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
 	 */
 	async getCheckpoints(
 		input: PaginationArguments<CheckpointPage['nextCursor']> & GetCheckpointsParams,
@@ -920,6 +1004,8 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 
 	/**
 	 * Return the committee information for the asked epoch
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
 	 */
 	async getCommitteeInfo(input?: GetCommitteeInfoParams): Promise<CommitteeInfo> {
 		return await this.transport.request({
@@ -929,6 +1015,10 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 		});
 	}
 
+	/**
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+	 */
 	async getNetworkMetrics({ signal }: { signal?: AbortSignal } = {}): Promise<NetworkMetrics> {
 		return await this.transport.request({
 			method: 'rtdx_getNetworkMetrics',
@@ -937,6 +1027,10 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 		});
 	}
 
+	/**
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+	 */
 	async getAddressMetrics({ signal }: { signal?: AbortSignal } = {}): Promise<AddressMetrics> {
 		return await this.transport.request({
 			method: 'rtdx_getLatestAddressMetrics',
@@ -945,6 +1039,10 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 		});
 	}
 
+	/**
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+	 */
 	async getEpochMetrics(
 		input?: {
 			descendingOrder?: boolean;
@@ -958,6 +1056,10 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 		});
 	}
 
+	/**
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+	 */
 	async getAllEpochAddressMetrics(input?: {
 		descendingOrder?: boolean;
 		signal?: AbortSignal;
@@ -971,6 +1073,8 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 
 	/**
 	 * Return the committee information for the asked epoch
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
 	 */
 	async getEpochs(
 		input?: {
@@ -987,6 +1091,8 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 
 	/**
 	 * Returns list of top move calls by usage
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
 	 */
 	async getMoveCallMetrics({ signal }: { signal?: AbortSignal } = {}): Promise<MoveCallMetrics> {
 		return await this.transport.request({
@@ -998,6 +1104,8 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 
 	/**
 	 * Return the committee information for the asked epoch
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
 	 */
 	async getCurrentEpoch({ signal }: { signal?: AbortSignal } = {}): Promise<EpochInfo> {
 		return await this.transport.request({
@@ -1009,6 +1117,8 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 
 	/**
 	 * Return the Validators APYs
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
 	 */
 	async getValidatorsApy({ signal }: { signal?: AbortSignal } = {}): Promise<ValidatorsApy> {
 		return await this.transport.request({
@@ -1019,12 +1129,20 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 	}
 
 	// TODO: Migrate this to `rtd_getChainIdentifier` once it is widely available.
+	/**
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+	 */
 	async getChainIdentifier({ signal }: { signal?: AbortSignal } = {}): Promise<string> {
 		const checkpoint = await this.getCheckpoint({ id: '0', signal });
 		const bytes = fromBase58(checkpoint.digest);
 		return toHex(bytes.slice(0, 4));
 	}
 
+	/**
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+	 */
 	async resolveNameServiceAddress(input: ResolveNameServiceAddressParams): Promise<string | null> {
 		return await this.transport.request({
 			method: 'rtdx_resolveNameServiceAddress',
@@ -1033,6 +1151,10 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 		});
 	}
 
+	/**
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+	 */
 	async resolveNameServiceNames({
 		format = 'dot',
 		...input
@@ -1053,6 +1175,10 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 		};
 	}
 
+	/**
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+	 */
 	async getProtocolConfig(input?: GetProtocolConfigParams): Promise<ProtocolConfig> {
 		return await this.transport.request({
 			method: 'rtd_getProtocolConfig',
@@ -1061,6 +1187,10 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 		});
 	}
 
+	/**
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+	 */
 	async verifyZkLoginSignature(input: VerifyZkLoginSignatureParams): Promise<ZkLoginVerifyResult> {
 		return await this.transport.request({
 			method: 'rtd_verifyZkLoginSignature',
@@ -1074,6 +1204,8 @@ export class RtdJsonRpcClient extends Experimental_BaseClient {
 	 * This can be used in conjunction with `executeTransactionBlock` to wait for the transaction to
 	 * be available via the API.
 	 * This currently polls the `getTransactionBlock` API to check for the transaction.
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
 	 */
 	async waitForTransaction({
 		signal,

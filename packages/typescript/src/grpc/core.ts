@@ -1,26 +1,41 @@
 // Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import type {
-	Experimental_CoreClientOptions,
-	Experimental_RtdClientTypes,
-} from '../experimental/index.js';
-import { Experimental_CoreClient } from '../experimental/index.js';
+import type { CoreClientOptions, RtdClientTypes } from '../client/index.js';
+import {
+	CoreClient,
+	formatMoveAbortMessage,
+	ObjectError,
+	SimulationError,
+	TransactionError,
+} from '../client/index.js';
+import { raceSignal } from '../client/mvr.js';
 import type { RtdGrpcClient } from './client.js';
 import type { Owner } from './proto/rtd/rpc/v2/owner.js';
 import { Owner_OwnerKind } from './proto/rtd/rpc/v2/owner.js';
 import { chunk, fromBase64, toBase64 } from 'rtd-utils';
-import type { ExecutedTransaction } from './proto/rtd/rpc/v2/executed_transaction.js';
 import type { TransactionEffects } from './proto/rtd/rpc/v2/effects.js';
-import { UnchangedConsensusObject_UnchangedConsensusObjectKind } from './proto/rtd/rpc/v2/effects.js';
 import {
+	UnchangedConsensusObject_UnchangedConsensusObjectKind,
 	ChangedObject_IdOperation,
 	ChangedObject_InputObjectState,
 	ChangedObject_OutputObjectState,
 } from './proto/rtd/rpc/v2/effects.js';
+import type {
+	ExecutionError as GrpcExecutionError,
+	MoveAbort as GrpcMoveAbort,
+} from './proto/rtd/rpc/v2/execution_status.js';
+import {
+	ExecutionError_ExecutionErrorKind,
+	CommandArgumentError_CommandArgumentErrorKind,
+	TypeArgumentError_TypeArgumentErrorKind,
+	PackageUpgradeError_PackageUpgradeErrorKind,
+} from './proto/rtd/rpc/v2/execution_status.js';
 import type { BuildTransactionOptions } from '../transactions/index.js';
 import { TransactionDataBuilder } from '../transactions/index.js';
 import { bcs } from '../bcs/index.js';
+import { normalizeStructTag, normalizeRtdAddress } from '../utils/rtd-types.js';
+import { RTD_TYPE_ARG } from '../utils/constants.js';
 import type { OpenSignature, OpenSignatureBody } from './proto/rtd/rpc/v2/move_package.js';
 import {
 	Ability,
@@ -28,59 +43,162 @@ import {
 	OpenSignature_Reference,
 	OpenSignatureBody_Type,
 } from './proto/rtd/rpc/v2/move_package.js';
-export interface GrpcCoreClientOptions extends Experimental_CoreClientOptions {
+import {
+	applyGrpcResolvedTransaction,
+	transactionDataToGrpcTransaction,
+	transactionToGrpcTransaction,
+	grpcTransactionToTransactionData,
+} from '../client/transaction-resolver.js';
+import { setAddressBalanceTransactionExpirationFromSimulatedEpoch } from '../client/address-balance-transaction-expiration.js';
+import { transactionBytesHaveEmptyGasPayment } from '../client/utils.js';
+import { Value } from './proto/google/protobuf/struct.js';
+import { ExecutedTransaction } from './proto/rtd/rpc/v2/executed_transaction.js';
+import {
+	SimulateTransactionRequest_TransactionChecks,
+	SimulateTransactionResponse,
+} from './proto/rtd/rpc/v2/transaction_execution_service.js';
+import type { QueryEnd, QueryOptions } from './proto/rtd/rpc/v2/query_options.js';
+import { Ordering, QueryEndReason } from './proto/rtd/rpc/v2/query_options.js';
+import type { ResolvedPagination } from '../client/query-filters.js';
+import { RpcError } from '@protobuf-ts/runtime-rpc';
+import { GrpcStatusCode } from '@protobuf-ts/grpcweb-transport';
+import {
+	resolveEventFilter,
+	resolvePagination,
+	resolveTransactionFilter,
+	validateTransactionQuery,
+} from '../client/query-filters.js';
+import { toGrpcEventFilter, toGrpcTransactionFilter } from './filters.js';
+import { hasDecodedStatusMessage } from './transport.js';
+
+export interface GrpcCoreClientOptions extends CoreClientOptions {
 	client: RtdGrpcClient;
 }
-export class GrpcCoreClient extends Experimental_CoreClient {
+
+function isNameServiceResolutionMiss(error: unknown): boolean {
+	// Read by shape, so an error from another copy of runtime-rpc is still recognised.
+	if (typeof error !== 'object' || error === null) return false;
+
+	const { code, message } = error as { code?: unknown; message?: unknown };
+	if (typeof code !== 'string' || typeof message !== 'string') return false;
+
+	if (code === GrpcStatusCode[GrpcStatusCode.NOT_FOUND]) return true;
+	if (code !== GrpcStatusCode[GrpcStatusCode.RESOURCE_EXHAUSTED]) return false;
+
+	// The service reports an expired name as RESOURCE_EXHAUSTED with no structured reason, so match
+	// the status text and leave other RESOURCE_EXHAUSTED failures alone. A transport this package did
+	// not build leaves `grpc-message` encoded, hence the second form.
+	if (message === 'name has expired') return true;
+
+	return !hasDecodedStatusMessage(error) && message === 'name%20has%20expired';
+}
+
+export class GrpcCoreClient extends CoreClient {
 	#client: RtdGrpcClient;
 	constructor({ client, ...options }: GrpcCoreClientOptions) {
 		super(options);
 		this.#client = client;
 	}
 
-	async getObjects(
-		options: Experimental_RtdClientTypes.GetObjectsOptions,
-	): Promise<Experimental_RtdClientTypes.GetObjectsResponse> {
+	async getObjects<Include extends RtdClientTypes.ObjectInclude = {}>(
+		options: RtdClientTypes.GetObjectsOptions<Include>,
+	): Promise<RtdClientTypes.GetObjectsResponse<Include>> {
 		const batches = chunk(options.objectIds, 50);
-		const results: Experimental_RtdClientTypes.GetObjectsResponse['objects'] = [];
+		const results: RtdClientTypes.GetObjectsResponse<Include>['objects'] = [];
+
+		const paths = ['owner', 'object_type', 'digest', 'version', 'object_id'];
+		if (options.include?.content) {
+			paths.push('contents');
+		}
+		if (options.include?.previousTransaction) {
+			paths.push('previous_transaction');
+		}
+		if (options.include?.objectBcs) {
+			paths.push('bcs');
+		}
+		if (options.include?.json) {
+			paths.push('json');
+		}
+		if (options.include?.display) {
+			paths.push('display');
+		}
 
 		for (const batch of batches) {
-			const response = await this.#client.ledgerService.batchGetObjects({
-				requests: batch.map((id) => ({ objectId: id })),
-				readMask: {
-					paths: [
-						'owner',
-						'object_type',
-						'bcs',
-						'digest',
-						'version',
-						'object_id',
-						'previous_transaction',
-					],
+			const response = await this.#client.ledgerService.batchGetObjects(
+				{
+					requests: batch.map((id) => ({ objectId: id })),
+					readMask: {
+						paths,
+					},
 				},
-			});
+				{ abort: options.signal },
+			);
 
 			results.push(
 				...response.response.objects.map(
-					(object): Experimental_RtdClientTypes.ObjectResponse | Error => {
+					(object, index): RtdClientTypes.Object<Include> | ObjectError => {
 						if (object.result.oneofKind === 'error') {
-							// TODO: improve error handling
-							return new Error(object.result.error.message);
+							const error = object.result.error;
+							if (error.code === GrpcStatusCode.NOT_FOUND) {
+								// Special case for backwards compatibility: missing objects reuse
+								// the long-standing JSON-RPC `notExists` code instead of the gRPC
+								// status name, so handlers written against earlier releases keep
+								// working.
+								return new ObjectError('notExists', error.message, {
+									cause: error,
+									reason: 'notFound',
+									objectId: batch[index],
+								});
+							}
+							// Other statuses use the gRPC status name (for example `INTERNAL`),
+							// never the raw status number.
+							return new ObjectError(GrpcStatusCode[error.code] ?? 'unknown', error.message, {
+								cause: error,
+								reason: 'unknown',
+								objectId: batch[index],
+							});
 						}
 
 						if (object.result.oneofKind !== 'object') {
-							return new Error('Unexpected result type');
+							return new ObjectError('unknown', 'Unexpected result type', {
+								reason: 'unknown',
+								objectId: batch[index],
+							});
 						}
 
+						const bcsContent = object.result.object.contents?.value ?? undefined;
+						const objectBcs = object.result.object.bcs?.value ?? undefined;
+
+						// Package objects have type "package" which is not a struct tag, so don't normalize it
+						const objectType = object.result.object.objectType;
+						const type =
+							objectType && objectType.includes('::')
+								? normalizeStructTag(objectType)
+								: (objectType ?? '');
+
+						const jsonContent = options.include?.json
+							? object.result.object.json
+								? (Value.toJson(object.result.object.json) as Record<string, unknown>)
+								: null
+							: undefined;
+
+						const displayData = mapDisplayProto(
+							options.include?.display,
+							object.result.object.display,
+						);
+
 						return {
-							id: object.result.object.objectId!,
+							objectId: object.result.object.objectId!,
 							version: object.result.object.version?.toString()!,
 							digest: object.result.object.digest!,
-							// TODO: bcs content is not returned in all cases
-							content: Promise.resolve(object.result.object.bcs?.value!),
+							content: bcsContent as RtdClientTypes.Object<Include>['content'],
 							owner: mapOwner(object.result.object.owner)!,
-							type: object.result.object.objectType!,
-							previousTransaction: object.result.object.previousTransaction ?? null,
+							type,
+							previousTransaction: (object.result.object.previousTransaction ??
+								undefined) as RtdClientTypes.Object<Include>['previousTransaction'],
+							objectBcs: objectBcs as RtdClientTypes.Object<Include>['objectBcs'],
+							json: jsonContent as RtdClientTypes.Object<Include>['json'],
+							display: displayData as RtdClientTypes.Object<Include>['display'],
 						};
 					},
 				),
@@ -91,46 +209,61 @@ export class GrpcCoreClient extends Experimental_CoreClient {
 			objects: results,
 		};
 	}
-	async getOwnedObjects(
-		options: Experimental_RtdClientTypes.GetOwnedObjectsOptions,
-	): Promise<Experimental_RtdClientTypes.GetOwnedObjectsResponse> {
-		const response = await this.#client.stateService.listOwnedObjects({
-			owner: options.address,
-			objectType: options.type
-				? (await this.mvr.resolveType({ type: options.type })).type
-				: undefined,
-			pageToken: options.cursor ? fromBase64(options.cursor) : undefined,
-			readMask: {
-				paths: [
-					'owner',
-					'object_type',
-					'bcs',
-					'digest',
-					'version',
-					'object_id',
-					'previous_transaction',
-				],
-			},
-		});
+	async listOwnedObjects<Include extends RtdClientTypes.ObjectInclude = {}>(
+		options: RtdClientTypes.ListOwnedObjectsOptions<Include>,
+	): Promise<RtdClientTypes.ListOwnedObjectsResponse<Include>> {
+		const paths = ['owner', 'object_type', 'digest', 'version', 'object_id'];
+		if (options.include?.content) {
+			paths.push('contents');
+		}
+		if (options.include?.previousTransaction) {
+			paths.push('previous_transaction');
+		}
+		if (options.include?.objectBcs) {
+			paths.push('bcs');
+		}
+		if (options.include?.json) {
+			paths.push('json');
+		}
+		if (options.include?.display) {
+			paths.push('display');
+		}
 
-		const objects = response.response.objects.map(
-			(object): Experimental_RtdClientTypes.ObjectResponse => ({
-				id: object.objectId!,
-				version: object.version?.toString()!,
-				digest: object.digest!,
-				// TODO: List owned objects doesn't return content right now
-				get content() {
-					return object.bcs?.value
-						? Promise.resolve(object.bcs.value)
-						: Promise.reject(
-								new Error('GRPC does not return object contents when listing owned objects'),
-							);
+		const response = await this.#client.stateService.listOwnedObjects(
+			{
+				owner: options.owner,
+				objectType: options.type
+					? (await this.mvr.resolveType({ type: options.type, signal: options.signal })).type
+					: undefined,
+				pageToken: options.cursor ? fromBase64(options.cursor) : undefined,
+				pageSize: options.limit,
+				readMask: {
+					paths,
 				},
-				owner: mapOwner(object.owner)!,
-				type: object.objectType!,
-				previousTransaction: object.previousTransaction ?? null,
-			}),
+			},
+			{ abort: options.signal },
 		);
+
+		const objects = response.response.objects.map((object): RtdClientTypes.Object<Include> => ({
+			objectId: object.objectId!,
+			version: object.version?.toString()!,
+			digest: object.digest!,
+			content: object.contents?.value as RtdClientTypes.Object<Include>['content'],
+			owner: mapOwner(object.owner)!,
+			type: object.objectType!,
+			previousTransaction: (object.previousTransaction ??
+				undefined) as RtdClientTypes.Object<Include>['previousTransaction'],
+			objectBcs: object.bcs?.value as RtdClientTypes.Object<Include>['objectBcs'],
+			json: (options.include?.json
+				? object.json
+					? (Value.toJson(object.json) as Record<string, unknown>)
+					: null
+				: undefined) as RtdClientTypes.Object<Include>['json'],
+			display: mapDisplayProto(
+				options.include?.display,
+				object.display,
+			) as RtdClientTypes.Object<Include>['display'],
+		}));
 
 		return {
 			objects,
@@ -138,76 +271,111 @@ export class GrpcCoreClient extends Experimental_CoreClient {
 			hasNextPage: response.response.nextPageToken !== undefined,
 		};
 	}
-	async getCoins(
-		options: Experimental_RtdClientTypes.GetCoinsOptions,
-	): Promise<Experimental_RtdClientTypes.GetCoinsResponse> {
-		const response = await this.#client.stateService.listOwnedObjects({
-			owner: options.address,
-			objectType: `0x2::coin::Coin<${(await this.mvr.resolveType({ type: options.coinType })).type}>`,
-			pageToken: options.cursor ? fromBase64(options.cursor) : undefined,
-			readMask: {
-				paths: [
-					'owner',
-					'object_type',
-					'bcs',
-					'digest',
-					'version',
-					'object_id',
-					'balance',
-					'previous_transaction',
-				],
+	async listCoins(
+		options: RtdClientTypes.ListCoinsOptions,
+	): Promise<RtdClientTypes.ListCoinsResponse> {
+		const paths = ['owner', 'object_type', 'digest', 'version', 'object_id', 'balance'];
+		const coinType = options.coinType ?? RTD_TYPE_ARG;
+
+		const response = await this.#client.stateService.listOwnedObjects(
+			{
+				owner: options.owner,
+				objectType: `0x2::coin::Coin<${(await this.mvr.resolveType({ type: coinType, signal: options.signal })).type}>`,
+				pageToken: options.cursor ? fromBase64(options.cursor) : undefined,
+				pageSize: options.limit,
+				readMask: {
+					paths,
+				},
 			},
-		});
+			{ abort: options.signal },
+		);
 
 		return {
-			objects: response.response.objects.map(
-				(object): Experimental_RtdClientTypes.CoinResponse => ({
-					id: object.objectId!,
-					version: object.version?.toString()!,
-					digest: object.digest!,
-					// TODO: List owned objects doesn't return content right now
-					get content() {
-						return object.bcs?.value
-							? Promise.resolve(object.bcs.value)
-							: Promise.reject(
-									new Error('GRPC does not return object contents when listing owned objects'),
-								);
-					},
-					owner: mapOwner(object.owner)!,
-					type: object.objectType!,
-					balance: object.balance?.toString()!,
-					previousTransaction: object.previousTransaction ?? null,
-				}),
-			),
+			objects: response.response.objects.map((object): RtdClientTypes.Coin => ({
+				objectId: object.objectId!,
+				version: object.version?.toString()!,
+				digest: object.digest!,
+				owner: mapOwner(object.owner)!,
+				type: object.objectType!,
+				balance: object.balance?.toString()!,
+			})),
 			cursor: response.response.nextPageToken ? toBase64(response.response.nextPageToken) : null,
 			hasNextPage: response.response.nextPageToken !== undefined,
 		};
 	}
 
 	async getBalance(
-		options: Experimental_RtdClientTypes.GetBalanceOptions,
-	): Promise<Experimental_RtdClientTypes.GetBalanceResponse> {
-		const result = await this.#client.stateService.getBalance({
-			owner: options.address,
-			coinType: (await this.mvr.resolveType({ type: options.coinType })).type,
-		});
+		options: RtdClientTypes.GetBalanceOptions,
+	): Promise<RtdClientTypes.GetBalanceResponse> {
+		const coinType = options.coinType ?? RTD_TYPE_ARG;
+		const result = await this.#client.stateService.getBalance(
+			{
+				owner: options.owner,
+				coinType: (await this.mvr.resolveType({ type: coinType, signal: options.signal })).type,
+			},
+			{ abort: options.signal },
+		);
 
 		return {
 			balance: {
 				balance: result.response.balance?.balance?.toString() ?? '0',
-				coinType: result.response.balance?.coinType ?? options.coinType,
+				coinType: result.response.balance?.coinType ?? coinType,
+				coinBalance: result.response.balance?.coinBalance?.toString() ?? '0',
+				addressBalance: result.response.balance?.addressBalance?.toString() ?? '0',
 			},
 		};
 	}
 
-	async getAllBalances(
-		options: Experimental_RtdClientTypes.GetAllBalancesOptions,
-	): Promise<Experimental_RtdClientTypes.GetAllBalancesResponse> {
-		const result = await this.#client.stateService.listBalances({
-			owner: options.address,
-			pageToken: options.cursor ? fromBase64(options.cursor) : undefined,
-			pageSize: options.limit,
-		});
+	async getCoinMetadata(
+		options: RtdClientTypes.GetCoinMetadataOptions,
+	): Promise<RtdClientTypes.GetCoinMetadataResponse> {
+		const coinType = (
+			await this.mvr.resolveType({ type: options.coinType, signal: options.signal })
+		).type;
+
+		let response;
+		try {
+			({ response } = await this.#client.stateService.getCoinInfo(
+				{
+					coinType,
+				},
+				{ abort: options.signal },
+			));
+		} catch (error) {
+			// Don't swallow cancellation — only treat the coin as missing on real errors.
+			if (options.signal?.aborted) {
+				throw error;
+			}
+			return { coinMetadata: null };
+		}
+
+		if (!response.metadata) {
+			return { coinMetadata: null };
+		}
+
+		return {
+			coinMetadata: {
+				id: response.metadata.id ?? null,
+				decimals: response.metadata.decimals ?? 0,
+				name: response.metadata.name ?? '',
+				symbol: response.metadata.symbol ?? '',
+				description: response.metadata.description ?? '',
+				iconUrl: response.metadata.iconUrl ?? null,
+			},
+		};
+	}
+
+	async listBalances(
+		options: RtdClientTypes.ListBalancesOptions,
+	): Promise<RtdClientTypes.ListBalancesResponse> {
+		const result = await this.#client.stateService.listBalances(
+			{
+				owner: options.owner,
+				pageToken: options.cursor ? fromBase64(options.cursor) : undefined,
+				pageSize: options.limit,
+			},
+			{ abort: options.signal },
+		);
 
 		return {
 			hasNextPage: !!result.response.nextPageToken,
@@ -215,128 +383,446 @@ export class GrpcCoreClient extends Experimental_CoreClient {
 			balances: result.response.balances.map((balance) => ({
 				balance: balance.balance?.toString() ?? '0',
 				coinType: balance.coinType!,
+				coinBalance: balance.coinBalance?.toString() ?? '0',
+				addressBalance: balance.addressBalance?.toString() ?? '0',
 			})),
 		};
 	}
-	async getTransaction(
-		options: Experimental_RtdClientTypes.GetTransactionOptions,
-	): Promise<Experimental_RtdClientTypes.GetTransactionResponse> {
-		const { response } = await this.#client.ledgerService.getTransaction({
-			digest: options.digest,
-			readMask: {
-				paths: ['digest', 'transaction', 'effects', 'signatures', 'balance_changes'],
+	async getTransaction<Include extends RtdClientTypes.TransactionInclude = {}>(
+		options: RtdClientTypes.GetTransactionOptions<Include>,
+	): Promise<RtdClientTypes.TransactionResult<Include>> {
+		try {
+			const { response } = await this.#client.ledgerService.getTransaction(
+				{
+					digest: options.digest,
+					readMask: {
+						paths: transactionReadMaskPaths(options.include),
+					},
+				},
+				{ abort: options.signal },
+			);
+
+			if (!response.transaction) {
+				throw new TransactionError('notFound', options.digest);
+			}
+
+			return withProtoJson(
+				parseGrpcTransactionResponse(response.transaction, { include: options.include }),
+				options.include,
+				() => ExecutedTransaction.toJson(response.transaction!),
+			);
+		} catch (error) {
+			if (error instanceof RpcError && error.code === GrpcStatusCode[GrpcStatusCode.NOT_FOUND]) {
+				throw new TransactionError('notFound', options.digest, { cause: error });
+			}
+			throw error;
+		}
+	}
+	async executeTransaction<Include extends RtdClientTypes.TransactionInclude = {}>(
+		options: RtdClientTypes.ExecuteTransactionOptions<Include>,
+	): Promise<RtdClientTypes.TransactionResult<Include>> {
+		const { response } = await this.#client.transactionExecutionService.executeTransaction(
+			{
+				transaction: {
+					bcs: {
+						value: options.transaction,
+					},
+				},
+				signatures: options.signatures.map((signature) => ({
+					bcs: {
+						value: fromBase64(signature),
+					},
+					signature: {
+						oneofKind: undefined,
+					},
+				})),
+				readMask: {
+					paths: transactionReadMaskPaths(options.include),
+				},
 			},
-		});
+			{ abort: options.signal },
+		);
+
+		return withProtoJson(
+			parseGrpcTransactionResponse(response.transaction!, { include: options.include }),
+			options.include,
+			() => ExecutedTransaction.toJson(response.transaction!),
+		);
+	}
+	async simulateTransaction<Include extends RtdClientTypes.SimulateTransactionInclude = {}>(
+		options: RtdClientTypes.SimulateTransactionOptions<Include> & { doGasSelection?: boolean },
+	): Promise<RtdClientTypes.SimulateTransactionResult<Include>> {
+		// The simulated transaction is nested one level deeper in the response
+		const paths = transactionReadMaskPaths(options.include, 'transaction.');
+		if (options.include?.commandResults) {
+			paths.push('command_outputs');
+		}
+
+		if (!(options.transaction instanceof Uint8Array)) {
+			await options.transaction.prepareForSerialization({ client: this });
+		}
+
+		// A gas payment explicitly set to an empty list means gas is paid from the sender's
+		// address balance, so the server needs to perform gas selection rather than simulating
+		// with a mocked gas coin.
+		const doGasSelection =
+			options.doGasSelection ??
+			(options.transaction instanceof Uint8Array
+				? transactionBytesHaveEmptyGasPayment(options.transaction)
+				: options.transaction.getData().gasData.payment?.length === 0);
+
+		const { response } = await this.#client.transactionExecutionService.simulateTransaction(
+			{
+				transaction:
+					options.transaction instanceof Uint8Array
+						? {
+								bcs: {
+									value: options.transaction,
+								},
+							}
+						: transactionToGrpcTransaction(options.transaction),
+				readMask: {
+					paths,
+				},
+				doGasSelection,
+				checks:
+					options.checksEnabled === false
+						? SimulateTransactionRequest_TransactionChecks.DISABLED
+						: SimulateTransactionRequest_TransactionChecks.ENABLED,
+			},
+			{ abort: options.signal },
+		);
+
+		return withProtoJson(
+			parseGrpcSimulateTransactionResponse(response, { include: options.include }),
+			options.include,
+			() => SimulateTransactionResponse.toJson(response),
+		);
+	}
+	async getReferenceGasPrice(
+		options?: RtdClientTypes.GetReferenceGasPriceOptions,
+	): Promise<RtdClientTypes.GetReferenceGasPriceResponse> {
+		const response = await this.#client.ledgerService.getEpoch(
+			{
+				readMask: {
+					paths: ['reference_gas_price'],
+				},
+			},
+			{ abort: options?.signal },
+		);
 
 		return {
-			transaction: parseTransaction(response.transaction!),
+			referenceGasPrice: response.response.epoch?.referenceGasPrice?.toString() ?? '',
 		};
 	}
-	async executeTransaction(
-		options: Experimental_RtdClientTypes.ExecuteTransactionOptions,
-	): Promise<Experimental_RtdClientTypes.ExecuteTransactionResponse> {
-		const { response } = await this.#client.transactionExecutionService.executeTransaction({
-			transaction: {
-				bcs: {
-					value: options.transaction,
-				},
+
+	async getProtocolConfig(
+		options?: RtdClientTypes.GetProtocolConfigOptions,
+	): Promise<RtdClientTypes.GetProtocolConfigResponse> {
+		const response = await this.#client.ledgerService.getEpoch(
+			{
+				readMask: { paths: ['protocol_config'] },
 			},
-			signatures: options.signatures.map((signature) => ({
-				bcs: {
-					value: fromBase64(signature),
-				},
-				signature: {
-					oneofKind: undefined,
-				},
-			})),
-			readMask: {
-				paths: [
-					'transaction.digest',
-					'transaction.transaction',
-					'transaction.effects',
-					'transaction.signatures',
-					'transaction.balance_changes',
-				],
-			},
-		});
-		return {
-			transaction: parseTransaction(response.transaction!),
-		};
-	}
-	async dryRunTransaction(
-		options: Experimental_RtdClientTypes.DryRunTransactionOptions,
-	): Promise<Experimental_RtdClientTypes.DryRunTransactionResponse> {
-		const { response } = await this.#client.transactionExecutionService.simulateTransaction({
-			transaction: {
-				bcs: {
-					value: options.transaction,
-				},
-			},
-			readMask: {
-				paths: [
-					'transaction.digest',
-					'transaction.transaction',
-					'transaction.effects',
-					'transaction.signatures',
-					'transaction.balance_changes',
-				],
-			},
-		});
+			{ abort: options?.signal },
+		);
+
+		const protocolConfig = response.response.epoch?.protocolConfig;
+		if (!protocolConfig) {
+			throw new Error('Protocol config not found in response');
+		}
+
+		const featureFlags: Record<string, boolean> = { ...protocolConfig.featureFlags };
+		const attributes: Record<string, string | null> = {};
+		if (protocolConfig.attributes) {
+			for (const [key, value] of Object.entries(protocolConfig.attributes)) {
+				attributes[key] = value ?? null;
+			}
+		}
 
 		return {
-			transaction: parseTransaction(response.transaction!),
-		};
-	}
-	async getReferenceGasPrice(): Promise<Experimental_RtdClientTypes.GetReferenceGasPriceResponse> {
-		const response = await this.#client.ledgerService.getEpoch({});
-
-		return {
-			referenceGasPrice: response.response.epoch?.referenceGasPrice?.toString()!,
+			protocolConfig: {
+				protocolVersion: protocolConfig.protocolVersion?.toString() ?? (null as never),
+				featureFlags,
+				attributes,
+			},
 		};
 	}
 
-	async getDynamicFields(
-		options: Experimental_RtdClientTypes.GetDynamicFieldsOptions,
-	): Promise<Experimental_RtdClientTypes.GetDynamicFieldsResponse> {
-		const response = await this.#client.stateService.listDynamicFields({
-			parent: options.parentId,
-			pageToken: options.cursor ? fromBase64(options.cursor) : undefined,
-		});
+	async getCurrentSystemState(
+		options?: RtdClientTypes.GetCurrentSystemStateOptions,
+	): Promise<RtdClientTypes.GetCurrentSystemStateResponse> {
+		const response = await this.#client.ledgerService.getEpoch(
+			{
+				readMask: {
+					paths: [
+						'system_state.version',
+						'system_state.epoch',
+						'system_state.protocol_version',
+						'system_state.reference_gas_price',
+						'system_state.epoch_start_timestamp_ms',
+						'system_state.safe_mode',
+						'system_state.safe_mode_storage_rewards',
+						'system_state.safe_mode_computation_rewards',
+						'system_state.safe_mode_storage_rebates',
+						'system_state.safe_mode_non_refundable_storage_fee',
+						'system_state.parameters',
+						'system_state.storage_fund',
+						'system_state.stake_subsidy',
+					],
+				},
+			},
+			{ abort: options?.signal },
+		);
+
+		const epoch = response.response.epoch;
+		const systemState = epoch?.systemState;
+		if (!systemState) {
+			throw new Error('System state not found in response');
+		}
+
+		const startMs = epoch?.start?.seconds
+			? Number(epoch.start.seconds) * 1000 + Math.floor((epoch.start.nanos || 0) / 1_000_000)
+			: systemState.epochStartTimestampMs
+				? Number(systemState.epochStartTimestampMs)
+				: (null as never);
 
 		return {
-			dynamicFields: response.response.dynamicFields.map((field) => ({
-				id: field.fieldId!,
-				name: {
-					type: field.name?.name!,
-					bcs: field.name?.value!,
+			systemState: {
+				systemStateVersion: systemState.version?.toString() ?? (null as never),
+				epoch: systemState.epoch?.toString() ?? (null as never),
+				protocolVersion: systemState.protocolVersion?.toString() ?? (null as never),
+				referenceGasPrice: systemState.referenceGasPrice?.toString() ?? (null as never),
+				epochStartTimestampMs: startMs.toString(),
+				safeMode: systemState.safeMode ?? false,
+				safeModeStorageRewards: systemState.safeModeStorageRewards?.toString() ?? (null as never),
+				safeModeComputationRewards:
+					systemState.safeModeComputationRewards?.toString() ?? (null as never),
+				safeModeStorageRebates: systemState.safeModeStorageRebates?.toString() ?? (null as never),
+				safeModeNonRefundableStorageFee:
+					systemState.safeModeNonRefundableStorageFee?.toString() ?? (null as never),
+				parameters: {
+					epochDurationMs: systemState.parameters?.epochDurationMs?.toString() ?? (null as never),
+					stakeSubsidyStartEpoch:
+						systemState.parameters?.stakeSubsidyStartEpoch?.toString() ?? (null as never),
+					maxValidatorCount:
+						systemState.parameters?.maxValidatorCount?.toString() ?? (null as never),
+					minValidatorJoiningStake:
+						systemState.parameters?.minValidatorJoiningStake?.toString() ?? (null as never),
+					validatorLowStakeThreshold:
+						systemState.parameters?.validatorLowStakeThreshold?.toString() ?? (null as never),
+					validatorLowStakeGracePeriod:
+						systemState.parameters?.validatorLowStakeGracePeriod?.toString() ?? (null as never),
 				},
-				type: field.fieldObject
-					? `0x2::dynamic_field::Field<0x2::dynamic_object_field::Wrapper<${field.name?.name!}>,0x2::object::ID>`
-					: `0x2::dynamic_field::Field<${field.name?.value!},${field.valueType!}>`,
-			})),
-			cursor: response.response.nextPageToken ? toBase64(response.response.nextPageToken) : null,
-			hasNextPage: response.response.nextPageToken !== undefined,
+				storageFund: {
+					totalObjectStorageRebates:
+						systemState.storageFund?.totalObjectStorageRebates?.toString() ?? (null as never),
+					nonRefundableBalance:
+						systemState.storageFund?.nonRefundableBalance?.toString() ?? (null as never),
+				},
+				stakeSubsidy: {
+					balance: systemState.stakeSubsidy?.balance?.toString() ?? (null as never),
+					distributionCounter:
+						systemState.stakeSubsidy?.distributionCounter?.toString() ?? (null as never),
+					currentDistributionAmount:
+						systemState.stakeSubsidy?.currentDistributionAmount?.toString() ?? (null as never),
+					stakeSubsidyPeriodLength:
+						systemState.stakeSubsidy?.stakeSubsidyPeriodLength?.toString() ?? (null as never),
+					stakeSubsidyDecreaseRate:
+						systemState.stakeSubsidy?.stakeSubsidyDecreaseRate ?? (null as never),
+				},
+			},
+		};
+	}
+
+	async listDynamicFields(
+		options: RtdClientTypes.ListDynamicFieldsOptions,
+	): Promise<RtdClientTypes.ListDynamicFieldsResponse> {
+		return this.#client.listDynamicFields(options);
+	}
+
+	async listTransactions<Include extends RtdClientTypes.TransactionInclude = {}>(
+		options: RtdClientTypes.ListTransactionsOptions<Include>,
+	): Promise<RtdClientTypes.ListTransactionsResponse<Include>> {
+		const paths = transactionReadMaskPaths(options.include);
+
+		const filter = options.filter
+			? await resolveTransactionFilter(this.mvr, options.filter, options.signal)
+			: undefined;
+		const pagination = resolvePagination(options);
+		validateTransactionQuery(filter, pagination);
+
+		const call = this.#client.ledgerService.listTransactions(
+			{
+				readMask: { paths },
+				filter: filter && toGrpcTransactionFilter(filter),
+				// Request one extra item as lookahead: the server reports its item limit as reached
+				// without scanning past it, so an exact-limit final page is otherwise
+				// indistinguishable from one with more results
+				options: toGrpcQueryOptions(pagination, pagination.limit + 1),
+			},
+			{ abort: options.signal },
+		);
+
+		const transactions: RtdClientTypes.TransactionResult<Include>[] = [];
+		let startCursor: string | null = null;
+		let endCursor: string | null = null;
+		let frontier: string | null = null;
+		let end: QueryEnd | undefined;
+		let sawLookaheadItem = false;
+
+		for await (const frame of call.responses) {
+			if (frame.watermark?.cursor) {
+				frontier = toBase64(frame.watermark.cursor);
+			}
+			if (frame.transaction) {
+				if (transactions.length >= pagination.limit) {
+					sawLookaheadItem = true;
+				} else {
+					startCursor ??= frontier;
+					endCursor = frontier;
+					transactions.push(
+						parseGrpcTransactionResponse(frame.transaction, { include: options.include }),
+					);
+				}
+			}
+			if (frame.end) {
+				end = frame.end;
+			}
+		}
+
+		// ITEM_LIMIT without the lookahead item means the server clamped the requested limit to
+		// its own maximum, so the filled page is still evidence of a possible next page
+		const hasNextPage =
+			sawLookaheadItem ||
+			end?.reason === QueryEndReason.SCAN_LIMIT ||
+			end?.reason === QueryEndReason.ITEM_LIMIT;
+
+		return {
+			transactions,
+			hasNextPage,
+			startCursor,
+			// Scans that stopped early without filling the page continue from the scan frontier
+			// (so already-scanned positions are not revisited), full pages continue after the last
+			// returned item, and terminal pages have no positions to continue from
+			endCursor: sawLookaheadItem ? endCursor : hasNextPage ? (frontier ?? endCursor) : endCursor,
+		};
+	}
+
+	async listEvents(
+		options: RtdClientTypes.ListEventsOptions,
+	): Promise<RtdClientTypes.ListEventsResponse> {
+		const pagination = resolvePagination(options);
+		const call = this.#client.ledgerService.listEvents(
+			{
+				readMask: {
+					paths: [
+						'package_id',
+						'module',
+						'sender',
+						'event_type',
+						'contents',
+						'json',
+						'checkpoint',
+						'transaction_digest',
+						'event_index',
+					],
+				},
+				filter: options.filter
+					? toGrpcEventFilter(await resolveEventFilter(this.mvr, options.filter, options.signal))
+					: undefined,
+				// Request one extra item as lookahead: the server reports its item limit as reached
+				// without scanning past it, so an exact-limit final page is otherwise
+				// indistinguishable from one with more results
+				options: toGrpcQueryOptions(pagination, pagination.limit + 1),
+			},
+			{ abort: options.signal },
+		);
+
+		const events: RtdClientTypes.EventEntry[] = [];
+		let startCursor: string | null = null;
+		let endCursor: string | null = null;
+		let frontier: string | null = null;
+		let end: QueryEnd | undefined;
+		let sawLookaheadItem = false;
+
+		for await (const frame of call.responses) {
+			if (frame.watermark?.cursor) {
+				frontier = toBase64(frame.watermark.cursor);
+			}
+			if (frame.event) {
+				if (events.length >= pagination.limit) {
+					sawLookaheadItem = true;
+				} else {
+					startCursor ??= frontier;
+					endCursor = frontier;
+					const event = frame.event;
+					events.push({
+						packageId: normalizeRtdAddress(event.packageId!),
+						module: event.module!,
+						sender: normalizeRtdAddress(event.sender!),
+						eventType: normalizeStructTag(event.eventType!),
+						bcs: event.contents?.value ?? new Uint8Array(),
+						json: event.json ? (Value.toJson(event.json) as Record<string, unknown>) : null,
+						checkpoint: event.checkpoint?.toString() ?? null,
+						transactionDigest: event.transactionDigest!,
+						eventIndex: event.eventIndex!,
+					});
+				}
+			}
+			if (frame.end) {
+				end = frame.end;
+			}
+		}
+
+		// ITEM_LIMIT without the lookahead item means the server clamped the requested limit to
+		// its own maximum, so the filled page is still evidence of a possible next page
+		const hasNextPage =
+			sawLookaheadItem ||
+			end?.reason === QueryEndReason.SCAN_LIMIT ||
+			end?.reason === QueryEndReason.ITEM_LIMIT;
+
+		return {
+			events,
+			hasNextPage,
+			startCursor,
+			// Scans that stopped early without filling the page continue from the scan frontier
+			// (so already-scanned positions are not revisited), full pages continue after the last
+			// returned item, and terminal pages have no positions to continue from
+			endCursor: sawLookaheadItem ? endCursor : hasNextPage ? (frontier ?? endCursor) : endCursor,
 		};
 	}
 
 	async verifyZkLoginSignature(
-		options: Experimental_RtdClientTypes.VerifyZkLoginSignatureOptions,
-	): Promise<Experimental_RtdClientTypes.ZkLoginVerifyResponse> {
-		const { response } = await this.#client.signatureVerificationService.verifySignature({
-			message: {
-				name: options.intentScope,
-				value: fromBase64(options.bytes),
-			},
-			signature: {
-				bcs: {
-					value: fromBase64(options.signature),
+		options: RtdClientTypes.VerifyZkLoginSignatureOptions,
+	): Promise<RtdClientTypes.ZkLoginVerifyResponse> {
+		const messageBytes = fromBase64(options.bytes);
+
+		// For PersonalMessage, the server expects BCS-encoded vector<u8>
+		// For TransactionData, the server expects the raw BCS-encoded TransactionData as-is
+		const messageValue =
+			options.intentScope === 'PersonalMessage'
+				? bcs.byteVector().serialize(messageBytes).toBytes()
+				: messageBytes;
+
+		const { response } = await this.#client.signatureVerificationService.verifySignature(
+			{
+				message: {
+					name: options.intentScope,
+					value: messageValue,
 				},
 				signature: {
-					oneofKind: undefined,
+					bcs: {
+						value: fromBase64(options.signature),
+					},
+					signature: {
+						oneofKind: undefined,
+					},
 				},
+				address: options.address,
+				jwks: [],
 			},
-			jwks: [],
-		});
+			{ abort: options.signal },
+		);
 
 		return {
 			success: response.isValid ?? false,
@@ -345,13 +831,16 @@ export class GrpcCoreClient extends Experimental_CoreClient {
 	}
 
 	async defaultNameServiceName(
-		options: Experimental_RtdClientTypes.DefaultNameServiceNameOptions,
-	): Promise<Experimental_RtdClientTypes.DefaultNameServiceNameResponse> {
+		options: RtdClientTypes.DefaultNameServiceNameOptions,
+	): Promise<RtdClientTypes.DefaultNameServiceNameResponse> {
 		const name =
 			(
-				await this.#client.nameService.reverseLookupName({
-					address: options.address,
-				})
+				await this.#client.nameService.reverseLookupName(
+					{
+						address: options.address,
+					},
+					{ abort: options.signal },
+				)
 			).response.record?.name ?? null;
 		return {
 			data: {
@@ -360,14 +849,39 @@ export class GrpcCoreClient extends Experimental_CoreClient {
 		};
 	}
 
+	async resolveNameServiceAddress(
+		options: RtdClientTypes.ResolveNameServiceAddressOptions,
+	): Promise<RtdClientTypes.ResolveNameServiceAddressResponse> {
+		try {
+			const { response } = await this.#client.nameService.lookupName(
+				{ name: options.name },
+				{ abort: options.signal },
+			);
+
+			return { address: response.record?.targetAddress ?? null };
+		} catch (error) {
+			if (isNameServiceResolutionMiss(error)) {
+				return { address: null };
+			}
+
+			throw error;
+		}
+	}
+
 	async getMoveFunction(
-		options: Experimental_RtdClientTypes.GetMoveFunctionOptions,
-	): Promise<Experimental_RtdClientTypes.GetMoveFunctionResponse> {
-		const { response } = await this.#client.movePackageService.getFunction({
-			packageId: (await this.mvr.resolvePackage({ package: options.packageId })).package,
-			moduleName: options.moduleName,
-			name: options.name,
-		});
+		options: RtdClientTypes.GetMoveFunctionOptions,
+	): Promise<RtdClientTypes.GetMoveFunctionResponse> {
+		const resolvedPackageId = (
+			await this.mvr.resolvePackage({ package: options.packageId, signal: options.signal })
+		).package;
+		const { response } = await this.#client.movePackageService.getFunction(
+			{
+				packageId: resolvedPackageId,
+				moduleName: options.moduleName,
+				name: options.name,
+			},
+			{ abort: options.signal },
+		);
 
 		let visibility: 'public' | 'private' | 'friend' | 'unknown' = 'unknown';
 
@@ -385,7 +899,7 @@ export class GrpcCoreClient extends Experimental_CoreClient {
 
 		return {
 			function: {
-				packageId: options.packageId,
+				packageId: normalizeRtdAddress(resolvedPackageId),
 				moduleName: options.moduleName,
 				name: response.function?.name!,
 				visibility,
@@ -416,27 +930,192 @@ export class GrpcCoreClient extends Experimental_CoreClient {
 		};
 	}
 
+	async getChainIdentifier(
+		options?: RtdClientTypes.GetChainIdentifierOptions,
+	): Promise<RtdClientTypes.GetChainIdentifierResponse> {
+		// The result is cached and shared across callers, so the underlying request must
+		// not carry any single caller's signal. Isolate cancellation per-caller instead.
+		return raceSignal(
+			Promise.resolve(
+				this.cache.read(['chainIdentifier'], async () => {
+					const { response } = await this.#client.ledgerService.getServiceInfo({});
+					if (!response.chainId) {
+						throw new Error('Chain identifier not found in service info');
+					}
+					return {
+						chainIdentifier: response.chainId,
+					};
+				}),
+			),
+			options?.signal,
+		);
+	}
+
 	resolveTransactionPlugin() {
-		// const client = this.#client;
+		const client = this.#client;
 		return async function resolveTransactionData(
-			_transactionData: TransactionDataBuilder,
-			_options: BuildTransactionOptions,
-			_next: () => Promise<void>,
+			transactionData: TransactionDataBuilder,
+			options: BuildTransactionOptions,
+			next: () => Promise<void>,
 		) {
-			throw new Error('Transaction resolution is not supported with the GRPC client');
+			const snapshot = transactionData.snapshot();
+			// If sender is not set, use a dummy address for resolution purposes
+			// The resolved transaction will not include the sender if it wasn't set originally
+			if (!snapshot.sender) {
+				snapshot.sender = '0x0000000000000000000000000000000000000000000000000000000000000000';
+			}
+			const grpcTransaction = transactionDataToGrpcTransaction(snapshot);
+			const doGasSelection =
+				!options.onlyTransactionKind &&
+				(snapshot.gasData.budget == null || snapshot.gasData.payment == null);
 
-			// const result = await client.liveDataService.simulateTransaction({
-			// 	transaction: transactionFromData(transactionData)
-			// })
-			// const resolvedData = dataFromSimulate(result)
-			// transactionData.applyResolvedData(resolvedData);
+			let response;
+			try {
+				const result = await client.transactionExecutionService.simulateTransaction({
+					transaction: grpcTransaction,
+					doGasSelection,
+					// Kind-only txns are never executed directly and do not have sender, so skip validation checks.
+					checks: options.onlyTransactionKind
+						? SimulateTransactionRequest_TransactionChecks.DISABLED
+						: SimulateTransactionRequest_TransactionChecks.ENABLED,
+					readMask: {
+						paths: [
+							'transaction.transaction.sender',
+							'transaction.transaction.gas_payment',
+							'transaction.transaction.expiration',
+							'transaction.transaction.kind',
+							'transaction.effects.status',
+							'transaction.effects.epoch',
+						],
+					},
+				});
+				response = result.response;
+			} catch (error) {
+				// The transport owns the status text. See ./transport.ts.
+				if (error instanceof Error && error.message) {
+					throw new SimulationError(error.message, { cause: error });
+				}
+				throw error;
+			}
 
-			// return await next();
+			if (
+				!options.onlyTransactionKind &&
+				response.transaction?.effects?.status &&
+				!response.transaction.effects.status.success
+			) {
+				const executionError = response.transaction.effects.status.error
+					? parseGrpcExecutionError(response.transaction.effects.status.error)
+					: undefined;
+				const errorMessage = executionError?.message ?? 'Transaction failed';
+				throw new SimulationError(`Transaction resolution failed: ${errorMessage}`, {
+					executionError,
+				});
+			}
+
+			if (!response.transaction?.transaction) {
+				throw new Error('simulateTransaction did not return resolved transaction data');
+			}
+
+			applyGrpcResolvedTransaction(transactionData, response.transaction.transaction, options);
+			await setAddressBalanceTransactionExpirationFromSimulatedEpoch({
+				transactionData,
+				client,
+				epoch: response.transaction.effects?.epoch,
+				originalTransactionData: snapshot,
+				isTransactionKindOnly: !!options.onlyTransactionKind,
+				doGasSelection,
+			});
+
+			return await next();
 		};
 	}
 }
 
-function mapOwner(owner: Owner | null | undefined): Experimental_RtdClientTypes.ObjectOwner | null {
+function toGrpcQueryOptions(pagination: ResolvedPagination, limit: number): QueryOptions {
+	return {
+		limit,
+		ordering: pagination.descending ? Ordering.DESCENDING : Ordering.ASCENDING,
+		after: pagination.after ? fromBase64(pagination.after) : undefined,
+		before: pagination.before ? fromBase64(pagination.before) : undefined,
+	};
+}
+
+function transactionReadMaskPaths(
+	include: RtdClientTypes.TransactionInclude | undefined,
+	prefix = '',
+): string[] {
+	const paths = [
+		'digest',
+		'transaction.digest',
+		'signatures',
+		'effects.status',
+		'timestamp',
+		'checkpoint',
+	];
+
+	if (include?.transaction) {
+		paths.push(
+			'transaction.sender',
+			'transaction.gas_payment',
+			'transaction.expiration',
+			'transaction.kind',
+		);
+	}
+	if (include?.bcs) {
+		paths.push('transaction.bcs');
+	}
+	if (include?.balanceChanges) {
+		paths.push('balance_changes');
+	}
+	if (include?.effects) {
+		paths.push('effects');
+	}
+	if (include?.events) {
+		paths.push('events');
+	}
+	if (include?.objectTypes) {
+		// Use effects.changed_objects to match JSON-RPC behavior (which uses objectChanges)
+		paths.push('effects.changed_objects.object_type');
+		paths.push('effects.changed_objects.object_id');
+	}
+
+	return prefix ? paths.map((path) => prefix + path) : paths;
+}
+
+function withProtoJson<Result>(
+	result: Result,
+	include: ({ protoJson?: boolean } & object) | undefined,
+	getProtoJson: () => unknown,
+): Result {
+	if (!include?.protoJson) {
+		return result;
+	}
+
+	return {
+		...result,
+		protoJson: getProtoJson(),
+	};
+}
+
+function mapDisplayProto(
+	include: boolean | undefined,
+	display: { output?: Value; errors?: Value } | undefined,
+): RtdClientTypes.Display | null | undefined {
+	if (!include) return undefined;
+	if (display === undefined) return null;
+	return {
+		output:
+			display.output !== undefined
+				? (Value.toJson(display.output) as Record<string, unknown> | null)
+				: null,
+		errors:
+			display.errors !== undefined
+				? (Value.toJson(display.errors) as Record<string, string> | null)
+				: null,
+	};
+}
+
+function mapOwner(owner: Owner | null | undefined): RtdClientTypes.ObjectOwner | null {
 	if (!owner) {
 		return null;
 	}
@@ -460,15 +1139,6 @@ function mapOwner(owner: Owner | null | undefined): Experimental_RtdClientTypes.
 	}
 
 	if (owner.kind === Owner_OwnerKind.SHARED) {
-		if (owner.address) {
-			return {
-				$kind: 'ConsensusAddressOwner',
-				ConsensusAddressOwner: {
-					owner: owner.address,
-					startVersion: owner.version?.toString()!,
-				},
-			};
-		}
 		return {
 			$kind: 'Shared',
 			Shared: {
@@ -477,7 +1147,196 @@ function mapOwner(owner: Owner | null | undefined): Experimental_RtdClientTypes.
 		};
 	}
 
-	throw new Error('Unknown owner kind');
+	if (owner.kind === Owner_OwnerKind.CONSENSUS_ADDRESS) {
+		return {
+			$kind: 'ConsensusAddressOwner',
+			ConsensusAddressOwner: {
+				startVersion: owner.version?.toString()!,
+				owner: owner.address!,
+			},
+		};
+	}
+
+	throw new Error(
+		`Unknown owner kind ${JSON.stringify(owner, (_k, v) => (typeof v === 'bigint' ? v.toString() : v))}`,
+	);
+}
+
+function parseGrpcExecutionError(error: GrpcExecutionError): RtdClientTypes.ExecutionError {
+	const message = error.description ?? 'Unknown error';
+	const command = error.command != null ? Number(error.command) : undefined;
+	const details = error.errorDetails;
+
+	switch (details?.oneofKind) {
+		case 'abort': {
+			const abort = details.abort;
+			const cleverError = abort.cleverError;
+			return {
+				$kind: 'MoveAbort',
+				message: formatMoveAbortMessage({
+					command,
+					location: abort.location,
+					abortCode: String(abort.abortCode ?? 0n),
+					cleverError: cleverError
+						? {
+								lineNumber:
+									cleverError.lineNumber != null ? Number(cleverError.lineNumber) : undefined,
+								constantName: cleverError.constantName,
+								value:
+									cleverError.value?.oneofKind === 'rendered'
+										? cleverError.value.rendered
+										: undefined,
+							}
+						: undefined,
+				}),
+				command,
+				MoveAbort: parseMoveAbort(abort),
+			};
+		}
+
+		case 'sizeError':
+			return {
+				$kind: 'SizeError',
+				message,
+				command,
+				SizeError: {
+					name: mapErrorName(error.kind),
+					size: Number(details.sizeError.size ?? 0n),
+					maxSize: Number(details.sizeError.maxSize ?? 0n),
+				},
+			};
+
+		case 'commandArgumentError':
+			return {
+				$kind: 'CommandArgumentError',
+				message,
+				command,
+				CommandArgumentError: {
+					argument: details.commandArgumentError.argument ?? 0,
+					name: mapErrorName(details.commandArgumentError.kind),
+				},
+			};
+
+		case 'typeArgumentError':
+			return {
+				$kind: 'TypeArgumentError',
+				message,
+				command,
+				TypeArgumentError: {
+					typeArgument: details.typeArgumentError.typeArgument ?? 0,
+					name: mapErrorName(details.typeArgumentError.kind),
+				},
+			};
+
+		case 'packageUpgradeError':
+			return {
+				$kind: 'PackageUpgradeError',
+				message,
+				command,
+				PackageUpgradeError: {
+					name: mapErrorName(details.packageUpgradeError.kind),
+					packageId: details.packageUpgradeError.packageId,
+					digest: details.packageUpgradeError.digest,
+				},
+			};
+
+		case 'indexError':
+			return {
+				$kind: 'IndexError',
+				message,
+				command,
+				IndexError: {
+					index: details.indexError.index,
+					subresult: details.indexError.subresult,
+				},
+			};
+
+		case 'coinDenyListError':
+			return {
+				$kind: 'CoinDenyListError',
+				message,
+				command,
+				CoinDenyListError: {
+					name: mapErrorName(error.kind),
+					coinType: details.coinDenyListError.coinType!,
+					address: details.coinDenyListError.address,
+				},
+			};
+
+		case 'congestedObjects':
+			return {
+				$kind: 'CongestedObjects',
+				message,
+				command,
+				CongestedObjects: {
+					name: mapErrorName(error.kind),
+					objects: details.congestedObjects.objects,
+				},
+			};
+
+		case 'objectId':
+			return {
+				$kind: 'ObjectIdError',
+				message,
+				command,
+				ObjectIdError: {
+					name: mapErrorName(error.kind),
+					objectId: details.objectId,
+				},
+			};
+
+		default:
+			return {
+				$kind: 'Unknown',
+				message,
+				command,
+				Unknown: null,
+			};
+	}
+}
+
+function parseMoveAbort(abort: GrpcMoveAbort): RtdClientTypes.MoveAbort {
+	return {
+		abortCode: String(abort.abortCode ?? 0n),
+		location: { ...abort.location },
+		cleverError: abort.cleverError
+			? {
+					errorCode:
+						abort.cleverError.errorCode != null ? Number(abort.cleverError.errorCode) : undefined,
+					lineNumber:
+						abort.cleverError.lineNumber != null ? Number(abort.cleverError.lineNumber) : undefined,
+					constantName: abort.cleverError.constantName,
+					constantType: abort.cleverError.constantType,
+					value:
+						abort.cleverError.value?.oneofKind === 'rendered'
+							? abort.cleverError.value.rendered
+							: abort.cleverError.value?.oneofKind === 'raw'
+								? toBase64(abort.cleverError.value.raw)
+								: undefined,
+				}
+			: undefined,
+	};
+}
+
+function mapErrorName(
+	kind:
+		| ExecutionError_ExecutionErrorKind
+		| CommandArgumentError_CommandArgumentErrorKind
+		| TypeArgumentError_TypeArgumentErrorKind
+		| PackageUpgradeError_PackageUpgradeErrorKind
+		| undefined,
+): string {
+	if (kind == null) {
+		return 'Unknown';
+	}
+	const name = CommandArgumentError_CommandArgumentErrorKind[kind];
+	if (!name || name.endsWith('_UNKNOWN')) {
+		return 'Unknown';
+	}
+	return name
+		.split('_')
+		.map((word) => word.charAt(0) + word.slice(1).toLowerCase())
+		.join('');
 }
 
 function mapIdOperation(
@@ -521,7 +1380,7 @@ function mapInputObjectState(
 
 function mapOutputObjectState(
 	state: ChangedObject_OutputObjectState | undefined,
-): null | 'ObjectWrite' | 'PackageWrite' | 'DoesNotExist' | 'AccumulatorWrite' | 'Unknown' {
+): null | 'ObjectWrite' | 'PackageWrite' | 'DoesNotExist' | 'AccumulatorWriteV1' | 'Unknown' {
 	if (state == null) {
 		return null;
 	}
@@ -533,7 +1392,7 @@ function mapOutputObjectState(
 		case ChangedObject_OutputObjectState.DOES_NOT_EXIST:
 			return 'DoesNotExist';
 		case ChangedObject_OutputObjectState.ACCUMULATOR_WRITE:
-			return 'AccumulatorWrite';
+			return 'AccumulatorWriteV1';
 		case ChangedObject_OutputObjectState.UNKNOWN:
 			return 'Unknown';
 		default:
@@ -544,7 +1403,7 @@ function mapOutputObjectState(
 
 function mapUnchangedConsensusObjectKind(
 	kind: UnchangedConsensusObject_UnchangedConsensusObjectKind | undefined,
-): null | Experimental_RtdClientTypes.UnchangedConsensusObject['kind'] {
+): null | RtdClientTypes.UnchangedConsensusObject['kind'] {
 	if (kind == null) {
 		return null;
 	}
@@ -571,32 +1430,30 @@ export function parseTransactionEffects({
 	effects,
 }: {
 	effects: TransactionEffects | undefined;
-}): Experimental_RtdClientTypes.TransactionEffects | null {
+}): RtdClientTypes.TransactionEffects | null {
 	if (!effects) {
 		return null;
 	}
 
-	const changedObjects = effects.changedObjects.map(
-		(change): Experimental_RtdClientTypes.ChangedObject => {
-			return {
-				id: change.objectId!,
-				inputState: mapInputObjectState(change.inputState)!,
-				inputVersion: change.inputVersion?.toString() ?? null,
-				inputDigest: change.inputDigest ?? null,
-				inputOwner: mapOwner(change.inputOwner),
-				outputState: mapOutputObjectState(change.outputState)!,
-				outputVersion: change.outputVersion?.toString() ?? null,
-				outputDigest: change.outputDigest ?? null,
-				outputOwner: mapOwner(change.outputOwner),
-				idOperation: mapIdOperation(change.idOperation)!,
-			};
-		},
-	);
+	const changedObjects = effects.changedObjects.map((change): RtdClientTypes.ChangedObject => {
+		return {
+			objectId: change.objectId!,
+			inputState: mapInputObjectState(change.inputState)!,
+			inputVersion: change.inputVersion?.toString() ?? null,
+			inputDigest: change.inputDigest ?? null,
+			inputOwner: mapOwner(change.inputOwner),
+			outputState: mapOutputObjectState(change.outputState)!,
+			outputVersion: change.outputVersion?.toString() ?? null,
+			outputDigest: change.outputDigest ?? null,
+			outputOwner: mapOwner(change.outputOwner),
+			idOperation: mapIdOperation(change.idOperation)!,
+		};
+	});
 
 	return {
 		bcs: effects.bcs?.value!,
-		digest: effects.digest!,
-		version: 2,
+
+		version: effects.version ?? 2,
 		status: effects.status?.success
 			? {
 					success: true,
@@ -604,8 +1461,7 @@ export function parseTransactionEffects({
 				}
 			: {
 					success: false,
-					// TODO: parse errors properly
-					error: JSON.stringify(effects.status?.error),
+					error: parseGrpcExecutionError(effects.status!.error!),
 				},
 		gasUsed: {
 			computationCost: effects.gasUsed?.computationCost?.toString()!,
@@ -614,24 +1470,28 @@ export function parseTransactionEffects({
 			nonRefundableStorageFee: effects.gasUsed?.nonRefundableStorageFee?.toString()!,
 		},
 		transactionDigest: effects.transactionDigest!,
-		gasObject: {
-			id: effects.gasObject?.objectId!,
-			inputState: mapInputObjectState(effects.gasObject?.inputState)!,
-			inputVersion: effects.gasObject?.inputVersion?.toString() ?? null,
-			inputDigest: effects.gasObject?.inputDigest ?? null,
-			inputOwner: mapOwner(effects.gasObject?.inputOwner),
-			outputState: mapOutputObjectState(effects.gasObject?.outputState)!,
-			outputVersion: effects.gasObject?.outputVersion?.toString() ?? null,
-			outputDigest: effects.gasObject?.outputDigest ?? null,
-			outputOwner: mapOwner(effects.gasObject?.outputOwner),
-			idOperation: mapIdOperation(effects.gasObject?.idOperation)!,
-		},
+		// gas_object is unset when the transaction has no gas object (system
+		// transactions, or gas paid from an address balance)
+		gasObject: effects.gasObject
+			? {
+					objectId: effects.gasObject.objectId!,
+					inputState: mapInputObjectState(effects.gasObject.inputState)!,
+					inputVersion: effects.gasObject.inputVersion?.toString() ?? null,
+					inputDigest: effects.gasObject.inputDigest ?? null,
+					inputOwner: mapOwner(effects.gasObject.inputOwner),
+					outputState: mapOutputObjectState(effects.gasObject.outputState)!,
+					outputVersion: effects.gasObject.outputVersion?.toString() ?? null,
+					outputDigest: effects.gasObject.outputDigest ?? null,
+					outputOwner: mapOwner(effects.gasObject.outputOwner),
+					idOperation: mapIdOperation(effects.gasObject.idOperation)!,
+				}
+			: null,
 		eventsDigest: effects.eventsDigest ?? null,
 		dependencies: effects.dependencies,
 		lamportVersion: effects.lamportVersion?.toString() ?? null,
 		changedObjects,
 		unchangedConsensusObjects: effects.unchangedConsensusObjects.map(
-			(object): Experimental_RtdClientTypes.UnchangedConsensusObject => {
+			(object): RtdClientTypes.UnchangedConsensusObject => {
 				return {
 					kind: mapUnchangedConsensusObjectKind(object.kind)!,
 					// TODO: we are inconsistent about id vs objectId
@@ -645,58 +1505,151 @@ export function parseTransactionEffects({
 	};
 }
 
-function parseTransaction(
+export function parseGrpcTransactionResponse<
+	Include extends RtdClientTypes.TransactionInclude = {},
+>(
 	transaction: ExecutedTransaction,
-): Experimental_RtdClientTypes.TransactionResponse {
-	const parsedTx = bcs.SenderSignedData.parse(transaction.transaction?.bcs?.value!)[0];
-	const bytes = bcs.TransactionData.serialize(parsedTx.intentMessage.value).toBytes();
-	const data = TransactionDataBuilder.restore({
-		version: 2,
-		sender: parsedTx.intentMessage.value.V1.sender,
-		expiration: parsedTx.intentMessage.value.V1.expiration,
-		gasData: parsedTx.intentMessage.value.V1.gasData,
-		inputs: parsedTx.intentMessage.value.V1.kind.ProgrammableTransaction!.inputs,
-		commands: parsedTx.intentMessage.value.V1.kind.ProgrammableTransaction!.commands,
-	});
-
+	options?: {
+		include?: Include & RtdClientTypes.TransactionInclude;
+	},
+): RtdClientTypes.TransactionResult<Include> {
+	const include = options?.include;
 	const objectTypes: Record<string, string> = {};
-	transaction.objects?.objects.forEach((object) => {
-		if (object.objectId && object.objectType) {
-			objectTypes[object.objectId] = object.objectType;
+	if (include?.objectTypes) {
+		transaction.effects?.changedObjects?.forEach((change) => {
+			if (change.objectId && change.objectType) {
+				objectTypes[change.objectId] = change.objectType;
+			}
+		});
+	}
+
+	let transactionData: RtdClientTypes.TransactionData | undefined;
+	if (include?.transaction) {
+		const tx = transaction.transaction;
+
+		if (!tx) {
+			throw new Error('Transaction data is required but missing from gRPC response');
 		}
-	});
 
-	const effects = parseTransactionEffects({
-		effects: transaction.effects,
-	})!;
+		const resolved = grpcTransactionToTransactionData(tx);
+		transactionData = {
+			gasData: resolved.gasData,
+			sender: resolved.sender,
+			expiration: resolved.expiration,
+			commands: resolved.commands,
+			inputs: resolved.inputs,
+			version: resolved.version,
+		};
+	}
 
-	return {
+	const bcsBytes = include?.bcs ? transaction.transaction?.bcs?.value : undefined;
+
+	const effects = include?.effects
+		? parseTransactionEffects({
+				effects: transaction.effects,
+			})
+		: undefined;
+
+	const status: RtdClientTypes.ExecutionStatus = transaction.effects?.status?.success
+		? { success: true, error: null }
+		: {
+				success: false,
+				error: transaction.effects?.status?.error
+					? parseGrpcExecutionError(transaction.effects.status.error)
+					: {
+							$kind: 'Unknown',
+							message: 'Transaction failed',
+							Unknown: null,
+						},
+			};
+
+	const result: RtdClientTypes.Transaction<Include> = {
 		digest: transaction.digest!,
 		epoch: transaction.effects?.epoch?.toString() ?? null,
-		effects,
-		objectTypes: Promise.resolve(objectTypes),
-		transaction: {
-			gasData: data.gasData,
-			sender: data.sender,
-			expiration: data.expiration,
-			commands: data.commands,
-			inputs: data.inputs,
-			version: data.version,
-			bcs: bytes,
-		},
-		signatures: parsedTx.txSignatures,
-		balanceChanges:
-			transaction.balanceChanges?.map((change) => ({
-				coinType: change.coinType!,
-				address: change.address!,
-				amount: change.amount!,
-			})) ?? [],
+		timestampMs: transaction.timestamp
+			? Number(transaction.timestamp.seconds) * 1000 +
+				Math.floor(transaction.timestamp.nanos / 1_000_000)
+			: null,
+		checkpoint: transaction.checkpoint?.toString() ?? null,
+		status,
+		effects: effects as RtdClientTypes.Transaction<Include>['effects'],
+		objectTypes: (include?.objectTypes
+			? objectTypes
+			: undefined) as RtdClientTypes.Transaction<Include>['objectTypes'],
+		transaction: transactionData as RtdClientTypes.Transaction<Include>['transaction'],
+		bcs: bcsBytes as RtdClientTypes.Transaction<Include>['bcs'],
+		signatures: transaction.signatures?.map((sig) => toBase64(sig.bcs?.value!)) ?? [],
+		balanceChanges: (include?.balanceChanges
+			? (transaction.balanceChanges?.map((change) => ({
+					coinType: change.coinType!,
+					address: change.address!,
+					amount: change.amount!,
+				})) ?? [])
+			: undefined) as RtdClientTypes.Transaction<Include>['balanceChanges'],
+		events: (include?.events
+			? (transaction.events?.events.map((event) => ({
+					packageId: normalizeRtdAddress(event.packageId!),
+					module: event.module!,
+					sender: normalizeRtdAddress(event.sender!),
+					eventType: event.eventType!,
+					bcs: event.contents?.value ?? new Uint8Array(),
+					json: event.json ? (Value.toJson(event.json) as Record<string, unknown>) : null,
+				})) ?? [])
+			: undefined) as RtdClientTypes.Transaction<Include>['events'],
+	};
+
+	return status.success
+		? {
+				$kind: 'Transaction',
+				Transaction: result,
+			}
+		: {
+				$kind: 'FailedTransaction',
+				FailedTransaction: result,
+			};
+}
+
+export function parseGrpcSimulateTransactionResponse<
+	Include extends RtdClientTypes.SimulateTransactionInclude = {},
+>(
+	response: SimulateTransactionResponse,
+	options?: {
+		include?: Include & RtdClientTypes.SimulateTransactionInclude;
+	},
+): RtdClientTypes.SimulateTransactionResult<Include> {
+	const include = options?.include;
+	const transactionResult = parseGrpcTransactionResponse(response.transaction!, { include });
+
+	const commandResults =
+		include?.commandResults && response.commandOutputs
+			? response.commandOutputs.map((output) => ({
+					returnValues: (output.returnValues ?? []).map((rv) => ({
+						bcs: rv.value?.value ?? null,
+					})),
+					mutatedReferences: (output.mutatedByRef ?? []).map((mr) => ({
+						bcs: mr.value?.value ?? null,
+					})),
+				}))
+			: undefined;
+
+	if (transactionResult.$kind === 'Transaction') {
+		return {
+			$kind: 'Transaction',
+			Transaction: transactionResult.Transaction,
+			commandResults:
+				commandResults as RtdClientTypes.SimulateTransactionResult<Include>['commandResults'],
+		};
+	}
+
+	return {
+		$kind: 'FailedTransaction',
+		FailedTransaction: transactionResult.FailedTransaction,
+		commandResults:
+			commandResults as RtdClientTypes.SimulateTransactionResult<Include>['commandResults'],
 	};
 }
 
-function parseNormalizedRtdMoveType(
-	type: OpenSignature,
-): Experimental_RtdClientTypes.OpenSignature {
+function parseNormalizedRtdMoveType(type: OpenSignature): RtdClientTypes.OpenSignature {
 	let reference: 'mutable' | 'immutable' | null = null;
 
 	if (type.reference === OpenSignature_Reference.IMMUTABLE) {
@@ -711,9 +1664,7 @@ function parseNormalizedRtdMoveType(
 	};
 }
 
-function parseNormalizedRtdMoveTypeBody(
-	type: OpenSignatureBody,
-): Experimental_RtdClientTypes.OpenSignatureBody {
+function parseNormalizedRtdMoveTypeBody(type: OpenSignatureBody): RtdClientTypes.OpenSignatureBody {
 	switch (type.type) {
 		case OpenSignatureBody_Type.TYPE_UNKNOWN:
 			return { $kind: 'unknown' };

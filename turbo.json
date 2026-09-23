@@ -1,40 +1,45 @@
 {
 	"$schema": "https://turbo.build/schema.json",
 	"tasks": {
-		"lint": {},
+		"lint": {
+			"inputs": [
+				"src/**",
+				"test/**",
+				"tests/**",
+				"examples/**",
+				"*.ts",
+				"*.tsx",
+				"*.js",
+				"*.mjs",
+				"*.json"
+			]
+		},
 		"test": {
 			"dependsOn": ["^build", "build"],
-			"env": [
-				"AWS_ACCESS_KEY_ID",
-				"AWS_SECRET_ACCESS_KEY",
-				"AWS_REGION",
-				"AWS_KMS_KEY_ID",
-				"GOOGLE_PROJECT_ID",
-				"GOOGLE_LOCATION",
-				"GOOGLE_KEYRING",
-				"GOOGLE_KEY_NAME",
-				"GOOGLE_KEY_NAME_VERSION",
-				"E2E_AWS_KMS_TEST_ENABLE",
-				"E2E_GCP_KMS_TEST_ENABLE",
-				"GOOGLE_APPLICATION_CREDENTIALS"
+			"inputs": [
+				"src/**",
+				"test/**",
+				"tests/**",
+				"__tests__/**",
+				"*.ts",
+				"*.tsx",
+				"vitest.config.*",
+				"tsconfig.json"
 			]
 		},
 		"test:e2e": {
 			"dependsOn": ["^build", "build"],
-			"env": [
-				"AWS_ACCESS_KEY_ID",
-				"AWS_SECRET_ACCESS_KEY",
-				"AWS_REGION",
-				"AWS_KMS_KEY_ID",
-				"GOOGLE_PROJECT_ID",
-				"GOOGLE_LOCATION",
-				"GOOGLE_KEYRING",
-				"GOOGLE_KEY_NAME",
-				"GOOGLE_KEY_NAME_VERSION",
-				"E2E_AWS_KMS_TEST_ENABLE",
-				"E2E_GCP_KMS_TEST_ENABLE",
-				"GOOGLE_APPLICATION_CREDENTIALS"
-			]
+			"inputs": [
+				"src/**",
+				"test/**",
+				"tests/**",
+				"__tests__/**",
+				"*.ts",
+				"*.tsx",
+				"vitest.config.*",
+				"tsconfig.json"
+			],
+			"cache": false
 		},
 		"dev": {
 			"dependsOn": ["^build"],
@@ -43,14 +48,18 @@
 		},
 		"build": {
 			"dependsOn": ["^build"],
-			"outputs": [
-				"build/**",
-				"dist/**",
-				"storybook-static/**",
-				".next/**",
-				"!.next/cache/**",
-				"pkg/**"
-			]
+			"inputs": [
+				"src/**",
+				"bin/**",
+				"scripts/**",
+				"templates/**",
+				"*.ts",
+				"*.mjs",
+				"tsconfig.json",
+				"tsdown.config.ts",
+				"package.json"
+			],
+			"outputs": ["build/**", "dist/**"]
 		}
 	},
 	"globalEnv": ["VERCEL_ENV", "VITE_NETWORK", "VITE_VERCEL_ANALYTICS_ID", "VITE_SENTRY_SAMPLE_RATE"]

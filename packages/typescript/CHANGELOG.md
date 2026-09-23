@@ -1,4 +1,853 @@
-# rtd-typescript.js
+# rtd-rtd.js
+
+## 2.31.3
+
+### Patch Changes
+
+- 59dedfe: Report unsupported enum variants and their expected values when parsing transaction data.
+
+## 2.31.2
+
+### Patch Changes
+
+- 8508156: Break the circular dependency between struct-tag and named-package utilities to prevent
+  initialization errors in Next.js Turbopack production builds.
+
+## 2.31.1
+
+### Patch Changes
+
+- c3966e2: Limit automatic gas selection in the JSON-RPC transaction resolver to 256 payment
+  entries, including any address-balance reservation. Preserve the existing single-page coin fetch
+  and its default limit, then truncate the filtered coins without enforcing a combined transaction
+  input limit.
+
+## 2.31.0
+
+### Minor Changes
+
+- 15eb25e: Add wire-level support for `SenderAllowance` funds withdrawals (`rtd::allowance`,
+  protocol v137). `bcs.WithdrawFrom`, the transaction input schema, and `Inputs.FundsWithdrawal`
+  accept `{ $kind: 'SenderAllowance', SenderAllowance: { funder, allowance } }`, and the gRPC,
+  GraphQL, and JSON-RPC clients decode and encode the new source when reading, simulating, and
+  resolving transactions.
+
+  Add `tx.balance({ allowance, balance, type })` and `tx.coin({ allowance, balance, type })` to
+  resolve allowance IDs and redeem their withdrawals automatically. A known `{ objectId, funder }`
+  reference skips metadata lookup. Allowance spends never fall back to the sender's funds. A shared
+  resolver handles the separate allowance and coin intents, reserving allowance withdrawals before
+  ordinary coin selection. Both helpers accept decimal strings for `balance`. App-bound allowances
+  accept `{ objectId, app: { type, permit }, funder? }` with a `SpendPermit<A>` from an app
+  authorization call.
+
+  Account for allowance reservations when selecting ordinary coins and gas, including transactions
+  where the sender or gas sponsor is also the allowance's funder.
+
+  Resolve MVR coin and app types before allowance metadata checks. Require decimal digits in string
+  amounts, rejecting empty or whitespace-only values. Upgrade read-only allowance inputs to mutable
+  when spending, including with a known funder.
+
+  Add `tx.withdrawal({ amount, type, from: 'allowance', allowance, funder })` and `from: 'sponsor'`.
+  Omitting `from` defaults to the sender. Export `WithdrawalOptions` with required allowance and
+  funder fields only for allowance withdrawals.
+
+### Patch Changes
+
+- 15eb25e: `RtdJsonRpcClient` core transaction reads now report the genesis transaction's
+  placeholder signature, matching gRPC and GraphQL, instead of an empty signature list.
+
+## 2.30.0
+
+### Minor Changes
+
+- cc2aec1: Add `assumeSufficientAddressBalances` build option to resolve `tx.coin()` and
+  `tx.balance()` from address balance without a client. On a full build that needs no other
+  resolution, doesn't use `tx.gas`, and already has a `ValidDuring` or `Validity` expiration, it
+  also sets an unset gas payment to `[]`
+
+## 2.29.0
+
+### Minor Changes
+
+- ee96ca4: `GrpcWebFetchTransport` exported from `rtd-typescript/grpc` is now a subclass of the
+  transport of the same name from `@protobuf-ts/grpcweb-transport`, fixing two defects in it. Status
+  messages are decoded instead of arriving percent-encoded as `Object%20not%20found:%200x1`. A call
+  ended by an abort takes its status from the reason: `DEADLINE_EXCEEDED` for an
+  `AbortSignal.timeout`, the status a reason carrying one gives, and `CANCELLED` for anything else,
+  where upstream reports all but a standard `AbortError` as `INTERNAL`.
+
+  `rtd-typescript/grpc` also exports the `RpcError` class and the `GrpcStatusCode` enum, so the errors
+  gRPC calls produce can be narrowed and coded without a direct `@protobuf-ts/*` dependency.
+
+  `RtdGrpcClient` builds one of these by default and now forwards the rest of `GrpcWebOptions`
+  (`fetch`, `format`, `meta`, `timeout`, `interceptors`, `jsonOptions`, `binaryOptions`) to it,
+  which were previously accepted and ignored. A transport passed in by the caller is used as given.
+
+## 2.28.0
+
+### Minor Changes
+
+- 5c16cf4: Add BCS, transaction schema, and gRPC support for `Validity` transaction expirations and
+  allowed proposers. Also synchronize recently added transaction and execution error variants.
+
+  The deprecated v1 JSON transaction format now represents `ValidDuring` and `Validity` expirations
+  instead of collapsing them to `{ None: true }`. Previously a `Transaction.serialize()` ->
+  `Transaction.from()` round trip silently discarded the expiration — and, for `Validity`, the set
+  of validators allowed to propose the transaction — so the rebuilt transaction signed materially
+  broader bytes. An expiration the v1 reader does not recognize is now an error rather than a silent
+  downgrade.
+
+## 2.27.1
+
+### Patch Changes
+
+- 52d0c93: Reduce GraphQL object batch sizes to stay below the service request payload limit.
+
+## 2.27.0
+
+### Minor Changes
+
+- 7c696dc: Add transaction checkpoint and timestamp metadata to the Core API, and support parsing V1
+  transaction effects.
+
+## 2.26.2
+
+### Patch Changes
+
+- f2f7048: Upgrade workspace dependencies, remove the legacy dapp-kit package, and migrate the
+  remaining consumers to the current gRPC-based dapp-kit. Remove the legacy API reference while
+  retaining the migration guide and deprecation notice.
+
+## 2.26.1
+
+### Patch Changes
+
+- c8d3046: Restore backwards-compatible `ObjectError.code` values for gRPC object lookups. Missing
+  objects now report the long-standing `notExists` code (instead of the raw gRPC status number `'5'`
+  introduced in 2.26.0), so handlers written against earlier releases keep working on every
+  transport. Other gRPC statuses use the status name (for example `'INTERNAL'`) as the code, and
+  unrecognized statuses map to `'unknown'`. The transport-neutral `reason` field is unchanged and
+  remains the preferred way to detect missing objects.
+
+## 2.26.0
+
+### Minor Changes
+
+- 87989d5: Add transport-neutral `ObjectError` and `TransactionError` lookup details across the Core
+  API clients. The existing transport-specific `ObjectError.code` field and `(code, message)`
+  constructor remain supported; the transport-neutral `reason`, resource identity, and `cause`
+  fields are additive.
+
+## 2.25.0
+
+### Minor Changes
+
+- f76883d: Forward the last four Core API methods to the top-level clients. `getCurrentSystemState`,
+  `getProtocolConfig`, `getChainIdentifier`, and `getDynamicObjectField` were reachable only through
+  `client.core`, so `RtdGrpcClient` and `RtdGraphQLClient` now expose the complete Core API surface
+  as top-level methods.
+
+  Also fixes `GraphQLCoreClient.getCurrentSystemState` and `getProtocolConfig`, which declared no
+  parameters and so silently dropped the `signal` option the contract and the gRPC implementation
+  both accept. Both now forward `signal` to the underlying query.
+
+### Patch Changes
+
+- f76883d: Forward `signal` through every GraphQL client method. Twelve methods on
+  `GraphQLCoreClient` accepted an options object carrying `signal` but never passed it to the
+  underlying query, so `AbortSignal` was silently ignored on `getObjects`, `listOwnedObjects`,
+  `listCoins`, `getBalance`, `listBalances`, `getCoinMetadata`, `getTransaction`,
+  `executeTransaction`, `simulateTransaction`, `getMoveFunction`, `verifyZkLoginSignature`, and
+  `RtdGraphQLClient.listDynamicFields`.
+
+  `getReferenceGasPrice` now accepts options on `GraphQLCoreClient` and on both top-level clients;
+  it previously took no arguments at all, so callers had no way to pass a signal.
+
+  `GraphQLCoreClient.getChainIdentifier` now races the caller's signal against its cached read, the
+  same way the gRPC implementation does. The cached request itself stays uncancelled, since it is
+  shared between callers, but each caller can stop waiting independently.
+
+- f76883d: Fix cancellation for signals that were already aborted, and forward the caller's signal
+  into MVR name resolution.
+
+  `raceSignal` registered an `abort` listener without first checking `signal.aborted`. An `abort`
+  event is not replayed for listeners added afterwards, so passing an already-aborted signal
+  resolved normally instead of rejecting. This affected every cached read that races a signal,
+  including `getChainIdentifier` on the gRPC and GraphQL clients.
+
+  Methods that resolve an MVR name before querying now pass the caller's signal into that lookup, so
+  aborting takes effect during name resolution rather than only afterwards. This covers
+  `listOwnedObjects`, `listCoins`, `getBalance`, `getCoinMetadata`, and `getMoveFunction` on the
+  GraphQL client, and `getCoinMetadata` and `getMoveFunction` on the deprecated JSON-RPC client.
+
+- f76883d: Forward the caller's `signal` into MVR name resolution and the remaining request paths.
+  `CoreClient.getDynamicObjectField` now passes it into the type resolution it performs before
+  reading the field, matching the sibling `getDynamicField` path.
+
+  On the deprecated JSON-RPC client, `listDynamicFields`, `verifyZkLoginSignature`, and
+  `getMoveFunction` forward the signal to their underlying requests, `simulateTransaction` forwards
+  it to the reference gas price lookup it performs while building, and `getChainIdentifier` races
+  the signal against its cached read the way the gRPC and GraphQL clients do. Fifteen MVR lookups in
+  `jsonRpc/client.ts` also went unsignalled, including the ones the Core `listCoins`, `getBalance`,
+  and `listOwnedObjects` paths reach, so a stalled resolution delayed cancellation on those methods.
+
+  One MVR call remains unsignalled by design: the named-packages transaction plugin, since
+  `BuildTransactionOptions` carries no signal to forward.
+
+- f76883d: Regenerate the GraphQL schema and `gql.tada` introspection types from upstream, picking
+  up the new `ForwardingAddressRegistryCreateTransaction` system transaction variant on the
+  `EndOfEpochTransactionKind` union. gRPC proto types were also regenerated and are unchanged.
+
+## 2.24.0
+
+### Minor Changes
+
+- c5f452f: Add `resolveNameServiceAddress` to the Core, gRPC, and GraphQL client APIs for
+  transport-agnostic RtdNS name-to-address resolution.
+
+## 2.23.2
+
+### Patch Changes
+
+- dda3746: Fix `effects.gasObject` being populated with an invalid all-null object for transactions
+  that have no gas object (system transactions, or transactions paying gas from an address balance).
+  The gRPC transport and the JSON-RPC simulation path now return `null`, matching the declared
+  `TransactionEffects` type and the BCS-based effects parsing used by the other code paths.
+
+## 2.23.1
+
+### Patch Changes
+
+- 8c4b149: Update dependencies to versions that resolve security advisories: hono,
+  @hono/node-server, next, postcss, and valibot
+
+## 2.23.0
+
+### Minor Changes
+
+- f9bfbbf: Add `listTransactions` and `listEvents` core API methods for querying transactions and
+  events with filters, pagination, and ordering. The methods behave identically across the gRPC,
+  GraphQL, and JSON-RPC transports. The regenerated gRPC protos also add the new
+  `SubscribeTransactions` and `SubscribeEvents` subscription APIs.
+
+  The `TransactionKind` BCS schema exported from `rtd-typescript/bcs` now fully parses system
+  transactions: the previously-unparseable placeholder variants (`ChangeEpoch`, `Genesis`,
+  `ConsensusCommitPrologue`) have typed payloads, and the missing system variants
+  (`AuthenticatorStateUpdate`, `EndOfEpochTransaction`, `RandomnessStateUpdate`,
+  `ConsensusCommitPrologueV2`–`V4`, and `ProgrammableSystemTransaction`) were added. JSON-RPC
+  `getTransaction` also no longer reports the genesis transaction's placeholder signature, matching
+  the other transports.
+
+- f9bfbbf: Enable gas selection in `core.simulateTransaction` for the gRPC and GraphQL clients when
+  the transaction's gas payment is explicitly set to an empty list (`[]`). This ensures transactions
+  paying gas from the sender's address balance are simulated with real gas selection rather than a
+  mocked gas coin. Transactions with gas coins set are simulated as-is, and transactions without a
+  gas payment keep the mocked gas coin behavior. The default can be overridden by passing
+  `doGasSelection` to `simulateTransaction` on `RtdGrpcClient` and `RtdGraphQLClient`.
+
+## 2.22.2
+
+### Patch Changes
+
+- c6e06f6: Resolve `tx.coin` and `tx.balance` cleanup before later transaction commands so coin
+  intents remain compatible with Random-consuming Move calls.
+
+## 2.22.1
+
+### Patch Changes
+
+- 5c0fa85: Set `ValidDuring` expiration when resolving transactions that explicitly use
+  address-balance gas with an empty gas payment and preset gas budget.
+- e890999: Extend zkLogin Poseidon hashing to support up to 64 inputs.
+- e2dca59: Update zkLogin JWT length validation limit.
+
+## 2.22.0
+
+### Minor Changes
+
+- 899d9e3: Add gRPC client transaction results that include protobuf JSON with
+  `include: { protoJson: true }`.
+
+## 2.21.0
+
+### Minor Changes
+
+- da78e18: Expose gRPC transaction response parsers for converting protobuf transaction responses
+  into SDK Core transaction result shapes.
+
+## 2.20.4
+
+### Patch Changes
+
+- 7333638: Deprecate JSON-RPC client APIs, transport APIs, and JSON-RPC-specific types. Migrate to
+  `RtdGrpcClient` or `RtdGraphQLClient`.
+- e77aa8d: Forward `AbortSignal` from `RtdGrpcClient` method options to the underlying gRPC
+  requests. Previously methods like `listOwnedObjects` accepted a `signal` but never passed it
+  through, so passing `signal` did not cancel the request. MVR
+  (`resolveType`/`resolvePackage`/`resolve`) resolution is now also cancellable via the same signal.
+
+## 2.20.3
+
+### Patch Changes
+
+- 5028c01: Fix kind-only transaction builds (`onlyTransactionKind: true`) that reference an owned
+  object without a sender set (e.g. the seal use-case). The gRPC and GraphQL clients now disable
+  simulation validation checks when resolving kind-only builds, so a transaction that would fail to
+  simulate can still be serialized. Kind-only builds also no longer leak the dummy `0x0` sender used
+  for resolution back into the transaction data, matching the JSON-RPC client's behavior.
+
+## 2.20.2
+
+### Patch Changes
+
+- 36ab719: Fix pagination options being dropped on the unified core client.
+
+  `GraphQLCoreClient.listBalances` now forwards the `limit` and `cursor` options to the underlying
+  query (previously both were ignored, so it always returned the full, unpaginated list).
+  `GrpcCoreClient.listCoins` now forwards `limit` as the request `pageSize` (previously only
+  `cursor` was passed, so `limit` had no effect). This brings both methods in line with the other
+  transports and list methods.
+
+## 2.20.1
+
+### Patch Changes
+
+- 91c4ef5: Fix `CoinWithBalance` intent failing to build after a `toJSON`/`Transaction.from`
+  round-trip. Serializing a transaction with `CoinWithBalance` as a supported intent turns the
+  intent's `balance` into a string, which was not coerced back to a `bigint` on deserialization,
+  causing `ValiError: Invalid type: Expected bigint` when building the restored transaction.
+
+## 2.20.0
+
+### Minor Changes
+
+- 7452835: Add `ZkLoginSigner`, a transport- and provider-agnostic zkLogin signer. It wraps any
+  ephemeral `Signer` and transforms its signatures into zkLogin signatures using the supplied proof
+  `inputs` and `maxEpoch`:
+  `new ZkLoginSigner({ ephemeralSigner, maxEpoch, inputs, legacyAddress })`. The address is derived
+  from the proof; `legacyAddress` is a required boolean (consistent with `jwtToAddress`,
+  `toZkLoginPublicIdentifier`, and the other zkLogin address APIs). Optionally pass `address` to
+  validate the derived address (throws on mismatch) and `client` to make the derived public key able
+  to verify signatures. Like other composite signers (e.g. `MultiSigSigner`), calling `sign()`
+  directly throws — use `signTransaction` / `signPersonalMessage`.
+
+  Also adds a read-only `legacyAddress` getter to `ZkLoginPublicIdentifier`.
+
+## 2.19.0
+
+### Minor Changes
+
+- 2be98ce: Add `isValidSignature`, `isValidPersonalMessageSignature`, and
+  `isValidTransactionSignature` to `rtd-typescript/verify` — boolean-returning siblings of the existing
+  `verify*` functions, taking the same arguments. They return `false` for a malformed or invalid
+  signature (or one that doesn't match a supplied `address`) instead of throwing, while still
+  letting a genuine environmental failure during verification (e.g. a zkLogin JWK/epoch lookup)
+  propagate. The `verify*` functions now delegate to these.
+
+## 2.18.0
+
+### Minor Changes
+
+- b093d05: `Transaction.from` now accepts an optional `intentResolvers` option, a map of intent
+  names to resolvers. This lets you synchronously copy a transaction that still contains unresolved
+  custom intents without first awaiting `prepareForSerialization`. Built-in intents (such as
+  `CoinWithBalance`) continue to be handled automatically.
+- bbf63cb: Updated dependencies
+
+### Patch Changes
+
+- 4ca4c66: zkLogin: `genAddressSeed` now rejects key claim name, value, or aud that contain a JSON
+  escape (`"`, `\`, or a control character).
+- Updated dependencies [bbf63cb]
+  - rtd-bcs@2.1.0
+  - rtd-utils@0.4.0
+
+## 2.17.0
+
+### Minor Changes
+
+- 521ec28: Regenerate gRPC, GraphQL, and JSON-RPC types from upstream sources, and add a
+  `ForkingService` gRPC client for use against `rtd-fork` instances.
+  - gRPC: `AccumulatorWrite` splits the old `value` field into `integerValue` / `integerTuple` /
+    `eventDigestValue` (authenticated events), with a new `EventDigestEntry` message and
+    `AccumulatorValue` enum.
+  - GraphQL: new `verifySignature` query (deprecates `verifyZkLoginSignature`), `IntentScope` enum,
+    `SignatureVerifyResult` type, `digest` arg on `Query.checkpoint`, and `version` field on
+    `TransactionEffects`.
+  - JSON-RPC: regenerated; `DisplayFieldsResponse.data` override from #993 is preserved.
+  - `RtdGrpcClient` now exposes a `forkingService` member built from
+    `rtd/forking/v1alpha/forking_service.proto` (pulled from the `rtd` repo, since it is not
+    mirrored in `rtd-apis`). The service is admin-only and works only against `rtd-fork` instances;
+    it serves on the same host/port as the regular Rtd gRPC services on a fork.
+
+## 2.16.3
+
+### Patch Changes
+
+- 5900ad5: Always pass a `ValidDuring` expiration as a simulate-only override when the resolver has
+  to compute a gas budget and the caller hasn't set an expiration. The simulate inside
+  `setGasBudget` runs with `payment: []`, and the validator's replay-protection check rejects
+  payment-less transactions that lack both a `ValidDuring` expiration and an address-owned input.
+  Previously this affected gasless / free-tier PTBs over JSON-RPC ("Transactions must either have
+  address-owned inputs, or a ValidDuring expiration with at most two epochs of validity"); it also
+  affects any PTB whose only inputs are shared objects, pure args, or balance withdrawals. The
+  override is scoped to the simulate request — the final transaction's expiration is unchanged.
+
+## 2.16.2
+
+### Patch Changes
+
+- f7de3e5: Restore docs in published tarballs.
+- Updated dependencies [f7de3e5]
+  - rtd-bcs@2.0.5
+  - rtd-utils@0.3.3
+
+## 2.16.1
+
+### Patch Changes
+
+- 9e067cf: Validate the new per-package release flow end-to-end across every public @linku package.
+  No functional changes — empty patch bump to force the orchestrator to dispatch every
+  release-<pkg>.yml workflow with `dry_run=false` so each package publishes via OIDC trusted
+  publishing.
+- Updated dependencies [9e067cf]
+  - rtd-bcs@2.0.4
+  - rtd-utils@0.3.2
+
+## 2.16.0
+
+### Minor Changes
+
+- 6adc085: Add `parseToUnits` and `parseToMist` balance parsing utilities using pure bigint
+  arithmetic.
+
+### Patch Changes
+
+- b1bf49a: Fix `extractMvrTypes` and `replaceMvrNames` to handle vector and primitive type
+  parameters. Previously, these functions passed all string type parameters directly to
+  `parseStructTag`, which produced corrupted results for vector types (e.g.,
+  `vector<@mvr/demo::baz::Qux>`) and threw on primitives (e.g., `u8`). Vector types are now
+  unwrapped and recursed into, and primitive types are passed through unchanged.
+
+## 2.15.0
+
+### Minor Changes
+
+- 43b2670: Re-export `GrpcWebFetchTransport`, `GrpcWebOptions`, and `RpcTransport` from
+  `rtd-typescript/grpc` so users can configure custom transports without adding `@protobuf-ts/*` as
+  direct dependencies.
+
+### Patch Changes
+
+- ef0b8a7: Error when mixing RTD CoinWithBalance intents that use the gas coin with ones that set
+  useGasCoin: false in the same transaction, preventing potential double-counting of address
+  balance.
+
+## 2.14.1
+
+### Patch Changes
+
+- 2d57e9c: Fix `normalizeStructTag` to reject top-level vector type strings with a clear error.
+  Previously, calling `normalizeStructTag('vector<0x2::rtd::RTD>')` would produce a corrupted result
+  because the vector string was passed directly to `parseStructTag`, which misinterpreted it. The
+  function now throws an error directing callers to use `normalizeTypeTag` instead.
+- a3f2b49: Remove coin reservation feature flag check from core resolver
+
+## 2.14.0
+
+### Minor Changes
+
+- d0a401e: Update `Display.output` type from `Record<string, string>` to `Record<string, unknown>`
+  to match actual API behavior. Display v2 templates can produce structured JSON values (objects,
+  arrays) for fields that reference non-string Move types or use the `:json` transform. This affects
+  the core client type, the JSON-RPC `DisplayFieldsResponse` type, and all three transport
+  implementations (gRPC, GraphQL, JSON-RPC).
+
+## 2.13.4
+
+### Patch Changes
+
+- 2f76ba2: Revert removal of coin reservation feature flag check in core resolver
+
+## 2.13.3
+
+### Patch Changes
+
+- 3324a93: Remove `enable_coin_reservation_obj_refs` feature flag check from core resolver. Coin
+  reservation refs are now created whenever address balance is non-zero, removing the need for the
+  `getProtocolConfig` call during transaction building.
+
+## 2.13.2
+
+### Patch Changes
+
+- 0819c73: Fix JSON-RPC `defaultNameServiceName` returning `undefined` instead of `null` when no
+  name is found.
+- 8491b8e: Fix `parseStructTag` to reject malformed inputs: empty address/module/name components
+  (e.g. `::foo::Bar`) and trailing content after type parameters (e.g. `Coin<u8>GARBAGE`).
+
+## 2.13.1
+
+### Patch Changes
+
+- 82c2386: Fix JSON-RPC simulateTransaction includes when dryRun fails for non-public functions with
+  checksEnabled: false. balanceChanges and objectTypes no longer return incorrect data from failed
+  dryRun, and the transaction include no longer crashes for unbuilt Transaction objects.
+
+## 2.13.0
+
+### Minor Changes
+
+- 329350a: Add `tx.coin()` and `tx.balance()` methods and rewrite CoinWithBalance intent resolution.
+  - `tx.coin({ type, balance })` — produces a `Coin<T>` of the requested balance, sourced from owned
+    coins and gas
+  - `tx.balance({ type, balance })` — produces a `Balance<T>` of the requested balance, sourced from
+    address balance or owned coins
+  - When balance intents are used, the merged pool remainder is converted to Balance and returned to
+    the sender's address balance via `send_funds`
+  - Multiple intents of the same coin type are now resolved with a single combined `SplitCoins`
+    instead of per-intent splits
+
+- 3c83909: Optimize transaction resolver to parallelize independent network requests (system state,
+  balance, coins, protocol config) and add coin reservation compat mode for address balance gas
+  payment when `coin_reservation` feature flag is enabled.
+
+## 2.12.1
+
+### Patch Changes
+
+- f9067d5: Fix JSON-RPC `simulateTransaction` failing when passed a Transaction instance with
+  unresolved object inputs
+
+## 2.12.0
+
+### Minor Changes
+
+- bfeff69: Add `checksEnabled` option to `simulateTransaction` to allow disabling transaction
+  validation checks during simulation, enabling inspection of non-public/non-entry Move functions.
+
+## 2.11.0
+
+### Minor Changes
+
+- 319aae1: Remove WebSocket client and streaming subscription APIs from the JSON-RPC transport. The
+  `subscribe` method, `WebSocketConstructor` option, `websocket` option,
+  `JsonRpcTransportSubscribeOptions` type, and `Unsubscribe` type have been removed from the public
+  API.
+
+## 2.10.0
+
+### Minor Changes
+
+- 78a577b: Add `getProtocolConfig()` Core API method returning protocol version, feature flags, and
+  config attributes.
+
+### Patch Changes
+
+- 2ee1a2a: Improve `waitForTransaction` polling with schedule-based timing tuned to actual indexing
+  latency. Default schedule polls at 0, 300, 600, 1500, 3500ms then every 2s. Add `pollSchedule`
+  option for custom absolute-time schedules.
+
+## 2.9.1
+
+### Patch Changes
+
+- 8835d80: Only set ValidDuring expiration when there are no versioned objects in transaction
+
+## 2.9.0
+
+### Minor Changes
+
+- c769abb: Add `RTD_COIN_REGISTRY_OBJECT_ID` constant
+
+## 2.8.0
+
+### Minor Changes
+
+- e51dc5d: Add credentialId support to PasskeyKeypair for targeted credential selection during
+  signing
+
+### Patch Changes
+
+- 43e69f8: Add embedded LLM-friendly docs to published packages
+- Updated dependencies [43e69f8]
+  - rtd-bcs@2.0.3
+
+## 2.7.0
+
+### Minor Changes
+
+- 2faaf69: Add `include: { display: true }` support to `getObject`, `getObjects`, and
+  `listOwnedObjects` across all three transports (gRPC, GraphQL, JSON-RPC). Returns a `Display`
+  object with `output` and `errors` fields when a Display template exists for the object type, or
+  `null` when no template is registered.
+
+## 2.6.0
+
+### Minor Changes
+
+- 903eecc: Add `childId` to `getDynamicField` response for dynamic object fields.
+- e33fea3: Add `json` field to event data in transaction responses. When `events: true` is included,
+  each event now contains a `json` field with the JSON representation of the event's Move struct
+  data (or `null` if unavailable). Supported across all three transports (gRPC, GraphQL, JSON-RPC).
+- 903eecc: Add `include: { value: true }` option to `listDynamicFields` on `RtdGrpcClient` and
+  `RtdGraphQLClient` to optionally return the field values
+
+### Patch Changes
+
+- e33fea3: Fix gas payment resolution to check sender's address balance when sender is their own gas
+  payer. Previously, address balance was only checked for sponsored transactions, causing "No valid
+  gas coins found" errors for accounts with sufficient address balance but no coin objects.
+- 903eecc: Fix IDE autocomplete for `include` option in client and client.core methods
+- 903eecc: Update GraphQL schema and remove references to dropped `SimulationResult.error` and
+  `ExecutionResult.errors` fields
+
+## 2.5.1
+
+### Patch Changes
+
+- e8f985e: Fix duplicate `storageCost` in `ParallelTransactionExecutor` gas calculation, which was
+  double-counting storage costs.
+
+## 2.5.0
+
+### Minor Changes
+
+- 1c97aa2: Add childId for listDyanamicFields response and fix name encoding for dynamic field
+  objects
+
+### Patch Changes
+
+- 9ab9a50: Fix `parseTypeTag` to correctly handle vector type parameters containing struct types
+  (e.g. `vector<0x2::rtd::RTD>`). Previously, the `::` inside the vector's type parameter caused the
+  entire vector to be incorrectly parsed as a struct tag. Also reject malformed vector inputs like
+  `vector<>` (empty type parameter) and `vector<u8` (missing closing bracket).
+
+## 2.4.0
+
+### Minor Changes
+
+- 5270eaf: Add `isValidStructTag` validation utility. `isValidNamedType` now also validates the full
+  struct tag structure (completing the TODO that previously returned `true` unconditionally).
+
+## 2.3.2
+
+### Patch Changes
+
+- 99d1e00: Add default export condition
+- Updated dependencies [99d1e00]
+  - rtd-utils@0.3.1
+  - rtd-bcs@2.0.2
+
+## 2.3.1
+
+### Patch Changes
+
+- 265ec25: Add `isPreparedForSerialization` method to Transaction class for checking if a
+  transaction is ready for JSON serialization. Update `Transaction.from` to validate that
+  transactions are prepared before copying and automatically register the CoinWithBalance intent
+  resolver when needed.
+
+## 2.3.0
+
+### Minor Changes
+
+- 724a13a: Improve handling of clever errors during simulation
+
+### Patch Changes
+
+- fcbf952: Fix `$extend` chaining so that `client.$extend(sdk1()).$extend(sdk2())` works correctly.
+  Previously, the second `$extend` call would lose the extensions from the first call.
+
+## 2.2.0
+
+### Minor Changes
+
+- 6125fbd: Add getCoinMetadata to core api
+
+## 2.1.0
+
+### Minor Changes
+
+- f950118: Use a Proxy for client extensions
+
+## 2.0.1
+
+### Patch Changes
+
+- Updated dependencies [339d1e0]
+  - rtd-utils@0.3.0
+  - rtd-bcs@2.0.1
+
+## 2.0.0
+
+### Major Changes
+
+- e00788c: Align BCS Object and Effects schemas exactly with Rust implementation
+
+  **Breaking Changes:**
+  - **ExecutionStatus**: Renamed variant `Failed` → `Failure` to match Rust implementation
+  - **UnchangedSharedKind**: Renamed to `UnchangedConsensusKind` and removed obsolete variants
+    (`MutateDeleted`, `ReadDeleted`)
+  - **ExecutionCancelledDueToSharedObjectCongestion**: Fixed field name from `congestedObjects` to
+    `congested_objects` (snake_case)
+  - Renamed BCS Owner enum variant: `ConsensusV2` → `ConsensusAddressOwner`
+  - Renamed Data enum variant: `data.MoveObject` → `data.Move`
+  - Renamed exported schema: `ObjectBcs` → `bcs.Object`
+  - Renamed TransactionEffectsV2 field: `unchangedSharedObjects` → `unchangedConsensusObjects`
+
+  **New Error Variants Added:**
+
+  ExecutionFailureStatus:
+  - `MoveVectorElemTooBig`
+  - `MoveRawValueTooBig`
+  - `InvalidLinkage`
+  - `InsufficientBalanceForWithdraw`
+  - `NonExclusiveWriteInputObjectModified`
+
+  CommandArgumentError:
+  - `InvalidArgumentArity`
+  - `InvalidTransferObject`
+  - `InvalidMakeMoveVecNonObjectArgument`
+  - `ArgumentWithoutValue`
+  - `CannotMoveBorrowedValue`
+  - `CannotWriteToExtendedReference`
+  - `InvalidReferenceArgument`
+
+  **New Types:**
+  - Added complete Object BCS schema matching Rust's ObjectInner
+  - Added `MovePackage` type for package objects
+  - Added `TypeOrigin` for tracking type definitions
+  - Added `UpgradeInfo` for package upgrade tracking
+  - Added `Data.Package` variant (was missing)
+  - Added accumulator types: `AccumulatorWriteV1`, `AccumulatorAddress`, `AccumulatorOperation`,
+    `AccumulatorValue`
+  - Added `ObjectOut.AccumulatorWriteV1` variant
+  - Added UnchangedConsensusKind variants: `MutateConsensusStreamEnded`, `ReadConsensusStreamEnded`,
+    `Cancelled`, `PerEpochConfig`
+  - Moved all Object BCS definitions from separate file into main bcs.ts
+
+  **Migration Guide:**
+
+  ```typescript
+  // ExecutionStatus variant name change
+  // Before
+  if (effects.status.$kind === 'Success') { ... }
+  const error = effects.status.Failed.error;
+
+  // After
+  if (effects.status.$kind === 'Success') { ... }
+  const error = effects.status.Failure.error;
+
+  // UnchangedSharedKind → UnchangedConsensusKind
+  // Before
+  effects.unchangedSharedObjects.forEach(([id, obj]) => {
+      if (obj.$kind === 'MutateDeleted') { ... }
+  });
+
+  // After
+  effects.unchangedConsensusObjects.forEach(([id, obj]) => {
+      if (obj.$kind === 'MutateConsensusStreamEnded') { ... }
+  });
+  ```
+
+- e00788c: Consolidate GraphQL schema exports into a single version:
+  - Removed versioned schema exports: `rtd-typescript/graphql/schemas/2024.1`,
+    `rtd-typescript/graphql/schemas/2024.4`, `rtd-typescript/graphql/schemas/latest`
+  - Added single unified schema export: `rtd-typescript/graphql/schema`
+  - The SDK now tracks only the latest mainnet GraphQL schema version
+
+  See the migration guide for updating your code to use the new export
+
+- e00788c: Rename `Commands` export to `TransactionCommands` to fix ESM resolution for React Native
+- e00788c: Remove default client used for verifying zklogin signatures
+- e00788c: `network` is now a required option on RtdGraphQLClient and RtdJsonRpcClient
+- e00788c: Make legacyAddress parameter in all methods to reduce confusion and inconsistency around
+  default values
+- e00788c: Remove named-packages plugin and global plugin registry APIs. MVR resolution is now built
+  directly into the transaction resolution process, making the plugin-based approach obsolete.
+
+  **Removed from rtd-typescript:**
+  - `namedPackagesPlugin` function
+  - `NamedPackagesPluginOptions` type
+  - `Transaction.registerGlobalSerializationPlugin()` static method
+  - `Transaction.unregisterGlobalSerializationPlugin()` static method
+  - `Transaction.registerGlobalBuildPlugin()` static method
+  - `Transaction.unregisterGlobalBuildPlugin()` static method
+  - Global plugin registry system
+
+  **Changed:**
+  - MVR name resolution (`.move` names) now happens automatically during transaction building for
+    all clients (JSON-RPC and gRPC)
+  - No manual plugin registration is required - MVR resolution is integrated into the standard
+    transaction resolution flow
+
+- e00788c: Remove RtdClient exports from rtd-typescript/client
+
+  BREAKING CHANGE: All exports from `rtd-typescript/client` have been removed. Use
+  `rtd-typescript/jsonRpc` instead:
+  - `RtdClient` -> `RtdJsonRpcClient`
+  - `RtdClientOptions` -> `RtdJsonRpcClientOptions`
+  - `isRtdClient` -> `isRtdJsonRpcClient`
+  - `RtdTransport` -> `JsonRpcTransport`
+  - `getFullnodeUrl` -> `getJsonRpcFullnodeUrl`
+
+  Migration example:
+
+  ```ts
+  // Before
+  import { RtdClient, getFullnodeUrl } from 'rtd-typescript/client';
+  const client = new RtdClient({ url: getFullnodeUrl('devnet'), network: 'devnet' });
+
+  // After
+  import { RtdJsonRpcClient, getJsonRpcFullnodeUrl } from 'rtd-typescript/jsonRpc';
+  const client = new RtdJsonRpcClient({ url: getJsonRpcFullnodeUrl('devnet'), network: 'devnet' });
+  ```
+
+- e00788c: Remove deprecated exports and properties:
+  - Removed `fromB64`, `toB64`, `fromHEX`, `toHEX` exports from utils (use `fromBase64`, `toBase64`,
+    `fromHex`, `toHex` instead)
+  - Removed `schema` property from `ParsedKeypair` (use `scheme` instead)
+  - Removed `requestType` parameter from `executeTransactionBlock`
+  - Removed deprecated faucet methods: `requestRtdFromFaucetV0`, `requestRtdFromFaucetV1`,
+    `getFaucetRequestStatus` (use `requestRtdFromFaucetV2` instead)
+  - Removed deprecated subscription methods: `subscribeEvent`, `subscribeTransaction`
+  - Removed `blockData` property from Transaction class (use `getData()` instead)
+  - Removed `gasConfig` property from TransactionDataBuilder (use `gasData` instead)
+  - Removed `NamedPackagesPluginCache` type export (use `NamedPackagesOverrides` instead)
+  - Removed unnamed plugin registration methods from Transaction class
+
+- e00788c: Stabilize experimental client API by moving it from `rtd-typescript/experimental` to
+  `rtd-typescript/client`:
+  - Moved client implementation from `src/experimental/` to `src/client/`
+  - Removed `Experimental_` prefix from all client types and classes
+  - Updated all internal packages to use the new stable API
+
+  Breaking changes:
+  - `rtd-typescript/experimental` module has been removed
+  - All `Experimental_` prefixed types/classes have been renamed (e.g., `Experimental_CoreClient` →
+    `CoreClient`)
+  - Client types namespace changed from `Experimental_RtdClientTypes` to `RtdClientTypes`
+
+### Minor Changes
+
+- e00788c: Transactions now default the expiration to the current epoch + 1 using `ValidDuring`
+- e00788c: Update transaction executor APIs to accept `ClientWithCoreApi` for gRPC, GraphQL, and
+  JSON-RPC compatibility.
+
+  **Breaking Changes:**
+  - `CachingTransactionExecutor`, `SerialTransactionExecutor`, and `ParallelTransactionExecutor` now
+    accept any client implementing `ClientWithCoreApi` instead of requiring `RtdJsonRpcClient`
+  - The `executeTransaction()` return type changed: `data` property renamed to `result` and uses
+    core API types (`RtdClientTypes.TransactionResult`)
+  - The second parameter of `executeTransaction()` changed from JSON-RPC options to core API
+    `include` options
+
+### Patch Changes
+
+- Updated dependencies [e00788c]
+- Updated dependencies [e00788c]
+  - rtd-bcs@2.0.0
 
 ## 1.45.2
 
@@ -256,7 +1105,7 @@
 
 ### Patch Changes
 
-- ec519fc: Deprecate schema on `ParsedKeypair` returned by `decodeSuiPrivateKey` which should have
+- ec519fc: Deprecate schema on `ParsedKeypair` returned by `decodeRtdPrivateKey` which should have
   always been called `scheme`
 
 ## 1.30.0
@@ -287,7 +1136,7 @@
 
 - 7d66a32: Add support for async thunks inn tx.add
 - eb91fba: memoize tx.add calls to avoid accidental duplicate inputs and commands in transactions
-- 19a8045: Add verifyZkLoginSignature to core API and support SuiClient in verifySignature methods
+- 19a8045: Add verifyZkLoginSignature to core API and support RtdClient in verifySignature methods
 
 ## 1.28.2
 
@@ -305,8 +1154,8 @@
 
 ### Minor Changes
 
-- 2705dc8: Added a requestSuiFromFaucetV2 and added a deprecation comment on the previous
-  requestSuiFromFaucetV0, V1, and status.
+- 2705dc8: Added a requestRtdFromFaucetV2 and added a deprecation comment on the previous
+  requestRtdFromFaucetV0, V1, and status.
 
 ## 1.27.1
 
@@ -318,7 +1167,7 @@
 
 ### Minor Changes
 
-- 4d13ef8: Add abort signals to all SuiClient methods
+- 4d13ef8: Add abort signals to all RtdClient methods
 - 4d13ef8: Add effects parsing and dynamic field queries to experimental core client
 
 ## 1.26.1
@@ -727,8 +1576,8 @@
 
 - a92b03de42: The Typescript SDK has been renamed to `rtd-typescript` and includes many new features
   and breaking changes. See the
-  [full migration guide](https://sdk.linkuverse.com/typescript/migrations/rtd-1.0) for details on
-  how to upgrade.
+  [full migration guide](https://sdk.linkuverse.com/rtd/migrations/rtd-1.0) for details on how to
+  upgrade.
 
 ### Patch Changes
 
@@ -763,7 +1612,7 @@
 ### Minor Changes
 
 - 929db4976a: Add normalizeRtdNSName and isValidRtdNSName utils, and add a format option to
-  SuiClient.resolveNameServiceNames
+  RtdClient.resolveNameServiceNames
 
 ## 0.51.2
 
@@ -804,7 +1653,7 @@
 - c08e3569ef: Export all keypair utilities
 - 9a14e61db4: Allow signer in signAndExecuteTransactionBlock to be a Signer rather than a Keypair
 - 13e922d9b1: Fix multiple shared objects not respecting mutable correctly
-- 220a766d86: Fix WebSocket constructor not being properly assigned in SuiClient HTTP transport
+- 220a766d86: Fix WebSocket constructor not being properly assigned in RtdClient HTTP transport
 - Updated dependencies [bae8802fe3]
   - rtd-bcs@0.11.0
 
@@ -839,7 +1688,7 @@
 
 ### Minor Changes
 
-- cdcfa76c43: Add a new client method for retrieving epoch metrics (suix_getEpochMetrics)
+- cdcfa76c43: Add a new client method for retrieving epoch metrics (rtdx_getEpochMetrics)
 
 ### Patch Changes
 
@@ -855,16 +1704,16 @@
 
   If you are using the `subscribeEvent` or `subscribeTransaction` in environments that do not
   support the `WebSocket` api natively (This will be true for most versions of Node.js) you will
-  need to provide a WebSocket implementation when creating your SuiClient. You can either use a
+  need to provide a WebSocket implementation when creating your RtdClient. You can either use a
   global polyfill for the WebSocket class, or pass a compatible WebSocket implementation into
-  SuiHTTPTransport (eg, using the `ws` package)
+  RtdHTTPTransport (eg, using the `ws` package)
 
   ```typescript
-  import { getFullnodeUrl, SuiClient, SuiHTTPTransport } from 'rtd-typescript.js/client';
+  import { getFullnodeUrl, RtdClient, RtdHTTPTransport } from 'rtd-rtd.js/client';
   import { WebSocket } from 'ws';
 
-  new SuiClient({
-  	transport: new SuiHTTPTransport({
+  new RtdClient({
+    transport: new RtdHTTPTransport({
   		url: getFullnodeUrl('mainnet'),
   		// The typescript definitions may not match perfectly, casting to never avoids these minor incompatibilities
   		WebSocketConstructor: WebSocket as never,
@@ -941,7 +1790,7 @@
 ### Patch Changes
 
 - faa13ded9: Ensure that TransactionBlocks can be copied via structuredClone to workaround bug in
-  Rtd wallet
+  rtd wallet
 - c5684bb52: rename zk to zkLogin
 
 ## 0.43.0
@@ -977,7 +1826,7 @@
 
 ### Minor Changes
 
-- fd8589806: Remove all previously deprecated exports from rtd-typescript.js
+- fd8589806: Remove all previously deprecated exports from rtd-rtd.js
 
 ## 0.41.2
 
@@ -996,7 +1845,7 @@
 
 ### Minor Changes
 
-- ba8e3b857: Rename TransactionBlock generated type in rtd-typescript.js/client to SuiTransactionBlock
+- ba8e3b857: Rename TransactionBlock generated type in rtd-rtd.js/client to RtdTransactionBlock
   to avoid conflicting names in exports
 
 ### Patch Changes
@@ -1007,7 +1856,7 @@
 
 ### Minor Changes
 
-- a503cad34: Add exports to `rtd-typescript.js/client` for rpc method params
+- a503cad34: Add exports to `rtd-rtd.js/client` for rpc method params
 
 ### Patch Changes
 
@@ -1032,23 +1881,23 @@
 - 6d41059c7: Deprecate imports from the root path which can be imported from a modular export
 - cc6441f46: The Rtd TS SDK has been broken up into a set of modular exports, and all exports from
   the root of the package have been deprecated. The following export paths have been added:
-  - `rtd-typescript.js/client` - A client for interacting with Rtd RPC nodes.
-  - `rtd-typescript.js/bcs` - A BCS builder with pre-defined types for Rtd.
-  - `rtd-typescript.js/transaction` - Utilities for building and interacting with transactions.
-  - `rtd-typescript.js/keypairs/*` - Modular exports for specific KeyPair implementations.
-  - `rtd-typescript.js/verify` - Methods for verifying transactions and messages.
-  - `rtd-typescript.js/cryptography` - Shared types and classes for cryptography.
-  - `rtd-typescript.js/multisig` - Utilities for working with multisig signatures.
-  - `rtd-typescript.js/utils` - Utilities for formatting and parsing various Rtd types.
-  - `rtd-typescript.js/faucet`- Methods for requesting rtd from a faucet.
+  - `rtd-rtd.js/client` - A client for interacting with Rtd RPC nodes.
+  - `rtd-rtd.js/bcs` - A BCS builder with pre-defined types for Rtd.
+  - `rtd-rtd.js/transaction` - Utilities for building and interacting with transactions.
+  - `rtd-rtd.js/keypairs/*` - Modular exports for specific KeyPair implementations.
+  - `rtd-rtd.js/verify` - Methods for verifying transactions and messages.
+  - `rtd-rtd.js/cryptography` - Shared types and classes for cryptography.
+  - `rtd-rtd.js/multisig` - Utilities for working with multisig signatures.
+  - `rtd-rtd.js/utils` - Utilities for formatting and parsing various Rtd types.
+  - `rtd-rtd.js/faucet`- Methods for requesting rtd from a faucet.
 
   As part of this refactor we are deprecating a number of existing APIs:
-  - `JsonRPCProvider` - This Provider pattern is being replaced by a new `SuiClient`
+  - `JsonRPCProvider` - This Provider pattern is being replaced by a new `RtdClient`
   - `SignerWithProver` and `RawSigner` - The Concept of Signers is being removed from the SDK.
     Signing in verifying has been moved to the KeyPair classes, and the
-    `signAndExecuteTransactionBlock` method has been moved to the new `SuiClient`.
+    `signAndExecuteTransactionBlock` method has been moved to the new `RtdClient`.
   - The `superstruct` type definitions for types used by JsonRPCProvider are being replaced with
-    generated types exported from `rtd-typescript.js/client`. The new type definitions are pure
+    generated types exported from `rtd-rtd.js/client`. The new type definitions are pure
     typescript types and can't be used for runtime validation. By generating these as types, it will
     be easier to keep them in sync with the RPC definitions and avoid discrepancies between the type
     definitions in the SDK and the data returned by RPC methods.
@@ -1073,16 +1922,16 @@
 
   #### Migrating JsonRpcProvider
 
-  The new SuiClient should mostly work as a drop in replacement for the `JsonRpcProvider` provider.
-  Setting up a `SuiClient` is slightly different, but once constructed should work just like a
+  The new RtdClient should mostly work as a drop in replacement for the `JsonRpcProvider` provider.
+  Setting up a `RtdClient` is slightly different, but once constructed should work just like a
   provider.
 
   ```diff
-  - import { JsonRpcProvider, devnetConnection } from 'rtd-typescript.js';
-  + import { SuiClient, getFullnodeUrl } from 'rtd-typescript.js/client';
+  - import { JsonRpcProvider, devnetConnection } from 'rtd-rtd.js';
+  + import { RtdClient, getFullnodeUrl } from 'rtd-rtd.js/client';
 
   - const provider = new JsonRpcProvider(localnetConnection);
-  + const client = new SuiClient({ url: getFullnodeUrl('localnet')});
+  + const client = new RtdClient({ url: getFullnodeUrl('localnet')});
   ```
 
   #### Signing TransactionBlocks
@@ -1097,15 +1946,15 @@
   -    RawSigner,
   -    TransactionBlock,
   -    localnetConnection,
-  - } from 'rtd-typescript.js';
-  + import { Ed25519Keypair } from 'rtd-typescript.js/keypairs/ed25519';
-  + import { SuiClient, getFullnodeUrl } from 'rtd-typescript.js/client';
-  + import { TransactionBlock } from 'rtd-typescript.js/transactions';
+  - } from 'rtd-rtd.js';
+  + import { Ed25519Keypair } from 'rtd-rtd.js/keypairs/ed25519';
+  + import { RtdClient, getFullnodeUrl } from 'rtd-rtd.js/client';
+  + import { TransactionBlock } from 'rtd-rtd.js/transactions';
 
     const keypair = new Ed25519Keypair()
   - const provider = new JsonRpcProvider(localnetConnection);
   - const signer = new RawSigner(keyPair, provider);
-  + const client = new SuiClient({ url: getFullnodeUrl('localnet')});
+  + const client = new RtdClient({ url: getFullnodeUrl('localnet')});
 
   - const result = await signer.signAndExecuteTransactionBlock({
   + const result = await client.signAndExecuteTransactionBlock({
@@ -1117,25 +1966,25 @@
 
   #### Migrating faucet requests
 
-  The ability to request rtd from a faucet was not added to `SuiClient`, instead you will need to
-  use a method `rtd-typescript.js/faucet` to make these requests
+  The ability to request Rtd from a faucet was not added to `RtdClient`, instead you will need to
+  use a method `rtd-rtd.js/faucet` to make these requests
 
   ```diff
-  - import { JsonRpcProvider, devnetConnection } from 'rtd-typescript.js';
+  - import { JsonRpcProvider, devnetConnection } from 'rtd-rtd.js';
   - const provider = new JsonRpcProvider(devnetConnection);
-  + import { requestSuiFromFaucetV0, getFaucetHost } from 'rtd-typescript.js/faucet';
+  + import { requestRtdFromFaucetV0, getFaucetHost } from 'rtd-rtd.js/faucet';
 
-  - await provider.requestSuiFromFaucet(
-  -  '<YOUR Rtd address>'
+  - await provider.requestRtdFromFaucet(
+  -  '<YOUR RTD ADDRESS>'
   - );
-  + await requestSuiFromFaucetV0({
+  + await requestRtdFromFaucetV0({
   +   host: getFaucetHost('devnet'),
-  +   recipient: '<YOUR Rtd address>',
+  +   recipient: '<YOUR RTD ADDRESS>',
   +});
   ```
 
-- 001148443: Introduce new `rtd-typescript.js/faucet` export, which should be used for all faucet
-  interactions. This deprecates the previous `requestSuiFromFaucet` APIs that existed on the
+- 001148443: Introduce new `rtd-rtd.js/faucet` export, which should be used for all faucet
+  interactions. This deprecates the previous `requestRtdFromFaucet` APIs that existed on the
   `JsonRpcProvider` and `Signer` classes.
 
 ### Patch Changes
@@ -1164,7 +2013,7 @@
 - 36f2edff3: Use splitGenericParamaters util from bcs
 - 75d1a190d: Fix bug that prevented deserializing transaction blocks with a set expiration
 - c3a4ec57c: Add explicit dependency on events package
-- 2f37537d5: Update `SuiEventFilter` structure for `TimeRange` query.
+- 2f37537d5: Update `RtdEventFilter` structure for `TimeRange` query.
 - 00484bcc3: add method to create Ed25519Keypair from a mnemonic seed
 - Updated dependencies [36f2edff3]
   - rtd-bcs@0.7.3
@@ -1302,7 +2151,7 @@
 - 4adfbff73: Use Blake2b instead of sha3_256 for address generation
 - 4c4573ebe: Removed DevInspectResultsType and now DevInspectResults has a property results of
   ExecutionResultType and a property error
-- acc2edb31: Update schema for `SuiSystemState` and `DelegatedStake`
+- acc2edb31: Update schema for `RtdSystemState` and `DelegatedStake`
 - 941b03af1: Change functions in transactions.ts of ts-sdk such that: `getTotalGasUsed` and
   `getTotalGasUsedUpperBound` of ts-sdk return a `bigint`,fields of `gasCostSummary` are defined as
   `string`, `epochId` is defined as `string`. In `rtd-json-rpc` the corresponding types are defined
@@ -1331,24 +2180,24 @@
   `getTotalTransactionBlocks`, `getReferenceGasPrice` return a `bigint`,
   `getLatestCheckpointSequenceNumber` returns a `string`, `gasPrice` of `devInspectTransactionBlock`
   is defined as a `string`, checkpoint sequence number of `getCheckpoint` is defined as a `string`,
-  `cursor` of `getCheckpoints` is defined as a `string`. Introduce `SuiCheckpointSequenceNumber`
+  `cursor` of `getCheckpoints` is defined as a `string`. Introduce `RtdCheckpointSequenceNumber`
   type in rtd-json-rpc-types that is a `BigInt` to use instead of `CheckpointSequenceNumber` of
   rtd-types.
 - 6bd88570c: Rework all coin APIs to take objects as arguments instead of positional arguments.
 - f1e42f792: Consolidate get_object and get_raw_object into a single get_object endpoint which now
-  takes an additional config parameter with type `SuiObjectDataOptions` and has a new return type
-  `SuiObjectResponse`. By default, only object_id, version, and digest are fetched.
+  takes an additional config parameter with type `RtdObjectDataOptions` and has a new return type
+  `RtdObjectResponse`. By default, only object_id, version, and digest are fetched.
 - 272389c20: Support for new versioned TransactionData format
-- 3de8de361: Remove `getSuiSystemState` method. Use `getLatestRtdSystemState` method instead.
-- be3c4f51e: Add `display` field in `SuiObjectResponse` for frontend rendering. See more details in
-  https://forums.rtd.life/t/nft-object-display-proposal/4872
+- 3de8de361: Remove `getRtdSystemState` method. Use `getLatestRtdSystemState` method instead.
+- be3c4f51e: Add `display` field in `RtdObjectResponse` for frontend rendering. See more details in
+  https://forums.rtd.io/t/nft-object-display-proposal/4872
 - dbe73d5a4: Update `executeTransaction` and `signAndExecuteTransaction` to take in an additional
-  parameter `SuiTransactionBlockResponseOptions` which is used to specify which fields to include in
-  `SuiTransactionBlockResponse` (e.g., transaction, effects, events, etc). By default, only the
+  parameter `RtdTransactionBlockResponseOptions` which is used to specify which fields to include in
+  `RtdTransactionBlockResponse` (e.g., transaction, effects, events, etc). By default, only the
   transaction digest will be included.
 - c82e4b454: Introduce BigInt struct to rtd-json-rpc-types to serialize and deserialize amounts
-  to/from string. Change ts-sdk to serialize amounts of PaySui and Pay as string.
-- 7a2eaf4a3: Changing the SuiObjectResponse struct to use data/error fields instead of
+  to/from string. Change ts-sdk to serialize amounts of PayRtd and Pay as string.
+- 7a2eaf4a3: Changing the RtdObjectResponse struct to use data/error fields instead of
   details/status
 - 2ef2bb59e: Deprecate getTransactionDigestsInRange. This method will be removed before April 2023,
   please use `getTransactions` instead
@@ -1373,7 +2222,7 @@
 - dd348cf03: Refactor `getTransactions` to `queryTransactions`
 - 57c17e02a: Removed `JsonRpcProviderWithCache`, use `JsonRpcProvider` instead.
 - 65f1372dd: Rename `provider.getTransactionWithEffects` to `provider.getTransaction`. The new
-  method takes in an additional parameter `SuiTransactionBlockResponseOptions` to configure which
+  method takes in an additional parameter `RtdTransactionBlockResponseOptions` to configure which
   fields to fetch(transaction, effects, events, etc). By default, only the transaction digest will
   be returned.
 - a09239308: [testing only] an intent scope can be passed in to verifyMessage
@@ -1384,16 +2233,16 @@
 - d3170ba41: All JSON-RPC APIs now accept objects instead of positional arugments.
 - a6ffb8088: Removed events from transaction effects, TransactionEvents will now be provided in the
   TransactionResponse, along side TransactionEffects.
-- 3304eb83b: Refactor Rust SuiTransactionBlockKind to be internally tagged for Json serialization
-  with tag="type" and SuiEvent to be adjacently tagged with tag="type" and content="content"
+- 3304eb83b: Refactor Rust RtdTransactionBlockKind to be internally tagged for Json serialization
+  with tag="type" and RtdEvent to be adjacently tagged with tag="type" and content="content"
 - 4189171ef: Adds support for validator candidate.
 - 77bdf907f: When parsing u64, u128, and u256 values with bcs, they are now string encoded.
 - a74df16ec: Minor change to the system transaction format
 - 0f7aa6507: Switching the response type of the getOwnedObjects api to a paginatedObjects response,
   and also moving filtering to FN
 - 9b60bf700: Change all snake_case fields in checkpoint.ts and faucet.ts to camelCase
-- 64fb649eb: Remove old `SuiExecuteTransactionResponse` interface, and `CertifiedTransaction`
-  interface in favor of the new unified `SuiTransactionBlockResponse` interfaces.
+- 64fb649eb: Remove old `RtdExecuteTransactionResponse` interface, and `CertifiedTransaction`
+  interface in favor of the new unified `RtdTransactionBlockResponse` interfaces.
 - a6b0c4e5f: Changed the getOwnerObjectsForAddress api to getOwnedObjects, and added options/
   pagination to the parameters
 
@@ -1463,7 +2312,7 @@
 
 ### Minor Changes
 
-- 473005d8f: Add protocol_version to CheckpointSummary and SuiSystemObject. Consolidate end-of-epoch
+- 473005d8f: Add protocol_version to CheckpointSummary and RtdSystemObject. Consolidate end-of-epoch
   information in CheckpointSummary.
 - 59641dc29: Support for deserializing new ConsensusCommitPrologue system transaction
 - 629804d26: Remove usage of `Base64DataBuffer`, and use `Uint8Array` instead.
@@ -1472,7 +2321,7 @@
 ### Patch Changes
 
 - fcba70206: Add basic formatting utilities
-- ebe6c3945: Support deserializing `paySui` and `payAllSui` transactions
+- ebe6c3945: Support deserializing `payRtd` and `payAllRtd` transactions
 - e630f6832: Added string option to getCheckpointContents call in SDK to support 0.22.0
 
 ## 0.26.1
@@ -1485,7 +2334,7 @@
 
 ### Minor Changes
 
-- a8746d4e9: update SuiExecuteTransactionResponse
+- a8746d4e9: update RtdExecuteTransactionResponse
 - e6a71882f: Rename getDelegatedStake to getDelegatedStakes
 - 21781ba52: Secp256k1 signs 64-bytes signature [r, s] instead of [r, s, v] with recovery id
 
@@ -1530,7 +2379,7 @@
 - e26f47cbf: added getDelegatedStake and getValidators and validator type
 - b745cde24: Add a call(endpoint, params) method to invoke any RPC endpoint
 - 35e0df780: EventID should use TransactionDigest instead of TxSequence
-- 5cd51dd38: Deprecate sui_executeTransaction in favor of sui_executeTransactionSerializedSig
+- 5cd51dd38: Deprecate rtd_executeTransaction in favor of rtd_executeTransactionSerializedSig
 - 8474242af: Add methods for getDynamicFields and getDynamicFieldObject
 - f74181212: Add method to deserialize a public key, using it's schema and base64 data
 
@@ -1559,11 +2408,11 @@
     public method and without the need of signer so a dapp can use it
   - fixes edge cases with pay txs
 - bb14ffdc5: Remove ImmediateReturn and WaitForTxCert from ExecuteTransactionRequestType
-- d2015f815: Rebuilt type-narrowing utilties (e.g. `isSuiObject`) on top of Superstruct, which
+- d2015f815: Rebuilt type-narrowing utilties (e.g. `isRtdObject`) on top of Superstruct, which
   should make them more reliable. The type-narrowing functions are no longer exported, instead a
   Superstruct schema is exported, in addition to an `is` and `assert` function, both of which can be
-  used to replace the previous narrowing functions. For example, `isSuiObject(data)` becomes
-  `is(data, SuiObject)`.
+  used to replace the previous narrowing functions. For example, `isRtdObject(data)` becomes
+  `is(data, RtdObject)`.
 - 7d0f25b61: Add devInspectTransaction, which is similar to dryRunTransaction, but lets you call any
   Move function(including non-entry function) with arbitrary values.
 
@@ -1623,7 +2472,7 @@
 - db22728c1: \* adds dryRunTransaction support
   - adds getGasCostEstimation to the signer-with-provider that estimates the gas cost for a
     transaction
-- 3b510d0fc: adds coin transfer method to framework that uses pay and paySui
+- 3b510d0fc: adds coin transfer method to framework that uses pay and payRtd
 
 ## 0.16.0
 
@@ -1657,7 +2506,7 @@
 ### Minor Changes
 
 - 8b4bea5e2: Remove gateway related APIs
-- e45b188a8: Introduce PaySui and PayAllSui native transaction types to TS SDK.
+- e45b188a8: Introduce PayRtd and PayAllRtd native transaction types to TS SDK.
 
 ### Patch Changes
 
@@ -1666,7 +2515,7 @@
 - ef3571dc8: Fix gas selection bug for a vector of objects
 - cccfe9315: Add deserialization util method to LocalTxnDataSerializer
 - 2dc594ef7: Introduce getCoinDenominationInfo, which returns denomination info of a coin, now only
-  supporting Rtd coin.
+  supporting RTD coin.
 - 4f0c611ff: Protocol change to add 'initial shared version' to shared object references.
 
 ## 0.13.0
@@ -1687,7 +2536,7 @@
   of breaking changes on applications. When there's a mismatch between the TypeScript definitions
   and RPC response, the SDK now log a console warning instead of throwing an error.
 - 03e6b552b: Add util function to get coin balances
-- 4575c0a02: Fix type definition of SuiMoveNormalizedType
+- 4575c0a02: Fix type definition of RtdMoveNormalizedType
 - ccf7f148d: Added generic signAndExecuteTransaction method to the SDK, which can be used with any
   supported type of transaction.
 

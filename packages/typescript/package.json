@@ -3,7 +3,7 @@
 	"author": "LinkU Labs <build@linkuverse.com>",
 	"description": "Rtd TypeScript API",
 	"homepage": "https://sdk.linkuverse.com",
-	"version": "1.45.2",
+	"version": "2.31.3",
 	"license": "Apache-2.0",
 	"sideEffects": false,
 	"files": [
@@ -15,6 +15,7 @@
 		"client",
 		"cryptography",
 		"dist",
+		"docs",
 		"experimental",
 		"faucet",
 		"graphql",
@@ -29,89 +30,94 @@
 		"zklogin"
 	],
 	"engines": {
-		"node": ">=18"
+		"node": ">=22"
 	},
-	"type": "commonjs",
+	"type": "module",
 	"exports": {
 		"./bcs": {
-			"import": "./dist/esm/bcs/index.js",
-			"require": "./dist/cjs/bcs/index.js"
+			"types": "./dist/bcs/index.d.mts",
+			"import": "./dist/bcs/index.mjs",
+			"default": "./dist/bcs/index.mjs"
 		},
 		"./client": {
-			"import": "./dist/esm/client/index.js",
-			"require": "./dist/cjs/client/index.js"
+			"types": "./dist/client/index.d.mts",
+			"import": "./dist/client/index.mjs",
+			"default": "./dist/client/index.mjs"
 		},
 		"./cryptography": {
-			"import": "./dist/esm/cryptography/index.js",
-			"require": "./dist/cjs/cryptography/index.js"
-		},
-		"./experimental": {
-			"import": "./dist/esm/experimental/index.js",
-			"require": "./dist/cjs/experimental/index.js"
+			"types": "./dist/cryptography/index.d.mts",
+			"import": "./dist/cryptography/index.mjs",
+			"default": "./dist/cryptography/index.mjs"
 		},
 		"./faucet": {
-			"import": "./dist/esm/faucet/index.js",
-			"require": "./dist/cjs/faucet/index.js"
+			"types": "./dist/faucet/index.d.mts",
+			"import": "./dist/faucet/index.mjs",
+			"default": "./dist/faucet/index.mjs"
 		},
 		"./graphql": {
-			"import": "./dist/esm/graphql/index.js",
-			"require": "./dist/cjs/graphql/index.js"
+			"types": "./dist/graphql/index.d.mts",
+			"import": "./dist/graphql/index.mjs",
+			"default": "./dist/graphql/index.mjs"
 		},
 		"./grpc": {
-			"import": "./dist/esm/grpc/index.js",
-			"require": "./dist/cjs/grpc/index.js"
+			"types": "./dist/grpc/index.d.mts",
+			"import": "./dist/grpc/index.mjs",
+			"default": "./dist/grpc/index.mjs"
 		},
 		"./jsonRpc": {
-			"import": "./dist/esm/jsonRpc/index.js",
-			"require": "./dist/cjs/jsonRpc/index.js"
+			"types": "./dist/jsonRpc/index.d.mts",
+			"import": "./dist/jsonRpc/index.mjs",
+			"default": "./dist/jsonRpc/index.mjs"
 		},
 		"./keypairs/ed25519": {
-			"import": "./dist/esm/keypairs/ed25519/index.js",
-			"require": "./dist/cjs/keypairs/ed25519/index.js"
+			"types": "./dist/keypairs/ed25519/index.d.mts",
+			"import": "./dist/keypairs/ed25519/index.mjs",
+			"default": "./dist/keypairs/ed25519/index.mjs"
 		},
 		"./keypairs/secp256k1": {
-			"import": "./dist/esm/keypairs/secp256k1/index.js",
-			"require": "./dist/cjs/keypairs/secp256k1/index.js"
+			"types": "./dist/keypairs/secp256k1/index.d.mts",
+			"import": "./dist/keypairs/secp256k1/index.mjs",
+			"default": "./dist/keypairs/secp256k1/index.mjs"
 		},
 		"./keypairs/secp256r1": {
-			"import": "./dist/esm/keypairs/secp256r1/index.js",
-			"require": "./dist/cjs/keypairs/secp256r1/index.js"
+			"types": "./dist/keypairs/secp256r1/index.d.mts",
+			"import": "./dist/keypairs/secp256r1/index.mjs",
+			"default": "./dist/keypairs/secp256r1/index.mjs"
 		},
 		"./keypairs/passkey": {
-			"import": "./dist/esm/keypairs/passkey/index.js",
-			"require": "./dist/cjs/keypairs/passkey/index.js"
+			"types": "./dist/keypairs/passkey/index.d.mts",
+			"import": "./dist/keypairs/passkey/index.mjs",
+			"default": "./dist/keypairs/passkey/index.mjs"
 		},
 		"./multisig": {
-			"import": "./dist/esm/multisig/index.js",
-			"require": "./dist/cjs/multisig/index.js"
+			"types": "./dist/multisig/index.d.mts",
+			"import": "./dist/multisig/index.mjs",
+			"default": "./dist/multisig/index.mjs"
 		},
 		"./transactions": {
-			"import": "./dist/esm/transactions/index.js",
-			"require": "./dist/cjs/transactions/index.js"
+			"types": "./dist/transactions/index.d.mts",
+			"import": "./dist/transactions/index.mjs",
+			"default": "./dist/transactions/index.mjs"
 		},
 		"./utils": {
-			"import": "./dist/esm/utils/index.js",
-			"require": "./dist/cjs/utils/index.js"
+			"types": "./dist/utils/index.d.mts",
+			"import": "./dist/utils/index.mjs",
+			"default": "./dist/utils/index.mjs"
 		},
 		"./verify": {
-			"import": "./dist/esm/verify/index.js",
-			"require": "./dist/cjs/verify/index.js"
+			"types": "./dist/verify/index.d.mts",
+			"import": "./dist/verify/index.mjs",
+			"default": "./dist/verify/index.mjs"
 		},
 		"./zklogin": {
-			"import": "./dist/esm/zklogin/index.js",
-			"require": "./dist/cjs/zklogin/index.js"
+			"types": "./dist/zklogin/index.d.mts",
+			"import": "./dist/zklogin/index.mjs",
+			"default": "./dist/zklogin/index.mjs"
 		},
-		"./graphql/schemas/2024.1": {
-			"import": "./dist/esm/graphql/schemas/2024.1/index.js",
-			"require": "./dist/cjs/graphql/schemas/2024.1/index.js"
-		},
-		"./graphql/schemas/2024.4": {
-			"import": "./dist/esm/graphql/schemas/2024.4/index.js",
-			"require": "./dist/cjs/graphql/schemas/2024.4/index.js"
-		},
-		"./graphql/schemas/latest": {
-			"import": "./dist/esm/graphql/schemas/latest/index.js",
-			"require": "./dist/cjs/graphql/schemas/latest/index.js"
+		"./graphql/schema": {
+			"types": "./dist/graphql/schema/index.d.mts",
+			"import": "./dist/graphql/schema/index.mjs",
+			"default": "./dist/graphql/schema/index.mjs"
 		}
 	},
 	"scripts": {
@@ -119,11 +125,12 @@
 		"codegen": "pnpm codegen:graphql && pnpm codegen:grpc && pnpm lint:fix",
 		"codegen:graphql": "graphql-codegen --config graphql-codegen.ts",
 		"codegen:version": "node genversion.mjs",
-		"codegen:grpc": "rm -rf src/grpc/proto && mkdir src/grpc/proto && pnpm codegen:grpc-protoc && pnpm codegen:grpc-header",
-		"codegen:grpc-protoc": "protoc --ts_out ./src/grpc/proto --ts_opt force_server_none --ts_opt optimize_code_size --ts_opt ts_nocheck -I ../../../../rtd-apis/proto -I ../../../../rtd-apis/proto ../../../../rtd-apis/proto/rtd/rpc/v2/*.proto ../../../../rtd-apis/proto/google/*/*.proto",
-		"codegen:grpc-header": "find src/grpc/proto -type f -exec sh -c 'echo \"// Copyright (c) Wenchuan Tech, Inc.\\n// SPDX-License-Identifier: Apache-2.0\\n\" | cat - {} > temp && mv temp {}' \\;",
-		"build": "node genversion.mjs && pnpm build:package",
-		"build:package": "build-package",
+		"codegen:grpc": "rm -rf src/grpc/proto && mkdir src/grpc/proto && pnpm codegen:grpc-protoc && pnpm codegen:grpc-header && pnpm codegen:grpc-extensions && pnpm codegen:grpc-types",
+		"codegen:grpc-types": "tsx scripts/generate-grpc-types.ts",
+		"codegen:grpc-protoc": "protoc --ts_out ./src/grpc/proto --ts_opt force_server_none --ts_opt optimize_code_size --ts_opt ts_nocheck -I ../../../rtd-apis/proto -I ../../../rtd/crates/rtd-fork/proto ../../../rtd-apis/proto/rtd/rpc/v2/*.proto ../../../rtd-apis/proto/google/*/*.proto ../../../rtd/crates/rtd-fork/proto/rtd/forking/v1alpha/*.proto",
+		"codegen:grpc-header": "find src/grpc/proto -type f -exec sh -c 'echo \"// Copyright (c) LinkU Labs, Inc.\\n// SPDX-License-Identifier: Apache-2.0\\n\" | cat - {} > temp && mv temp {}' \\;",
+		"codegen:grpc-extensions": "find src/grpc/proto -name '*.ts' | xargs sed -i '' -E 's/from \"(\\.[^\"]+)\"/from \"\\1.js\"/g'",
+		"build": "rm -rf dist && node genversion.mjs && tsc --noEmit && tsdown",
 		"vitest": "vitest",
 		"test": "pnpm test:typecheck && pnpm test:unit",
 		"test:typecheck": "tsc -p ./test",
@@ -133,12 +140,11 @@
 		"analyze": "size-limit --why",
 		"prettier:check": "prettier -c --ignore-unknown .",
 		"prettier:fix": "prettier -w --ignore-unknown .",
-		"eslint:check": "eslint --max-warnings=0 .",
-		"eslint:fix": "pnpm run eslint:check --fix",
-		"lint": "pnpm run eslint:check && pnpm run prettier:check",
-		"lint:fix": "pnpm run eslint:fix && pnpm run prettier:fix",
-		"update-schemas": "pnpm tsx scripts/update-graphql-schemas.ts",
-		"generate-schema": "gql.tada generate-output"
+		"oxlint:check": "oxlint  .",
+		"oxlint:fix": "oxlint --fix",
+		"lint": "pnpm run oxlint:check && pnpm run prettier:check",
+		"lint:fix": "pnpm run oxlint:fix && pnpm run prettier:fix",
+		"update-graphql-schema": "pnpm tsx scripts/update-graphql-schema.ts"
 	},
 	"repository": {
 		"type": "git",
@@ -151,47 +157,44 @@
 		"access": "public"
 	},
 	"devDependencies": {
-		"@0no-co/graphqlsp": "^1.15.1",
-		"@graphql-codegen/add": "^6.0.0",
-		"@graphql-codegen/cli": "^6.1.0",
-		"@graphql-codegen/typed-document-node": "^6.1.4",
-		"@graphql-codegen/typescript": "5.0.6",
-		"@graphql-codegen/typescript-document-nodes": "5.0.6",
-		"@graphql-codegen/typescript-operations": "^5.0.6",
-		"@iarna/toml": "^2.2.5",
-		"@parcel/watcher": "^2.5.1",
-		"@protobuf-ts/plugin": "^2.11.1",
-		"@types/node": "^24.10.1",
+		"@0no-co/graphqlsp": "^1.17.3",
+		"@graphql-codegen/add": "^7.1.0",
+		"@graphql-codegen/cli": "^7.2.0",
+		"@graphql-codegen/typed-document-node": "^7.1.0",
+		"@graphql-codegen/typescript": "6.1.0",
+		"@graphql-codegen/typescript-document-nodes": "6.1.0",
+		"@graphql-codegen/typescript-operations": "^6.1.6",
+		"@grpc/grpc-js": ">=1.14.4",
+		"@parcel/watcher": "^2.6.0",
+		"@protobuf-ts/grpc-transport": "^2.11.1",
+		"@types/node": "^26.2.0",
 		"@types/tmp": "^0.2.6",
-		"@types/ws": "^8.18.1",
 		"cross-env": "^10.1.0",
 		"graphql-config": "^5.1.5",
-		"msw": "^2.12.3",
-		"rtd-build-scripts": "workspace:^",
-		"tmp": "^0.2.5",
+		"msw": "^2.15.0",
+		"tmp": "^0.2.7",
 		"ts-retry-promise": "^0.8.1",
-		"typescript": "^5.9.3",
-		"vite": "^7.2.6",
-		"vite-tsconfig-paths": "^5.1.4",
-		"vitest": "^4.0.15",
-		"wait-on": "^9.0.3",
-		"ws": "^8.18.3"
+		"typescript": "^7.0.2",
+		"vite": "^8.2.1",
+		"vite-tsconfig-paths": "^6.0.4",
+		"vitest": "^4.1.11",
+		"wait-on": "^9.1.0"
 	},
 	"dependencies": {
 		"@graphql-typed-document-node/core": "^3.2.0",
-		"@noble/curves": "=1.9.4",
-		"@noble/hashes": "^1.8.0",
+		"@noble/curves": "^2.3.0",
+		"@noble/hashes": "^2.3.0",
 		"@protobuf-ts/grpcweb-transport": "^2.11.1",
 		"@protobuf-ts/runtime": "^2.11.1",
 		"@protobuf-ts/runtime-rpc": "^2.11.1",
-		"@scure/base": "^1.2.6",
-		"@scure/bip32": "^1.7.0",
-		"@scure/bip39": "^1.6.0",
-		"gql.tada": "^1.9.0",
-		"graphql": "^16.12.0",
-		"poseidon-lite": "0.2.1",
-		"rtd-bcs": "workspace:*",
-		"rtd-utils": "workspace:*",
-		"valibot": "^1.2.0"
+		"@scure/base": "^2.3.0",
+		"@scure/bip32": "^2.3.0",
+		"@scure/bip39": "^2.3.0",
+		"gql.tada": "^1.11.3",
+		"graphql": "^17.0.2",
+		"poseidon-lite": "0.3.0",
+		"rtd-bcs": "workspace:^",
+		"rtd-utils": "workspace:^",
+		"valibot": "^1.4.2"
 	}
 }

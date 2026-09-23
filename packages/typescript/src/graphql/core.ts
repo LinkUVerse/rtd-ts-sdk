@@ -1,40 +1,73 @@
 // Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { Experimental_CoreClient } from '../experimental/core.js';
-import type { Experimental_RtdClientTypes } from '../experimental/types.js';
+import { CoreClient } from '../client/core.js';
+import { raceSignal } from '../client/mvr.js';
+import type { RtdClientTypes } from '../client/types.js';
+import { RTD_TYPE_ARG } from '../utils/constants.js';
 import type { GraphQLQueryOptions, RtdGraphQLClient } from './client.js';
 import type {
 	Object_Owner_FieldsFragment,
 	Transaction_FieldsFragment,
 } from './generated/queries.js';
+
+type GraphQLExecutionError = NonNullable<
+	NonNullable<Transaction_FieldsFragment['effects']>['executionError']
+>;
 import {
 	DefaultRtdnsNameDocument,
 	ExecuteTransactionDocument,
+	ExecutionStatus,
 	GetAllBalancesDocument,
 	GetBalanceDocument,
+	GetChainIdentifierDocument,
+	GetCoinMetadataDocument,
 	GetCoinsDocument,
-	GetDynamicFieldsDocument,
+	GetCurrentSystemStateDocument,
 	GetMoveFunctionDocument,
+	GetProtocolConfigDocument,
 	GetOwnedObjectsDocument,
 	GetReferenceGasPriceDocument,
 	GetTransactionBlockDocument,
+	ListEventsDocument,
+	ListTransactionsDocument,
 	MultiGetObjectsDocument,
+	ResolveNameServiceAddressDocument,
+	ResolveTransactionDocument,
 	SimulateTransactionDocument,
 	VerifyZkLoginSignatureDocument,
 	ZkLoginIntentScope,
 } from './generated/queries.js';
-import { ObjectError } from '../experimental/errors.js';
+import { ObjectError, SimulationError, TransactionError } from '../client/errors.js';
 import { chunk, fromBase64, toBase64 } from 'rtd-utils';
 import { normalizeStructTag, normalizeRtdAddress } from '../utils/rtd-types.js';
-import { deriveDynamicFieldID } from '../utils/dynamic-fields.js';
 import {
-	parseTransactionBcs,
+	formatMoveAbortMessage,
 	parseTransactionEffectsBcs,
-} from '../experimental/transports/utils.js';
+	transactionBytesHaveEmptyGasPayment,
+} from '../client/utils.js';
 import type { OpenMoveTypeSignatureBody, OpenMoveTypeSignature } from './types.js';
+import {
+	transactionDataToGrpcTransaction,
+	transactionToGrpcJson,
+	grpcTransactionToTransactionData,
+} from '../client/transaction-resolver.js';
+import { setAddressBalanceTransactionExpirationFromSimulatedEpoch } from '../client/address-balance-transaction-expiration.js';
+import { BalanceChange as BalanceChangeType } from '../grpc/proto/rtd/rpc/v2/balance_change.js';
+import { TransactionEffects as TransactionEffectsType } from '../grpc/proto/rtd/rpc/v2/effects.js';
+import { Transaction as GrpcTransactionType } from '../grpc/proto/rtd/rpc/v2/transaction.js';
+import { TransactionDataBuilder } from '../transactions/TransactionData.js';
+import type { BuildTransactionOptions } from '../transactions/index.js';
+import {
+	resolveEventFilter,
+	resolvePagination,
+	resolveTransactionFilter,
+	validateTransactionQuery,
+} from '../client/query-filters.js';
 
-export class GraphQLCoreClient extends Experimental_CoreClient {
+const GRAPHQL_OBJECT_BATCH_SIZE = 40;
+
+export class GraphQLCoreClient extends CoreClient {
 	#graphqlClient: RtdGraphQLClient;
 
 	constructor({
@@ -42,7 +75,7 @@ export class GraphQLCoreClient extends Experimental_CoreClient {
 		mvr,
 	}: {
 		graphqlClient: RtdGraphQLClient;
-		mvr?: Experimental_RtdClientTypes.MvrOptions;
+		mvr?: RtdClientTypes.MvrOptions;
 	}) {
 		super({ network: graphqlClient.network, base: graphqlClient, mvr });
 		this.#graphqlClient = graphqlClient;
@@ -55,6 +88,7 @@ export class GraphQLCoreClient extends Experimental_CoreClient {
 	>(
 		options: GraphQLQueryOptions<Result, Variables>,
 		getData?: (result: Result) => Data,
+		createMissingDataError?: () => Error,
 	): Promise<NonNullable<Data>> {
 		const { data, errors } = await this.#graphqlClient.query(options);
 
@@ -63,52 +97,89 @@ export class GraphQLCoreClient extends Experimental_CoreClient {
 		const extractedData = data && (getData ? getData(data) : data);
 
 		if (extractedData == null) {
-			throw new Error('Missing response data');
+			throw createMissingDataError?.() ?? new Error('Missing response data');
 		}
 
 		return extractedData as NonNullable<Data>;
 	}
 
-	async getObjects(
-		options: Experimental_RtdClientTypes.GetObjectsOptions,
-	): Promise<Experimental_RtdClientTypes.GetObjectsResponse> {
-		const batches = chunk(options.objectIds, 50);
-		const results: Experimental_RtdClientTypes.GetObjectsResponse['objects'] = [];
+	async getObjects<Include extends RtdClientTypes.ObjectInclude = {}>(
+		options: RtdClientTypes.GetObjectsOptions<Include>,
+	): Promise<RtdClientTypes.GetObjectsResponse<Include>> {
+		const batches = chunk(options.objectIds, GRAPHQL_OBJECT_BATCH_SIZE);
+		const results: RtdClientTypes.GetObjectsResponse<Include>['objects'] = [];
 
 		for (const batch of batches) {
 			const page = await this.#graphqlQuery(
 				{
 					query: MultiGetObjectsDocument,
+					signal: options.signal,
 					variables: {
 						objectKeys: batch.map((address) => ({ address })),
+						includeContent: options.include?.content ?? false,
+						includePreviousTransaction: options.include?.previousTransaction ?? false,
+						includeObjectBcs: options.include?.objectBcs ?? false,
+						includeJson: options.include?.json ?? false,
+						includeDisplay: options.include?.display ?? false,
 					},
 				},
 				(result) => result.multiGetObjects,
 			);
 			results.push(
 				...batch
-					.map((id) => normalizeRtdAddress(id))
+					.map((objectId) => ({ objectId, normalized: normalizeRtdAddress(objectId) }))
 					.map(
-						(id) =>
-							page.find((obj) => obj?.address === id) ??
-							new ObjectError('notFound', `Object ${id} not found`),
+						({ objectId, normalized }) =>
+							page.find((obj) => obj?.address === normalized) ??
+							new ObjectError('notFound', `Object ${normalized} not found`, {
+								reason: 'notFound',
+								objectId,
+							}),
 					)
 					.map((obj) => {
 						if (obj instanceof ObjectError) {
 							return obj;
 						}
+						const bcsContent = obj.asMoveObject?.contents?.bcs
+							? fromBase64(obj.asMoveObject.contents.bcs)
+							: undefined;
+
+						const objectBcs = obj.objectBcs ? fromBase64(obj.objectBcs) : undefined;
+
+						// Determine object type: package or Move object
+						// GraphQL already returns normalized struct tags
+						let type: string;
+						if (obj.asMovePackage) {
+							type = 'package';
+						} else if (obj.asMoveObject?.contents?.type?.repr) {
+							type = obj.asMoveObject.contents.type.repr;
+						} else {
+							type = '';
+						}
+
+						const jsonContent = options.include?.json
+							? obj.asMoveObject?.contents?.json
+								? (obj.asMoveObject.contents.json as Record<string, unknown>)
+								: null
+							: undefined;
+
+						const displayData = mapDisplay(
+							options.include?.display,
+							obj.asMoveObject?.contents?.display,
+						);
+
 						return {
-							id: obj.address,
+							objectId: obj.address,
 							version: obj.version?.toString()!,
 							digest: obj.digest!,
 							owner: mapOwner(obj.owner!),
-							type: obj.asMoveObject?.contents?.type?.repr!,
-							content: Promise.resolve(
-								obj.asMoveObject?.contents?.bcs
-									? fromBase64(obj.asMoveObject.contents.bcs)
-									: new Uint8Array(),
-							),
-							previousTransaction: obj.previousTransaction?.digest ?? null,
+							type,
+							content: bcsContent as RtdClientTypes.Object<Include>['content'],
+							previousTransaction: (obj.previousTransaction?.digest ??
+								undefined) as RtdClientTypes.Object<Include>['previousTransaction'],
+							objectBcs: objectBcs as RtdClientTypes.Object<Include>['objectBcs'],
+							json: jsonContent as RtdClientTypes.Object<Include>['json'],
+							display: displayData as RtdClientTypes.Object<Include>['display'],
 						};
 					}),
 			);
@@ -118,51 +189,75 @@ export class GraphQLCoreClient extends Experimental_CoreClient {
 			objects: results,
 		};
 	}
-	async getOwnedObjects(
-		options: Experimental_RtdClientTypes.GetOwnedObjectsOptions,
-	): Promise<Experimental_RtdClientTypes.GetOwnedObjectsResponse> {
+	async listOwnedObjects<Include extends RtdClientTypes.ObjectInclude = {}>(
+		options: RtdClientTypes.ListOwnedObjectsOptions<Include>,
+	): Promise<RtdClientTypes.ListOwnedObjectsResponse<Include>> {
 		const objects = await this.#graphqlQuery(
 			{
 				query: GetOwnedObjectsDocument,
+				signal: options.signal,
 				variables: {
-					owner: options.address,
+					owner: options.owner,
 					limit: options.limit,
 					cursor: options.cursor,
 					filter: options.type
-						? { type: (await this.mvr.resolveType({ type: options.type })).type }
+						? {
+								type: (await this.mvr.resolveType({ type: options.type, signal: options.signal }))
+									.type,
+							}
 						: undefined,
+					includeContent: options.include?.content ?? false,
+					includePreviousTransaction: options.include?.previousTransaction ?? false,
+					includeObjectBcs: options.include?.objectBcs ?? false,
+					includeJson: options.include?.json ?? false,
+					includeDisplay: options.include?.display ?? false,
 				},
 			},
 			(result) => result.address?.objects,
 		);
 
 		return {
-			objects: objects.nodes.map((obj) => ({
-				id: obj.address,
+			objects: objects.nodes.map((obj): RtdClientTypes.Object<Include> => ({
+				objectId: obj.address,
 				version: obj.version?.toString()!,
 				digest: obj.digest!,
 				owner: mapOwner(obj.owner!),
 				type: obj.contents?.type?.repr!,
-				content: Promise.resolve(
-					obj.contents?.bcs ? fromBase64(obj.contents.bcs) : new Uint8Array(),
-				),
-				previousTransaction: obj.previousTransaction?.digest ?? null,
+				content: (obj.contents?.bcs
+					? fromBase64(obj.contents.bcs)
+					: undefined) as RtdClientTypes.Object<Include>['content'],
+				previousTransaction: (obj.previousTransaction?.digest ??
+					undefined) as RtdClientTypes.Object<Include>['previousTransaction'],
+				objectBcs: (obj.objectBcs
+					? fromBase64(obj.objectBcs)
+					: undefined) as RtdClientTypes.Object<Include>['objectBcs'],
+				json: (options.include?.json
+					? obj.contents?.json
+						? (obj.contents.json as Record<string, unknown>)
+						: null
+					: undefined) as RtdClientTypes.Object<Include>['json'],
+				display: mapDisplay(
+					options.include?.display,
+					obj.contents?.display,
+				) as RtdClientTypes.Object<Include>['display'],
 			})),
 			hasNextPage: objects.pageInfo.hasNextPage,
 			cursor: objects.pageInfo.endCursor ?? null,
 		};
 	}
-	async getCoins(
-		options: Experimental_RtdClientTypes.GetCoinsOptions,
-	): Promise<Experimental_RtdClientTypes.GetCoinsResponse> {
+	async listCoins(
+		options: RtdClientTypes.ListCoinsOptions,
+	): Promise<RtdClientTypes.ListCoinsResponse> {
+		const coinType = options.coinType ?? RTD_TYPE_ARG;
 		const coins = await this.#graphqlQuery(
 			{
 				query: GetCoinsDocument,
+				signal: options.signal,
 				variables: {
-					owner: options.address,
+					owner: options.owner,
 					cursor: options.cursor,
 					first: options.limit,
-					type: `0x2::coin::Coin<${(await this.mvr.resolveType({ type: options.coinType })).type}>`,
+					type: `0x2::coin::Coin<${(await this.mvr.resolveType({ type: coinType, signal: options.signal })).type}>`,
 				},
 			},
 			(result) => result.address?.objects,
@@ -171,49 +266,90 @@ export class GraphQLCoreClient extends Experimental_CoreClient {
 		return {
 			cursor: coins.pageInfo.endCursor ?? null,
 			hasNextPage: coins.pageInfo.hasNextPage,
-			objects: coins.nodes.map((coin) => ({
-				id: coin.address,
+			objects: coins.nodes.map((coin): RtdClientTypes.Coin => ({
+				objectId: coin.address,
 				version: coin.version?.toString()!,
 				digest: coin.digest!,
 				owner: mapOwner(coin.owner!),
 				type: coin.contents?.type?.repr!,
 				balance: (coin.contents?.json as { balance: string })?.balance,
-				content: Promise.resolve(
-					coin.contents?.bcs ? fromBase64(coin.contents.bcs) : new Uint8Array(),
-				),
-				previousTransaction: coin.previousTransaction?.digest ?? null,
 			})),
 		};
 	}
 
 	async getBalance(
-		options: Experimental_RtdClientTypes.GetBalanceOptions,
-	): Promise<Experimental_RtdClientTypes.GetBalanceResponse> {
+		options: RtdClientTypes.GetBalanceOptions,
+	): Promise<RtdClientTypes.GetBalanceResponse> {
+		const coinType = options.coinType ?? RTD_TYPE_ARG;
 		const result = await this.#graphqlQuery(
 			{
 				query: GetBalanceDocument,
+				signal: options.signal,
 				variables: {
-					owner: options.address,
-					type: (await this.mvr.resolveType({ type: options.coinType })).type,
+					owner: options.owner,
+					coinType: (await this.mvr.resolveType({ type: coinType, signal: options.signal })).type,
 				},
 			},
 			(result) => result.address?.balance,
 		);
 
+		const addressBalance = BigInt(result.addressBalance ?? '0');
+		const coinBalance = BigInt(result.totalBalance ?? '0') - addressBalance;
+
 		return {
 			balance: {
-				coinType: result.coinType?.repr!,
-				balance: result.totalBalance!,
+				coinType: result.coinType?.repr ?? coinType,
+				balance: result.totalBalance ?? '0',
+				coinBalance: coinBalance.toString(),
+				addressBalance: addressBalance.toString(),
 			},
 		};
 	}
-	async getAllBalances(
-		options: Experimental_RtdClientTypes.GetAllBalancesOptions,
-	): Promise<Experimental_RtdClientTypes.GetAllBalancesResponse> {
+	async getCoinMetadata(
+		options: RtdClientTypes.GetCoinMetadataOptions,
+	): Promise<RtdClientTypes.GetCoinMetadataResponse> {
+		const coinType = (
+			await this.mvr.resolveType({ type: options.coinType, signal: options.signal })
+		).type;
+
+		const { data, errors } = await this.#graphqlClient.query({
+			query: GetCoinMetadataDocument,
+			signal: options.signal,
+			variables: {
+				coinType,
+			},
+		});
+
+		handleGraphQLErrors(errors);
+
+		if (!data?.coinMetadata) {
+			return { coinMetadata: null };
+		}
+
+		return {
+			coinMetadata: {
+				id: data.coinMetadata.address!,
+				decimals: data.coinMetadata.decimals!,
+				name: data.coinMetadata.name!,
+				symbol: data.coinMetadata.symbol!,
+				description: data.coinMetadata.description!,
+				iconUrl: data.coinMetadata.iconUrl ?? null,
+			},
+		};
+	}
+
+	async listBalances(
+		options: RtdClientTypes.ListBalancesOptions,
+	): Promise<RtdClientTypes.ListBalancesResponse> {
 		const balances = await this.#graphqlQuery(
 			{
 				query: GetAllBalancesDocument,
-				variables: { owner: options.address },
+				signal: options.signal,
+				variables: {
+					owner: options.owner,
+					limit: options.limit,
+					cursor: options.cursor,
+				},
 			},
 			(result) => result.address?.balances,
 		);
@@ -221,160 +357,438 @@ export class GraphQLCoreClient extends Experimental_CoreClient {
 		return {
 			cursor: balances.pageInfo.endCursor ?? null,
 			hasNextPage: balances.pageInfo.hasNextPage,
-			balances: balances.nodes.map((balance) => ({
-				coinType: balance.coinType?.repr!,
-				balance: balance.totalBalance!,
-			})),
+			balances: balances.nodes.map((balance) => {
+				const addressBalance = BigInt(balance.addressBalance ?? '0');
+				const coinBalance = BigInt(balance.totalBalance ?? '0') - addressBalance;
+				return {
+					coinType: balance.coinType?.repr!,
+					balance: balance.totalBalance!,
+					coinBalance: coinBalance.toString(),
+					addressBalance: addressBalance.toString(),
+				};
+			}),
 		};
 	}
-	async getTransaction(
-		options: Experimental_RtdClientTypes.GetTransactionOptions,
-	): Promise<Experimental_RtdClientTypes.GetTransactionResponse> {
+	async getTransaction<Include extends RtdClientTypes.TransactionInclude = {}>(
+		options: RtdClientTypes.GetTransactionOptions<Include>,
+	): Promise<RtdClientTypes.TransactionResult<Include>> {
 		const result = await this.#graphqlQuery(
 			{
 				query: GetTransactionBlockDocument,
-				variables: { digest: options.digest },
+				signal: options.signal,
+				variables: {
+					digest: options.digest,
+					includeTransaction: options.include?.transaction ?? false,
+					includeEffects: options.include?.effects ?? false,
+					includeEvents: options.include?.events ?? false,
+					includeBalanceChanges: options.include?.balanceChanges ?? false,
+					includeObjectTypes: options.include?.objectTypes ?? false,
+					includeBcs: options.include?.bcs ?? false,
+				},
 			},
 			(result) => result.transaction,
+			() => new TransactionError('notFound', options.digest),
 		);
 
-		return {
-			transaction: parseTransaction(result),
-		};
+		return parseTransaction(result, options.include);
 	}
-	async executeTransaction(
-		options: Experimental_RtdClientTypes.ExecuteTransactionOptions,
-	): Promise<Experimental_RtdClientTypes.ExecuteTransactionResponse> {
+	async executeTransaction<Include extends RtdClientTypes.TransactionInclude = {}>(
+		options: RtdClientTypes.ExecuteTransactionOptions<Include>,
+	): Promise<RtdClientTypes.TransactionResult<Include>> {
 		const result = await this.#graphqlQuery(
 			{
 				query: ExecuteTransactionDocument,
+				signal: options.signal,
 				variables: {
 					transactionDataBcs: toBase64(options.transaction),
 					signatures: options.signatures,
+					includeTransaction: options.include?.transaction ?? false,
+					includeEffects: options.include?.effects ?? false,
+					includeEvents: options.include?.events ?? false,
+					includeBalanceChanges: options.include?.balanceChanges ?? false,
+					includeObjectTypes: options.include?.objectTypes ?? false,
+					includeBcs: options.include?.bcs ?? false,
 				},
 			},
 			(result) => result.executeTransaction,
 		);
 
-		if (result.errors) {
-			if (result.errors.length === 1) {
-				throw new Error(result.errors[0]);
-			}
-			throw new AggregateError(result.errors.map((error) => new Error(error)));
+		return parseTransaction(result.effects?.transaction!, options.include);
+	}
+	async simulateTransaction<Include extends RtdClientTypes.SimulateTransactionInclude = {}>(
+		options: RtdClientTypes.SimulateTransactionOptions<Include> & { doGasSelection?: boolean },
+	): Promise<RtdClientTypes.SimulateTransactionResult<Include>> {
+		if (!(options.transaction instanceof Uint8Array)) {
+			await options.transaction.prepareForSerialization({ client: this });
 		}
 
-		return {
-			transaction: parseTransaction(result.effects?.transaction!),
-		};
-	}
-	async dryRunTransaction(
-		options: Experimental_RtdClientTypes.DryRunTransactionOptions,
-	): Promise<Experimental_RtdClientTypes.DryRunTransactionResponse> {
+		// A gas payment explicitly set to an empty list means gas is paid from the sender's
+		// address balance, so the server needs to perform gas selection rather than simulating
+		// with a mocked gas coin.
+		const doGasSelection =
+			options.doGasSelection ??
+			(options.transaction instanceof Uint8Array
+				? transactionBytesHaveEmptyGasPayment(options.transaction)
+				: options.transaction.getData().gasData.payment?.length === 0);
+
 		const result = await this.#graphqlQuery(
 			{
 				query: SimulateTransactionDocument,
+				signal: options.signal,
 				variables: {
-					transaction: {
-						bcs: {
-							value: toBase64(options.transaction),
-						},
-					},
+					transaction:
+						options.transaction instanceof Uint8Array
+							? {
+									bcs: {
+										value: toBase64(options.transaction),
+									},
+								}
+							: transactionToGrpcJson(options.transaction),
+					includeTransaction: options.include?.transaction ?? false,
+					includeEffects: options.include?.effects ?? false,
+					includeEvents: options.include?.events ?? false,
+					includeBalanceChanges: options.include?.balanceChanges ?? false,
+					includeObjectTypes: options.include?.objectTypes ?? false,
+					includeCommandResults: options.include?.commandResults ?? false,
+					includeBcs: options.include?.bcs ?? false,
+					doGasSelection,
+					checksEnabled: options.checksEnabled ?? true,
 				},
 			},
 			(result) => result.simulateTransaction,
 		);
 
-		if (result.error) {
-			throw new Error(result.error);
-		}
+		const transactionResult = parseTransaction(result.effects?.transaction!, options.include);
 
-		return {
-			transaction: parseTransaction(result.effects?.transaction!),
-		};
+		const commandResults =
+			options.include?.commandResults && result.outputs
+				? result.outputs.map((output) => ({
+						returnValues: (output.returnValues ?? []).map((rv) => ({
+							bcs: rv.value?.bcs ? fromBase64(rv.value.bcs) : null,
+						})),
+						mutatedReferences: (output.mutatedReferences ?? []).map((mr) => ({
+							bcs: mr.value?.bcs ? fromBase64(mr.value.bcs) : null,
+						})),
+					}))
+				: undefined;
+
+		if (transactionResult.$kind === 'Transaction') {
+			return {
+				$kind: 'Transaction',
+				Transaction: transactionResult.Transaction,
+				commandResults:
+					commandResults as RtdClientTypes.SimulateTransactionResult<Include>['commandResults'],
+			};
+		} else {
+			return {
+				$kind: 'FailedTransaction',
+				FailedTransaction: transactionResult.FailedTransaction,
+				commandResults:
+					commandResults as RtdClientTypes.SimulateTransactionResult<Include>['commandResults'],
+			};
+		}
 	}
-	async getReferenceGasPrice(): Promise<Experimental_RtdClientTypes.GetReferenceGasPriceResponse> {
+	async getReferenceGasPrice(
+		options?: RtdClientTypes.GetReferenceGasPriceOptions,
+	): Promise<RtdClientTypes.GetReferenceGasPriceResponse> {
 		const result = await this.#graphqlQuery(
 			{
 				query: GetReferenceGasPriceDocument,
+				signal: options?.signal,
 			},
 			(result) => result.epoch?.referenceGasPrice,
 		);
 
 		return {
-			referenceGasPrice: result,
+			referenceGasPrice: result ?? '',
 		};
 	}
 
-	async getDynamicFields(
-		options: Experimental_RtdClientTypes.GetDynamicFieldsOptions,
-	): Promise<Experimental_RtdClientTypes.GetDynamicFieldsResponse> {
+	async getProtocolConfig(
+		options?: RtdClientTypes.GetProtocolConfigOptions,
+	): Promise<RtdClientTypes.GetProtocolConfigResponse> {
 		const result = await this.#graphqlQuery(
 			{
-				query: GetDynamicFieldsDocument,
-				variables: { parentId: options.parentId },
+				query: GetProtocolConfigDocument,
+				signal: options?.signal,
 			},
-			(result) => result.address?.dynamicFields,
+			(result) => result.epoch?.protocolConfigs,
 		);
 
+		const featureFlags: Record<string, boolean> = {};
+		for (const flag of result?.featureFlags ?? []) {
+			featureFlags[flag.key] = flag.value;
+		}
+		const attributes: Record<string, string | null> = {};
+		for (const config of result?.configs ?? []) {
+			attributes[config.key] = config.value ?? null;
+		}
+
 		return {
-			dynamicFields: result.nodes.map((dynamicField) => {
-				const valueType =
-					dynamicField.value?.__typename === 'MoveObject'
-						? dynamicField.value.contents?.type?.repr!
-						: dynamicField.value?.type?.repr!;
-				return {
-					id: deriveDynamicFieldID(
-						options.parentId,
-						dynamicField.name?.type?.repr!,
-						fromBase64(dynamicField.name?.bcs!),
-					),
-					type: normalizeStructTag(
-						dynamicField.value?.__typename === 'MoveObject'
-							? `0x2::dynamic_field::Field<0x2::dynamic_object_field::Wrapper<${dynamicField.name?.type?.repr}>,0x2::object::ID>`
-							: `0x2::dynamic_field::Field<${dynamicField.name?.type?.repr},${valueType}>`,
-					),
-					name: {
-						type: dynamicField.name?.type?.repr!,
-						bcs: fromBase64(dynamicField.name?.bcs!),
+			protocolConfig: {
+				protocolVersion: result?.protocolVersion?.toString() ?? (null as never),
+				featureFlags,
+				attributes,
+			},
+		};
+	}
+
+	async getCurrentSystemState(
+		options?: RtdClientTypes.GetCurrentSystemStateOptions,
+	): Promise<RtdClientTypes.GetCurrentSystemStateResponse> {
+		const result = await this.#graphqlQuery(
+			{
+				query: GetCurrentSystemStateDocument,
+				signal: options?.signal,
+			},
+			(result) => result.epoch,
+		);
+
+		if (!result) {
+			throw new Error('Epoch data not found in response');
+		}
+
+		const startMs = result.startTimestamp
+			? new Date(result.startTimestamp).getTime().toString()
+			: (null as never);
+
+		// Parse the system state JSON from the MoveValue
+		const systemStateJson = result.systemState?.json as
+			| {
+					system_state_version?: string | number;
+					safe_mode?: boolean;
+					safe_mode_storage_rewards?: string;
+					safe_mode_computation_rewards?: string;
+					safe_mode_storage_rebates?: string | number;
+					safe_mode_non_refundable_storage_fee?: string | number;
+					parameters?: {
+						epoch_duration_ms?: string | number;
+						stake_subsidy_start_epoch?: string | number;
+						max_validator_count?: string | number;
+						min_validator_joining_stake?: string | number;
+						validator_low_stake_threshold?: string | number;
+						validator_low_stake_grace_period?: string | number;
+					};
+					storage_fund?: {
+						total_object_storage_rebates?: string;
+						non_refundable_balance?: string;
+					};
+					stake_subsidy?: {
+						balance?: string;
+						distribution_counter?: string | number;
+						current_distribution_amount?: string | number;
+						stake_subsidy_period_length?: string | number;
+						stake_subsidy_decrease_rate?: number;
+					};
+			  }
+			| undefined;
+
+		return {
+			systemState: {
+				systemStateVersion: systemStateJson?.system_state_version?.toString() ?? (null as never),
+				epoch: result.epochId?.toString() ?? (null as never),
+				protocolVersion: result.protocolConfigs?.protocolVersion?.toString() ?? (null as never),
+				referenceGasPrice: result.referenceGasPrice ?? (null as never),
+				epochStartTimestampMs: startMs,
+				safeMode: systemStateJson?.safe_mode ?? false,
+				safeModeStorageRewards: systemStateJson?.safe_mode_storage_rewards ?? (null as never),
+				safeModeComputationRewards:
+					systemStateJson?.safe_mode_computation_rewards ?? (null as never),
+				safeModeStorageRebates:
+					systemStateJson?.safe_mode_storage_rebates?.toString() ?? (null as never),
+				safeModeNonRefundableStorageFee:
+					systemStateJson?.safe_mode_non_refundable_storage_fee?.toString() ?? (null as never),
+				parameters: {
+					epochDurationMs:
+						systemStateJson?.parameters?.epoch_duration_ms?.toString() ?? (null as never),
+					stakeSubsidyStartEpoch:
+						systemStateJson?.parameters?.stake_subsidy_start_epoch?.toString() ?? (null as never),
+					maxValidatorCount:
+						systemStateJson?.parameters?.max_validator_count?.toString() ?? (null as never),
+					minValidatorJoiningStake:
+						systemStateJson?.parameters?.min_validator_joining_stake?.toString() ?? (null as never),
+					validatorLowStakeThreshold:
+						systemStateJson?.parameters?.validator_low_stake_threshold?.toString() ??
+						(null as never),
+					validatorLowStakeGracePeriod:
+						systemStateJson?.parameters?.validator_low_stake_grace_period?.toString() ??
+						(null as never),
+				},
+				storageFund: {
+					totalObjectStorageRebates:
+						systemStateJson?.storage_fund?.total_object_storage_rebates ?? (null as never),
+					nonRefundableBalance:
+						systemStateJson?.storage_fund?.non_refundable_balance ?? (null as never),
+				},
+				stakeSubsidy: {
+					balance: systemStateJson?.stake_subsidy?.balance ?? (null as never),
+					distributionCounter:
+						systemStateJson?.stake_subsidy?.distribution_counter?.toString() ?? (null as never),
+					currentDistributionAmount:
+						systemStateJson?.stake_subsidy?.current_distribution_amount?.toString() ??
+						(null as never),
+					stakeSubsidyPeriodLength:
+						systemStateJson?.stake_subsidy?.stake_subsidy_period_length?.toString() ??
+						(null as never),
+					stakeSubsidyDecreaseRate:
+						systemStateJson?.stake_subsidy?.stake_subsidy_decrease_rate ?? (null as never),
+				},
+			},
+		};
+	}
+
+	async listDynamicFields(
+		options: RtdClientTypes.ListDynamicFieldsOptions,
+	): Promise<RtdClientTypes.ListDynamicFieldsResponse> {
+		return this.#graphqlClient.listDynamicFields(options);
+	}
+
+	async listTransactions<Include extends RtdClientTypes.TransactionInclude = {}>(
+		options: RtdClientTypes.ListTransactionsOptions<Include>,
+	): Promise<RtdClientTypes.ListTransactionsResponse<Include>> {
+		const pagination = resolvePagination(options);
+		const { descending, after, before, limit } = pagination;
+		const filter = options.filter
+			? await resolveTransactionFilter(this.mvr, options.filter, options.signal)
+			: undefined;
+		validateTransactionQuery(filter, pagination);
+
+		const transactions = await this.#graphqlQuery(
+			{
+				query: ListTransactionsDocument,
+				signal: options.signal,
+				variables: {
+					filter: filter && {
+						sentAddress: filter.$kind === 'sender' ? filter.sender : undefined,
+						function:
+							filter.$kind === 'function'
+								? [filter.package, filter.module, filter.function].filter(Boolean).join('::')
+								: undefined,
 					},
-					valueType,
+					first: descending ? undefined : limit,
+					after,
+					last: descending ? limit : undefined,
+					before,
+					includeTransaction: options.include?.transaction ?? false,
+					includeEffects: options.include?.effects ?? false,
+					includeEvents: options.include?.events ?? false,
+					includeBalanceChanges: options.include?.balanceChanges ?? false,
+					includeObjectTypes: options.include?.objectTypes ?? false,
+					includeBcs: options.include?.bcs ?? false,
+				},
+			},
+			(result) => result.transactions,
+		);
+
+		// Backwards pagination returns nodes in ascending order, so reverse them for descending reads
+		const nodes = descending ? [...transactions.nodes].reverse() : transactions.nodes;
+
+		return {
+			transactions: nodes.map((transaction) => parseTransaction(transaction, options.include)),
+			hasNextPage: descending
+				? transactions.pageInfo.hasPreviousPage
+				: transactions.pageInfo.hasNextPage,
+			startCursor:
+				(descending ? transactions.pageInfo.endCursor : transactions.pageInfo.startCursor) ?? null,
+			endCursor:
+				(descending ? transactions.pageInfo.startCursor : transactions.pageInfo.endCursor) ?? null,
+		};
+	}
+
+	async listEvents(
+		options: RtdClientTypes.ListEventsOptions,
+	): Promise<RtdClientTypes.ListEventsResponse> {
+		const { descending, after, before, limit } = resolvePagination(options);
+		const filter = options.filter
+			? await resolveEventFilter(this.mvr, options.filter, options.signal)
+			: undefined;
+
+		const events = await this.#graphqlQuery(
+			{
+				query: ListEventsDocument,
+				signal: options.signal,
+				variables: {
+					filter: filter && {
+						sender: filter.$kind === 'sender' ? filter.sender : undefined,
+						module:
+							filter.$kind === 'emitModule' ? `${filter.package}::${filter.module}` : undefined,
+						type:
+							filter.$kind === 'eventTypeModule'
+								? `${filter.package}::${filter.module}`
+								: filter.$kind === 'eventType'
+									? filter.eventType
+									: undefined,
+					},
+					first: descending ? undefined : limit,
+					after,
+					last: descending ? limit : undefined,
+					before,
+				},
+			},
+			(result) => result.events,
+		);
+
+		// Backwards pagination returns nodes in ascending order, so reverse them for descending reads
+		const nodes = descending ? [...events.nodes].reverse() : events.nodes;
+
+		return {
+			events: nodes.map((event): RtdClientTypes.EventEntry => {
+				const packageId = event.transactionModule?.package?.address;
+				const module = event.transactionModule?.name;
+				const sender = event.sender?.address;
+				const eventType = event.contents?.type?.repr;
+				const transactionDigest = event.transaction?.digest;
+
+				if (!packageId || !module || !sender || !eventType || !transactionDigest) {
+					throw new Error('listEvents response is missing expected event fields');
+				}
+
+				return {
+					packageId: normalizeRtdAddress(packageId),
+					module,
+					sender: normalizeRtdAddress(sender),
+					eventType: normalizeStructTag(eventType),
+					bcs: event.contents?.bcs ? fromBase64(event.contents.bcs) : new Uint8Array(),
+					json: (event.contents?.json as Record<string, unknown>) ?? null,
+					checkpoint: event.transaction?.effects?.checkpoint?.sequenceNumber?.toString() ?? null,
+					transactionDigest,
+					eventIndex: event.sequenceNumber,
 				};
 			}),
-			cursor: result.pageInfo.endCursor ?? null,
-			hasNextPage: result.pageInfo.hasNextPage,
+			hasNextPage: descending ? events.pageInfo.hasPreviousPage : events.pageInfo.hasNextPage,
+			startCursor: (descending ? events.pageInfo.endCursor : events.pageInfo.startCursor) ?? null,
+			endCursor: (descending ? events.pageInfo.startCursor : events.pageInfo.endCursor) ?? null,
 		};
 	}
 
 	async verifyZkLoginSignature(
-		options: Experimental_RtdClientTypes.VerifyZkLoginSignatureOptions,
-	): Promise<Experimental_RtdClientTypes.ZkLoginVerifyResponse> {
+		options: RtdClientTypes.VerifyZkLoginSignatureOptions,
+	): Promise<RtdClientTypes.ZkLoginVerifyResponse> {
 		const intentScope =
 			options.intentScope === 'TransactionData'
 				? ZkLoginIntentScope.TransactionData
 				: ZkLoginIntentScope.PersonalMessage;
 
-		const result = await this.#graphqlQuery(
-			{
-				query: VerifyZkLoginSignatureDocument,
-				variables: {
-					bytes: options.bytes,
-					signature: options.signature,
-					intentScope,
-					author: options.author,
-				},
+		const { data } = await this.#graphqlClient.query({
+			query: VerifyZkLoginSignatureDocument,
+			signal: options.signal,
+			variables: {
+				bytes: options.bytes,
+				signature: options.signature,
+				intentScope,
+				author: options.address,
 			},
-			(result) => result.verifyZkLoginSignature,
-		);
+		});
 
 		return {
-			success: result.success ?? false,
-			errors: result.error ? [result.error] : [],
+			success: data?.verifyZkLoginSignature?.success ?? false,
+			errors: [],
 		};
 	}
 
 	async defaultNameServiceName(
-		options: Experimental_RtdClientTypes.DefaultNameServiceNameOptions,
-	): Promise<Experimental_RtdClientTypes.DefaultNameServiceNameResponse> {
+		options: RtdClientTypes.DefaultNameServiceNameOptions,
+	): Promise<RtdClientTypes.DefaultNameServiceNameResponse> {
 		const name = await this.#graphqlQuery(
 			{
 				query: DefaultRtdnsNameDocument,
@@ -383,7 +797,7 @@ export class GraphQLCoreClient extends Experimental_CoreClient {
 					address: options.address,
 				},
 			},
-			(result) => result.address?.defaultRtdnsName ?? null,
+			(result) => result.address?.defaultNameRecord?.domain ?? null,
 		);
 
 		return {
@@ -391,14 +805,31 @@ export class GraphQLCoreClient extends Experimental_CoreClient {
 		};
 	}
 
+	async resolveNameServiceAddress(
+		options: RtdClientTypes.ResolveNameServiceAddressOptions,
+	): Promise<RtdClientTypes.ResolveNameServiceAddressResponse> {
+		const { data, errors } = await this.#graphqlClient.query({
+			query: ResolveNameServiceAddressDocument,
+			signal: options.signal,
+			variables: { name: options.name },
+		});
+
+		handleGraphQLErrors(errors);
+
+		return { address: data?.address?.address ?? null };
+	}
+
 	async getMoveFunction(
-		options: Experimental_RtdClientTypes.GetMoveFunctionOptions,
-	): Promise<Experimental_RtdClientTypes.GetMoveFunctionResponse> {
+		options: RtdClientTypes.GetMoveFunctionOptions,
+	): Promise<RtdClientTypes.GetMoveFunctionResponse> {
 		const moveFunction = await this.#graphqlQuery(
 			{
 				query: GetMoveFunctionDocument,
+				signal: options.signal,
 				variables: {
-					package: (await this.mvr.resolvePackage({ package: options.packageId })).package,
+					package: (
+						await this.mvr.resolvePackage({ package: options.packageId, signal: options.signal })
+					).package,
 					module: options.moduleName,
 					function: options.name,
 				},
@@ -455,8 +886,103 @@ export class GraphQLCoreClient extends Experimental_CoreClient {
 		};
 	}
 
-	resolveTransactionPlugin(): never {
-		throw new Error('GraphQL client does not support transaction resolution yet');
+	async getChainIdentifier(
+		options?: RtdClientTypes.GetChainIdentifierOptions,
+	): Promise<RtdClientTypes.GetChainIdentifierResponse> {
+		// The result is cached and shared across callers, so the underlying request must
+		// not carry any single caller's signal. Isolate cancellation per-caller instead.
+		const cached = this.cache.read(['chainIdentifier'], async () => {
+			const checkpoint = await this.#graphqlQuery(
+				{
+					query: GetChainIdentifierDocument,
+				},
+				(result) => result.checkpoint,
+			);
+			if (!checkpoint?.digest) {
+				throw new Error('Genesis checkpoint digest not found');
+			}
+			return {
+				chainIdentifier: checkpoint.digest,
+			};
+		});
+
+		return raceSignal(Promise.resolve(cached), options?.signal);
+	}
+
+	resolveTransactionPlugin() {
+		const graphqlClient = this.#graphqlClient;
+		return async function resolveTransactionData(
+			transactionData: TransactionDataBuilder,
+			options: BuildTransactionOptions,
+			next: () => Promise<void>,
+		) {
+			const snapshot = transactionData.snapshot();
+			// If sender is not set, use a dummy address for resolution purposes
+			if (!snapshot.sender) {
+				snapshot.sender = '0x0000000000000000000000000000000000000000000000000000000000000000';
+			}
+			const grpcTransaction = transactionDataToGrpcTransaction(snapshot);
+			const transactionJson = GrpcTransactionType.toJson(grpcTransaction);
+			const doGasSelection =
+				!options.onlyTransactionKind &&
+				(snapshot.gasData.budget == null || snapshot.gasData.payment == null);
+
+			const { data, errors } = await graphqlClient.query({
+				query: ResolveTransactionDocument,
+				variables: {
+					transaction: transactionJson,
+					doGasSelection,
+					checksEnabled: !options.onlyTransactionKind,
+				},
+			});
+
+			handleGraphQLErrors(errors);
+
+			const transactionEffects = data?.simulateTransaction?.effects?.transaction?.effects;
+			if (!options.onlyTransactionKind && transactionEffects?.status === ExecutionStatus.Failure) {
+				const executionError = parseGraphQLExecutionError(transactionEffects.executionError);
+				const errorMessage = executionError?.message ?? 'Transaction failed';
+				throw new SimulationError(`Transaction resolution failed: ${errorMessage}`, {
+					executionError,
+				});
+			}
+
+			const resolvedTransactionBcs =
+				data?.simulateTransaction?.effects?.transaction?.transactionBcs;
+
+			if (!resolvedTransactionBcs) {
+				throw new Error('simulateTransaction did not return resolved transaction data');
+			}
+
+			const resolvedBuilder = TransactionDataBuilder.fromBytes(fromBase64(resolvedTransactionBcs));
+			const resolved = resolvedBuilder.snapshot();
+
+			if (options.onlyTransactionKind) {
+				transactionData.applyResolvedData({
+					...resolved,
+					sender: null,
+					gasData: {
+						budget: null,
+						owner: null,
+						payment: null,
+						price: null,
+					},
+					expiration: null,
+				});
+			} else {
+				transactionData.applyResolvedData(resolved);
+			}
+			await setAddressBalanceTransactionExpirationFromSimulatedEpoch({
+				transactionData,
+				client: graphqlClient,
+				epoch: transactionEffects?.epoch?.epochId,
+				originalTransactionData: snapshot,
+				isTransactionKindOnly: !!options.onlyTransactionKind,
+				doGasSelection,
+			});
+
+			return await next();
+		};
 	}
 }
 export type GraphQLResponseErrors = Array<{
@@ -464,6 +990,18 @@ export type GraphQLResponseErrors = Array<{
 	locations?: { line: number; column: number }[];
 	path?: (string | number)[];
 }>;
+
+function mapDisplay(
+	include: boolean | undefined,
+	display: { output?: unknown | null; errors?: unknown | null } | null | undefined,
+): RtdClientTypes.Display | null | undefined {
+	if (!include) return undefined;
+	if (!display) return null;
+	return {
+		output: (display.output as Record<string, unknown> | null) ?? null,
+		errors: (display.errors as Record<string, string> | null) ?? null,
+	};
+}
 
 function handleGraphQLErrors(errors: GraphQLResponseErrors | undefined): void {
 	if (!errors || errors.length === 0) return;
@@ -486,7 +1024,7 @@ class GraphQLResponseError extends Error {
 	}
 }
 
-function mapOwner(owner: Object_Owner_FieldsFragment): Experimental_RtdClientTypes.ObjectOwner {
+function mapOwner(owner: Object_Owner_FieldsFragment): RtdClientTypes.ObjectOwner {
 	switch (owner.__typename) {
 		case 'AddressOwner':
 			return { $kind: 'AddressOwner', AddressOwner: owner.address?.address! };
@@ -510,57 +1048,124 @@ function mapOwner(owner: Object_Owner_FieldsFragment): Experimental_RtdClientTyp
 	}
 }
 
-function parseTransaction(
+function parseTransaction<Include extends RtdClientTypes.TransactionInclude = {}>(
 	transaction: Transaction_FieldsFragment,
-): Experimental_RtdClientTypes.TransactionResponse {
+	include?: Include,
+): RtdClientTypes.TransactionResult<Include> {
 	const objectTypes: Record<string, string> = {};
 
-	transaction.effects?.unchangedConsensusObjects?.nodes.forEach((node) => {
-		if (node.__typename === 'ConsensusObjectRead') {
-			const type = node.object?.asMoveObject?.contents?.type?.repr;
-			const address = node.object?.asMoveObject?.address;
+	if (include?.objectTypes) {
+		const effectsJson = transaction.effects?.effectsJson;
+		if (effectsJson) {
+			const effects = TransactionEffectsType.fromJson(
+				effectsJson as Parameters<typeof TransactionEffectsType.fromJson>[0],
+			);
+			effects.changedObjects?.forEach((change) => {
+				if (change.objectId && change.objectType) {
+					objectTypes[change.objectId] = change.objectType;
+				}
+			});
+		}
 
-			if (type && address) {
-				objectTypes[address] = type;
+		const objectChanges = transaction.effects?.objectChanges?.nodes;
+		if (objectChanges) {
+			for (const change of objectChanges) {
+				const type = change.outputState?.asMoveObject?.contents?.type?.repr;
+				if (change.address && type) {
+					objectTypes[change.address] = type;
+				}
 			}
 		}
-	});
-
-	transaction.effects?.objectChanges?.nodes.forEach((node) => {
-		const address = node.address;
-		const type =
-			node.inputState?.asMoveObject?.contents?.type?.repr ??
-			node.outputState?.asMoveObject?.contents?.type?.repr;
-
-		if (address && type) {
-			objectTypes[address] = type;
-		}
-	});
-
-	if (transaction.effects?.balanceChanges?.pageInfo.hasNextPage) {
-		throw new Error('Pagination for balance changes is not supported');
 	}
 
-	return {
+	let balanceChanges: RtdClientTypes.BalanceChange[] | undefined;
+	if (include?.balanceChanges) {
+		const balanceChangesJson = transaction.effects?.balanceChangesJson;
+		if (Array.isArray(balanceChangesJson)) {
+			balanceChanges = balanceChangesJson.map((json) => {
+				const change = BalanceChangeType.fromJson(
+					json as Parameters<typeof BalanceChangeType.fromJson>[0],
+				);
+				return {
+					coinType: change.coinType!,
+					address: change.address!,
+					amount: change.amount!,
+				};
+			});
+		} else {
+			balanceChanges = [];
+		}
+	}
+
+	// Get status from GraphQL response
+	const status: RtdClientTypes.ExecutionStatus =
+		transaction.effects?.status === ExecutionStatus.Success
+			? { success: true, error: null }
+			: {
+					success: false,
+					error: parseGraphQLExecutionError(transaction.effects?.executionError),
+				};
+
+	let transactionData: RtdClientTypes.TransactionData | undefined;
+	if (include?.transaction && transaction.transactionJson) {
+		const grpcTx = GrpcTransactionType.fromJson(
+			transaction.transactionJson as Parameters<typeof GrpcTransactionType.fromJson>[0],
+		);
+		const resolved = grpcTransactionToTransactionData(grpcTx);
+		transactionData = {
+			gasData: resolved.gasData,
+			sender: resolved.sender,
+			expiration: resolved.expiration,
+			commands: resolved.commands,
+			inputs: resolved.inputs,
+			version: resolved.version,
+		};
+	}
+
+	const bcsBytes =
+		include?.bcs && transaction.transactionBcs ? fromBase64(transaction.transactionBcs) : undefined;
+	const timestampMs = transaction.effects?.timestamp
+		? Date.parse(transaction.effects.timestamp)
+		: null;
+
+	const result: RtdClientTypes.Transaction<Include> = {
 		digest: transaction.digest!,
-		effects: parseTransactionEffectsBcs(fromBase64(transaction.effects?.effectsBcs!)),
+		status,
+		effects: (include?.effects
+			? parseTransactionEffectsBcs(fromBase64(transaction.effects?.effectsBcs!))
+			: undefined) as RtdClientTypes.Transaction<Include>['effects'],
 		epoch: transaction.effects?.epoch?.epochId?.toString() ?? null,
-		objectTypes: Promise.resolve(objectTypes),
-		transaction: parseTransactionBcs(fromBase64(transaction.transactionBcs!)),
+		timestampMs: timestampMs !== null && !Number.isNaN(timestampMs) ? timestampMs : null,
+		checkpoint: transaction.effects?.checkpoint?.sequenceNumber?.toString() ?? null,
+		objectTypes: (include?.objectTypes
+			? objectTypes
+			: undefined) as RtdClientTypes.Transaction<Include>['objectTypes'],
+		transaction: transactionData as RtdClientTypes.Transaction<Include>['transaction'],
+		bcs: bcsBytes as RtdClientTypes.Transaction<Include>['bcs'],
 		signatures: transaction.signatures.map((sig) => sig.signatureBytes!),
-		balanceChanges:
-			transaction.effects?.balanceChanges?.nodes.map((change) => ({
-				coinType: change?.coinType?.repr!,
-				address: change.owner?.address!,
-				amount: change.amount!,
-			})) ?? [],
-		// events: transaction.events?.pageInfo.hasNextPage
+		balanceChanges: balanceChanges as RtdClientTypes.Transaction<Include>['balanceChanges'],
+		events: (include?.events
+			? (transaction.effects?.events?.nodes.map((event) => {
+					const eventType = event.contents?.type?.repr!;
+					const [packageId, module] = eventType.split('::');
+					return {
+						packageId,
+						module,
+						sender: event.sender?.address!,
+						eventType,
+						bcs: event.contents?.bcs ? fromBase64(event.contents.bcs) : new Uint8Array(),
+						json: (event.contents?.json as Record<string, unknown>) ?? null,
+					};
+				}) ?? [])
+			: undefined) as RtdClientTypes.Transaction<Include>['events'],
 	};
+
+	return status.success
+		? { $kind: 'Transaction', Transaction: result, FailedTransaction: undefined as never }
+		: { $kind: 'FailedTransaction', Transaction: undefined as never, FailedTransaction: result };
 }
 
-function parseNormalizedRtdMoveType(
-	type: OpenMoveTypeSignature,
-): Experimental_RtdClientTypes.OpenSignature {
+function parseNormalizedRtdMoveType(type: OpenMoveTypeSignature): RtdClientTypes.OpenSignature {
 	let reference: 'mutable' | 'immutable' | null = null;
 
 	if (type.ref === '&') {
@@ -575,9 +1180,99 @@ function parseNormalizedRtdMoveType(
 	};
 }
 
+function parseGraphQLExecutionError(
+	executionError: GraphQLExecutionError | null | undefined,
+): RtdClientTypes.ExecutionError {
+	const name = mapGraphQLExecutionErrorKind(executionError);
+
+	if (name === 'MoveAbort' && executionError?.abortCode != null) {
+		const location = parseGraphQLMoveLocation(executionError);
+		const cleverError = parseGraphQLCleverError(executionError);
+		const commandMatch = executionError.message?.match(/in (\d+)\w* command/);
+		const command = commandMatch ? parseInt(commandMatch[1], 10) - 1 : undefined;
+
+		return {
+			$kind: 'MoveAbort',
+			message: formatMoveAbortMessage({
+				command,
+				location: location
+					? {
+							package: location.package,
+							module: location.module,
+							functionName: location.functionName,
+							instruction: location.instruction,
+						}
+					: undefined,
+				abortCode: executionError.abortCode!,
+				cleverError: cleverError
+					? {
+							lineNumber: cleverError.lineNumber,
+							constantName: cleverError.constantName,
+							value: cleverError.value,
+						}
+					: undefined,
+			}),
+			command,
+			MoveAbort: {
+				abortCode: executionError.abortCode!,
+				location,
+				cleverError,
+			},
+		};
+	}
+
+	return {
+		$kind: 'Unknown',
+		message: executionError?.message ?? 'Transaction failed',
+		Unknown: null,
+	};
+}
+
+function mapGraphQLExecutionErrorKind(
+	executionError: GraphQLExecutionError | null | undefined,
+): string {
+	if (executionError?.abortCode != null) {
+		return 'MoveAbort';
+	}
+
+	const match = executionError?.message?.match(/^(\w+)/);
+	return match?.[1] ?? 'Unknown';
+}
+
+function parseGraphQLMoveLocation(
+	executionError: GraphQLExecutionError,
+): RtdClientTypes.MoveLocation | undefined {
+	const hasLocation = executionError.module?.package?.address && executionError.module?.name;
+	if (!hasLocation) {
+		return undefined;
+	}
+
+	return {
+		package: executionError.module?.package?.address,
+		module: executionError.module?.name,
+		functionName: executionError.function?.name,
+		instruction: executionError.instructionOffset ?? undefined,
+	};
+}
+
+function parseGraphQLCleverError(
+	executionError: GraphQLExecutionError,
+): RtdClientTypes.CleverError | undefined {
+	const hasCleverError = executionError.identifier || executionError.constant;
+	if (!hasCleverError) {
+		return undefined;
+	}
+
+	return {
+		constantName: executionError.identifier ?? undefined,
+		value: executionError.constant ?? undefined,
+		lineNumber: executionError.sourceLineNumber ?? undefined,
+	};
+}
+
 function parseNormalizedRtdMoveTypeBody(
 	type: OpenMoveTypeSignatureBody,
-): Experimental_RtdClientTypes.OpenSignatureBody {
+): RtdClientTypes.OpenSignatureBody {
 	switch (type) {
 		case 'address':
 			return { $kind: 'address' };

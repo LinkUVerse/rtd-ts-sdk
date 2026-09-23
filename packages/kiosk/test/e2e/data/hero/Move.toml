@@ -3,6 +3,8 @@ name = "hero"
 version = "0.0.1"
 edition = "2024.beta"
 
+[dependencies]
+Rtd = { git = "https://github.com/LinkUVerse/rtd.git", subdir = "crates/rtd-framework/packages/rtd-framework", rev = "framework/testnet" }
 
 [addresses]
 hero =  "0x0"

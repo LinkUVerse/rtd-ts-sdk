@@ -7,16 +7,7 @@ import type { BcsType } from 'rtd-bcs';
 import { Address } from './bcs.js';
 
 export type BasePureType =
-	| 'u8'
-	| 'u16'
-	| 'u32'
-	| 'u64'
-	| 'u128'
-	| 'u256'
-	| 'bool'
-	| 'id'
-	| 'string'
-	| 'address';
+	'u8' | 'u16' | 'u32' | 'u64' | 'u128' | 'u256' | 'bool' | 'id' | 'string' | 'address';
 
 interface PureShapeByType {
 	u8: number;
@@ -50,7 +41,6 @@ export type ShapeFromPureTypeName<T extends PureTypeName> = T extends BasePureTy
 
 type PureTypeValidationError<T extends string> = {
 	error: `Invalid Pure type name: ${T}`;
-	// eslint-disable-next-line @typescript-eslint/ban-types
 } & {};
 
 export function pureBcsSchemaFromTypeName<T extends PureTypeName>(

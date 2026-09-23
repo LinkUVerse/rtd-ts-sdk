@@ -4,8 +4,8 @@
 import { bcs } from 'rtd-bcs';
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { Transaction } from '../../src/transactions';
-import { publishPackage, setup, TestToolbox } from './utils/setup';
+import { Transaction } from '../../src/transactions/index.js';
+import { setup, TestToolbox } from './utils/setup.js';
 
 describe('Test Move call with strings', () => {
 	let toolbox: TestToolbox;
@@ -20,21 +20,19 @@ describe('Test Move call with strings', () => {
 				tx.pure.u64(len),
 			],
 		});
-		const result = await toolbox.client.signAndExecuteTransaction({
+
+		const result = await toolbox.keypair.signAndExecuteTransaction({
 			transaction: tx,
-			signer: toolbox.keypair,
-			options: {
-				showEffects: true,
-			},
+			client: toolbox.grpcClient,
 		});
-		await toolbox.client.waitForTransaction({ digest: result.digest });
-		expect(result.effects?.status.status).toEqual('success');
+
+		await toolbox.grpcClient.core.waitForTransaction({ result });
+		expect(result.Transaction?.effects?.status.success).toEqual(true);
 	}
 
 	beforeAll(async () => {
 		toolbox = await setup();
-
-		({ packageId } = await publishPackage('entry_point_types'));
+		packageId = await toolbox.getPackage('test_data');
 	});
 
 	it('Test ascii', async () => {

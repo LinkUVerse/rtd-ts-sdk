@@ -68,6 +68,7 @@ export const ObjectArg = bcs.enum('ObjectArg', {
 	Receiving: RtdObjectRef,
 });
 
+// Rust: crates/rtd-types/src/object.rs
 export const Owner = bcs.enum('Owner', {
 	AddressOwner: Address,
 	ObjectOwner: Address,
@@ -76,9 +77,36 @@ export const Owner = bcs.enum('Owner', {
 	}),
 	Immutable: null,
 	ConsensusAddressOwner: bcs.struct('ConsensusAddressOwner', {
-		owner: Address,
 		startVersion: bcs.u64(),
+		owner: Address,
 	}),
+});
+
+// Rust: crates/rtd-types/src/transaction.rs
+export const Reservation = bcs.enum('Reservation', {
+	MaxAmountU64: bcs.u64(),
+});
+
+// Rust: crates/rtd-types/src/transaction.rs
+export const WithdrawalType = bcs.enum('WithdrawalType', {
+	Balance: bcs.lazy(() => TypeTag),
+});
+
+// Rust: crates/rtd-types/src/transaction.rs
+export const WithdrawFrom = bcs.enum('WithdrawFrom', {
+	Sender: null,
+	Sponsor: null,
+	SenderAllowance: bcs.struct('SenderAllowance', {
+		funder: Address,
+		allowance: Address,
+	}),
+});
+
+// Rust: crates/rtd-types/src/transaction.rs
+export const FundsWithdrawal = bcs.struct('FundsWithdrawal', {
+	reservation: Reservation,
+	typeArg: WithdrawalType,
+	withdrawFrom: WithdrawFrom,
 });
 
 export const CallArg = bcs.enum('CallArg', {
@@ -89,6 +117,7 @@ export const CallArg = bcs.enum('CallArg', {
 		}),
 	}),
 	Object: ObjectArg,
+	FundsWithdrawal: FundsWithdrawal,
 });
 
 const InnerTypeTag: BcsType<TypeTagType, TypeTagType> = bcs.enum('TypeTag', {
@@ -203,16 +232,65 @@ export const ProgrammableTransaction = bcs.struct('ProgrammableTransaction', {
 	commands: bcs.vector(Command),
 });
 
-export const TransactionKind = bcs.enum('TransactionKind', {
-	ProgrammableTransaction: ProgrammableTransaction,
-	ChangeEpoch: null,
-	Genesis: null,
-	ConsensusCommitPrologue: null,
+// Rust: crates/rtd-types/src/transaction.rs
+export const ValidDuring = bcs.struct('ValidDuring', {
+	minEpoch: bcs.option(bcs.u64()),
+	maxEpoch: bcs.option(bcs.u64()),
+	minTimestamp: bcs.option(bcs.u64()),
+	maxTimestamp: bcs.option(bcs.u64()),
+	chain: ObjectDigest,
+	nonce: bcs.u32(),
+});
+
+export function assertAllowedProposersNotEmpty(proposers: number[]) {
+	if (proposers.length === 0) {
+		throw new Error('Allowed proposers must not be empty');
+	}
+
+	return proposers;
+}
+
+export function assertAllowedProposersStrictlyIncreasing(proposers: number[]) {
+	assertAllowedProposersNotEmpty(proposers);
+
+	for (let i = 1; i < proposers.length; i++) {
+		if (proposers[i] <= proposers[i - 1]) {
+			throw new Error('Allowed proposers must be strictly increasing');
+		}
+	}
+
+	return proposers;
+}
+
+// Upstream only checks sortedness in `validity_check`, on submission, so decoding an unsorted
+// set must succeed. Empty is a deserialization error there, and here.
+const AllowedProposerIndices = bcs.vector(bcs.u32()).transform({
+	input: assertAllowedProposersStrictlyIncreasing,
+	output: assertAllowedProposersNotEmpty,
+});
+
+// Rust: crates/rtd-types/src/transaction.rs
+export const AllowedProposers = bcs.struct('AllowedProposers', {
+	epoch: bcs.u64(),
+	proposers: AllowedProposerIndices,
+});
+
+// Rust: crates/rtd-types/src/transaction.rs
+export const Validity = bcs.struct('Validity', {
+	minEpoch: bcs.option(bcs.u64()),
+	maxEpoch: bcs.option(bcs.u64()),
+	minTimestamp: bcs.option(bcs.u64()),
+	maxTimestamp: bcs.option(bcs.u64()),
+	chain: ObjectDigest,
+	nonce: bcs.u32(),
+	allowedProposers: bcs.option(AllowedProposers),
 });
 
 export const TransactionExpiration = bcs.enum('TransactionExpiration', {
 	None: null,
 	Epoch: unsafe_u64(),
+	ValidDuring: ValidDuring,
+	Validity,
 });
 
 export const StructTag = bcs.struct('StructTag', {
@@ -227,17 +305,6 @@ export const GasData = bcs.struct('GasData', {
 	owner: Address,
 	price: bcs.u64(),
 	budget: bcs.u64(),
-});
-
-export const TransactionDataV1 = bcs.struct('TransactionDataV1', {
-	kind: TransactionKind,
-	sender: Address,
-	gasData: GasData,
-	expiration: TransactionExpiration,
-});
-
-export const TransactionData = bcs.enum('TransactionData', {
-	V1: TransactionDataV1,
 });
 
 export const IntentScope = bcs.enum('IntentScope', {
@@ -305,17 +372,61 @@ export const base64String = bcs.byteVector().transform({
 	output: (val) => toBase64(new Uint8Array(val)),
 });
 
-export const SenderSignedTransaction = bcs.struct('SenderSignedTransaction', {
-	intentMessage: IntentMessage(TransactionData),
-	txSignatures: bcs.vector(base64String),
-});
-
-export const SenderSignedData = bcs.vector(SenderSignedTransaction, {
-	name: 'SenderSignedData',
-});
-
 export const PasskeyAuthenticator = bcs.struct('PasskeyAuthenticator', {
 	authenticatorData: bcs.byteVector(),
 	clientDataJson: bcs.string(),
 	userSignature: bcs.byteVector(),
+});
+
+// Rust: crates/rtd-types/src/object.rs
+export const MoveObjectType = bcs.enum('MoveObjectType', {
+	Other: StructTag,
+	GasCoin: null,
+	StakedRtd: null,
+	Coin: TypeTag,
+	AccumulatorBalanceWrapper: null,
+});
+
+// Rust: crates/rtd-types/src/object.rs
+export const TypeOrigin = bcs.struct('TypeOrigin', {
+	moduleName: bcs.string(),
+	datatypeName: bcs.string(),
+	package: Address,
+});
+
+// Rust: crates/rtd-types/src/object.rs
+export const UpgradeInfo = bcs.struct('UpgradeInfo', {
+	upgradedId: Address,
+	upgradedVersion: bcs.u64(),
+});
+
+// Rust: crates/rtd-types/src/object.rs
+export const MovePackage = bcs.struct('MovePackage', {
+	id: Address,
+	version: bcs.u64(),
+	moduleMap: bcs.map(bcs.string(), bcs.byteVector()),
+	typeOriginTable: bcs.vector(TypeOrigin),
+	linkageTable: bcs.map(Address, UpgradeInfo),
+});
+
+// Rust: crates/rtd-types/src/object.rs
+export const MoveObject = bcs.struct('MoveObject', {
+	type: MoveObjectType,
+	hasPublicTransfer: bcs.bool(),
+	version: bcs.u64(),
+	contents: bcs.byteVector(),
+});
+
+// Rust: crates/rtd-types/src/object.rs
+export const Data = bcs.enum('Data', {
+	Move: MoveObject,
+	Package: MovePackage,
+});
+
+// Rust: crates/rtd-types/src/object.rs
+export const ObjectInner = bcs.struct('ObjectInner', {
+	data: Data,
+	owner: Owner,
+	previousTransaction: ObjectDigest,
+	storageRebate: bcs.u64(),
 });

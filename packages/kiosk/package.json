@@ -2,22 +2,23 @@
 	"name": "rtd-kiosk",
 	"author": "LinkU Labs <build@linkuverse.com>",
 	"description": "Rtd Kiosk library",
-	"version": "0.14.6",
+	"version": "1.4.13",
 	"license": "Apache-2.0",
-	"type": "commonjs",
-	"main": "./dist/cjs/index.js",
-	"module": "./dist/esm/index.js",
-	"types": "./dist/cjs/index.d.ts",
+	"type": "module",
+	"main": "./dist/index.mjs",
+	"types": "./dist/index.d.mts",
 	"exports": {
 		".": {
-			"import": "./dist/esm/index.js",
-			"require": "./dist/cjs/index.js"
+			"types": "./dist/index.d.mts",
+			"import": "./dist/index.mjs",
+			"default": "./dist/index.mjs"
 		}
 	},
 	"sideEffects": false,
 	"files": [
 		"CHANGELOG.md",
 		"dist",
+		"docs",
 		"src"
 	],
 	"engines": {
@@ -31,29 +32,30 @@
 		"url": "https://github.com/LinkUVerse/rtd-ts-sdk/issues/new"
 	},
 	"scripts": {
-		"build": "build-package",
-		"test": "echo 'No unit tests for kiosk SDK'",
+		"build": "rm -rf dist && tsc --noEmit && tsdown",
+		"test": "vitest run --typecheck --config vitest.unit.config.mts",
 		"pre-commit": "pnpm prettier:fix && pnpm lint && pnpm build",
 		"prettier:check": "prettier -c --ignore-unknown .",
 		"prettier:fix": "prettier -w --ignore-unknown .",
-		"eslint:check": "eslint --max-warnings=0 .",
-		"eslint:fix": "pnpm run eslint:check --fix",
-		"lint": "pnpm run eslint:check && pnpm run prettier:check",
-		"lint:fix": "pnpm run eslint:fix && pnpm run prettier:fix",
+		"oxlint:check": "oxlint  .",
+		"oxlint:fix": "oxlint --fix",
+		"lint": "pnpm run oxlint:check && pnpm run prettier:check",
+		"lint:fix": "pnpm run oxlint:fix && pnpm run prettier:fix",
 		"test:e2e": "vitest run e2e"
 	},
 	"dependencies": {
-		"rtd-typescript": "workspace:*",
-		"rtd-utils": "workspace:*"
+		"rtd-bcs": "workspace:^"
 	},
 	"devDependencies": {
-		"rtd-build-scripts": "workspace:*",
 		"cross-env": "^10.1.0",
-		"tmp": "^0.2.5",
+		"tmp": "^0.2.7",
 		"ts-retry-promise": "^0.8.1",
-		"typescript": "^5.9.3",
-		"vite": "^7.2.6",
-		"vitest": "^4.0.15",
-		"wait-on": "^9.0.3"
+		"typescript": "^7.0.2",
+		"vite": "^8.2.1",
+		"vitest": "^4.1.11",
+		"wait-on": "^9.1.0"
+	},
+	"peerDependencies": {
+		"rtd-typescript": "workspace:^"
 	}
 }

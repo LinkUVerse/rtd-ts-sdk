@@ -1,4 +1,4 @@
-// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 /// Description:
@@ -7,11 +7,11 @@
 ///
 module kiosk::personal_kiosk {
     use std::option::{Self, Option};
-    use sui::transfer;
-    use sui::kiosk::{Self, Kiosk, KioskOwnerCap};
-    use sui::object::{Self, ID, UID};
-    use sui::tx_context::{sender, TxContext};
-    use sui::dynamic_field as df;
+    use rtd::transfer;
+    use rtd::kiosk::{Self, Kiosk, KioskOwnerCap};
+    use rtd::object::{Self, ID, UID};
+    use rtd::tx_context::{sender, TxContext};
+    use rtd::dynamic_field as df;
 
     /// Trying to return the Cap / Borrow to a wrong PersonalKioskCap object.
     const EIncorrectCapObject: u64 = 0;
@@ -83,7 +83,7 @@ module kiosk::personal_kiosk {
             owner
         );
 
-        sui::event::emit(NewPersonalKiosk {
+        rtd::event::emit(NewPersonalKiosk {
             kiosk_id: object::id(kiosk)
         });
 

@@ -1,21 +1,36 @@
 // Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+import { BaseClient } from './client.js';
+import type { ClientWithCoreApi, CoreClientOptions } from './core.js';
+import { CoreClient } from './core.js';
+import type { ClientWithExtensions, RtdClientTypes, RtdClientRegistration } from './types.js';
 export {
-	type JsonRpcTransport as RtdTransport,
-	type JsonRpcTransportRequestOptions as RtdTransportRequestOptions,
-	type JsonRpcTransportSubscribeOptions as RtdTransportSubscribeOptions,
-	type HttpHeaders,
-	type JsonRpcHTTPTransportOptions as RtdHTTPTransportOptions,
-	JsonRpcHTTPTransport as RtdHTTPTransport,
-} from '../jsonRpc/http-transport.js';
-export { getFullnodeUrl } from './network.js';
-export type * from '../jsonRpc/types/index.js';
+	extractStatusFromEffectsBcs,
+	formatMoveAbortMessage,
+	parseTransactionBcs,
+	parseTransactionEffectsBcs,
+} from './utils.js';
+
 export {
-	type RtdJsonRpcClientOptions as RtdClientOptions,
-	type PaginationArguments,
-	type OrderArguments,
-	isRtdJsonRpcClient as isRtdClient,
-	RtdJsonRpcClient as RtdClient,
-} from '../jsonRpc/client.js';
-export { RtdHTTPStatusError, RtdHTTPTransportError, JsonRpcError } from '../jsonRpc/errors.js';
+	BaseClient,
+	CoreClient,
+	type CoreClientOptions,
+	type ClientWithExtensions,
+	type RtdClientTypes,
+	type RtdClientRegistration,
+	type ClientWithCoreApi,
+};
+
+export {
+	ObjectError,
+	SimulationError,
+	RtdClientError,
+	TransactionError,
+	type ObjectErrorOptions,
+	type ObjectErrorReason,
+	type TransactionErrorReason,
+} from './errors.js';
+
+export { ClientCache, type ClientCacheOptions } from './cache.js';
+export { type NamedPackagesOverrides } from './mvr.js';

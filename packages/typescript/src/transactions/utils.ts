@@ -3,7 +3,7 @@
 
 import { is } from 'valibot';
 
-import type { RtdMoveNormalizedType } from '../client/index.js';
+import type { RtdMoveNormalizedType } from '../jsonRpc/index.js';
 import { normalizeRtdAddress } from '../utils/rtd-types.js';
 import { ArgumentSchema } from './data/internal.js';
 import type { Argument, CallArg, Command } from './data/internal.js';

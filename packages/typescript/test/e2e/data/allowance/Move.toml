@@ -1,0 +1,10 @@
+[package]
+name = "allowance_test"
+edition = "2024.beta"
+
+[dependencies]
+# Match the rtd-tools image used by the allowance tests.
+Rtd = { git = "https://github.com/LinkUVerse/rtd.git", subdir = "crates/rtd-framework/packages/rtd-framework", rev = "892d777ccdf414f13b9421641831fc57462a8c6e" }
+
+[addresses]
+allowance_test = "0x0"

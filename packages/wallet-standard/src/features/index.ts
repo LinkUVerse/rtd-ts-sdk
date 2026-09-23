@@ -9,7 +9,6 @@ import type {
 	WalletWithFeatures,
 } from '@wallet-standard/core';
 
-import type { RtdReportTransactionEffectsFeature } from './rtdReportTransactionEffects.js';
 import type { RtdSignAndExecuteTransactionFeature } from './rtdSignAndExecuteTransaction.js';
 import type { RtdSignAndExecuteTransactionBlockFeature } from './rtdSignAndExecuteTransactionBlock.js';
 import type { RtdSignMessageFeature } from './rtdSignMessage.js';
@@ -28,7 +27,6 @@ export type RtdFeatures = Partial<RtdSignTransactionBlockFeature> &
 	RtdSignTransactionFeature &
 	// This deprecated feature should be removed once wallets update to the new method:
 	Partial<RtdSignMessageFeature> &
-	Partial<RtdReportTransactionEffectsFeature> &
 	Partial<RtdGetCapabilitiesFeature>;
 
 export type RtdWalletFeatures = StandardConnectFeature &
@@ -57,5 +55,4 @@ export * from './rtdSignTransaction.js';
 export * from './rtdSignAndExecuteTransactionBlock.js';
 export * from './rtdSignAndExecuteTransaction.js';
 export * from './rtdSignPersonalMessage.js';
-export * from './rtdReportTransactionEffects.js';
 export * from './rtdGetCapabilities.js';

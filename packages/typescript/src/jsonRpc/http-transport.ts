@@ -1,61 +1,67 @@
 // Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { PACKAGE_VERSION, TARGETED_RPC_VERSION } from '../version.js';
+import { PACKAGE_VERSION } from '../version.js';
 import { JsonRpcError, RtdHTTPStatusError } from './errors.js';
-import type { WebsocketClientOptions } from './rpc-websocket-client.js';
-import { WebsocketClient } from './rpc-websocket-client.js';
 
 /**
  * An object defining headers to be passed to the RPC server
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+ * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
  */
 export type HttpHeaders = { [header: string]: string };
 
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+ * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface JsonRpcHTTPTransportOptions {
 	fetch?: typeof fetch;
-	WebSocketConstructor?: typeof WebSocket;
 	url: string;
 	rpc?: {
 		headers?: HttpHeaders;
 		url?: string;
 	};
-	websocket?: WebsocketClientOptions & {
-		url?: string;
-	};
 }
 
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+ * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface JsonRpcTransportRequestOptions {
 	method: string;
 	params: unknown[];
 	signal?: AbortSignal;
 }
 
-// eslint-disable-next-line @typescript-eslint/ban-types
-
-export interface JsonRpcTransportSubscribeOptions<T> {
-	method: string;
-	unsubscribe: string;
-	params: unknown[];
-	onMessage: (event: T) => void;
-	signal?: AbortSignal;
-}
-
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+ * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export interface JsonRpcTransport {
 	request<T = unknown>(input: JsonRpcTransportRequestOptions): Promise<T>;
-	subscribe<T = unknown>(
-		input: JsonRpcTransportSubscribeOptions<T>,
-	): Promise<() => Promise<boolean>>;
 }
 
+/**
+ * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+ * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+ */
 export class JsonRpcHTTPTransport implements JsonRpcTransport {
 	#requestId = 0;
 	#options: JsonRpcHTTPTransportOptions;
-	#websocketClient?: WebsocketClient;
 
+	/**
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+	 */
 	constructor(options: JsonRpcHTTPTransportOptions) {
 		this.#options = options;
 	}
 
+	/**
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+	 */
 	fetch(input: RequestInfo, init?: RequestInit): Promise<Response> {
 		const fetchFn = this.#options.fetch ?? fetch;
 
@@ -68,27 +74,10 @@ export class JsonRpcHTTPTransport implements JsonRpcTransport {
 		return fetchFn(input, init);
 	}
 
-	#getWebsocketClient(): WebsocketClient {
-		if (!this.#websocketClient) {
-			const WebSocketConstructor = this.#options.WebSocketConstructor ?? WebSocket;
-			if (!WebSocketConstructor) {
-				throw new Error(
-					'The current environment does not support WebSocket, you can provide a WebSocketConstructor in the options for RtdHTTPTransport.',
-				);
-			}
-
-			this.#websocketClient = new WebsocketClient(
-				this.#options.websocket?.url ?? this.#options.url,
-				{
-					WebSocketConstructor,
-					...this.#options.websocket,
-				},
-			);
-		}
-
-		return this.#websocketClient;
-	}
-
+	/**
+	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+	 */
 	async request<T>(input: JsonRpcTransportRequestOptions): Promise<T> {
 		this.#requestId += 1;
 
@@ -99,7 +88,6 @@ export class JsonRpcHTTPTransport implements JsonRpcTransport {
 				'Content-Type': 'application/json',
 				'Client-Sdk-Type': 'typescript',
 				'Client-Sdk-Version': PACKAGE_VERSION,
-				'Client-Target-Api-Version': TARGETED_RPC_VERSION,
 				'Client-Request-Method': input.method,
 				...this.#options.rpc?.headers,
 			},
@@ -126,18 +114,5 @@ export class JsonRpcHTTPTransport implements JsonRpcTransport {
 		}
 
 		return data.result;
-	}
-
-	async subscribe<T>(input: JsonRpcTransportSubscribeOptions<T>): Promise<() => Promise<boolean>> {
-		const unsubscribe = await this.#getWebsocketClient().subscribe(input);
-
-		if (input.signal) {
-			input.signal.throwIfAborted();
-			input.signal.addEventListener('abort', () => {
-				unsubscribe();
-			});
-		}
-
-		return async () => !!(await unsubscribe());
 	}
 }
