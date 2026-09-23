@@ -19,8 +19,6 @@ import { normalizeRtdNSName } from '../utils/rtdns.js';
 import { JsonRpcHTTPTransport } from './http-transport.js';
 import type { JsonRpcTransport } from './http-transport.js';
 import type {
-	AddressMetrics,
-	AllEpochsAddressMetrics,
 	Checkpoint,
 	CheckpointPage,
 	CoinBalance,
@@ -33,9 +31,6 @@ import type {
 	DryRunTransactionBlockParams,
 	DryRunTransactionBlockResponse,
 	DynamicFieldPage,
-	EpochInfo,
-	EpochMetricsPage,
-	EpochPage,
 	ExecuteTransactionBlockParams,
 	GetAllBalancesParams,
 	GetAllCoinsParams,
@@ -62,10 +57,8 @@ import type {
 	GetStakesParams,
 	GetTotalSupplyParams,
 	GetTransactionBlockParams,
-	MoveCallMetrics,
 	MultiGetObjectsParams,
 	MultiGetTransactionBlocksParams,
-	NetworkMetrics,
 	ObjectRead,
 	Order,
 	PaginatedCoins,
@@ -1012,106 +1005,6 @@ export class RtdJsonRpcClient extends BaseClient {
 			method: 'rtdx_getCommitteeInfo',
 			params: [input?.epoch],
 			signal: input?.signal,
-		});
-	}
-
-	/**
-	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
-	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
-	 */
-	async getNetworkMetrics({ signal }: { signal?: AbortSignal } = {}): Promise<NetworkMetrics> {
-		return await this.transport.request({
-			method: 'rtdx_getNetworkMetrics',
-			params: [],
-			signal,
-		});
-	}
-
-	/**
-	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
-	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
-	 */
-	async getAddressMetrics({ signal }: { signal?: AbortSignal } = {}): Promise<AddressMetrics> {
-		return await this.transport.request({
-			method: 'rtdx_getLatestAddressMetrics',
-			params: [],
-			signal,
-		});
-	}
-
-	/**
-	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
-	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
-	 */
-	async getEpochMetrics(
-		input?: {
-			descendingOrder?: boolean;
-			signal?: AbortSignal;
-		} & PaginationArguments<EpochMetricsPage['nextCursor']>,
-	): Promise<EpochMetricsPage> {
-		return await this.transport.request({
-			method: 'rtdx_getEpochMetrics',
-			params: [input?.cursor, input?.limit, input?.descendingOrder],
-			signal: input?.signal,
-		});
-	}
-
-	/**
-	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
-	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
-	 */
-	async getAllEpochAddressMetrics(input?: {
-		descendingOrder?: boolean;
-		signal?: AbortSignal;
-	}): Promise<AllEpochsAddressMetrics> {
-		return await this.transport.request({
-			method: 'rtdx_getAllEpochAddressMetrics',
-			params: [input?.descendingOrder],
-			signal: input?.signal,
-		});
-	}
-
-	/**
-	 * Return the committee information for the asked epoch
-	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
-	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
-	 */
-	async getEpochs(
-		input?: {
-			descendingOrder?: boolean;
-			signal?: AbortSignal;
-		} & PaginationArguments<EpochPage['nextCursor']>,
-	): Promise<EpochPage> {
-		return await this.transport.request({
-			method: 'rtdx_getEpochs',
-			params: [input?.cursor, input?.limit, input?.descendingOrder],
-			signal: input?.signal,
-		});
-	}
-
-	/**
-	 * Returns list of top move calls by usage
-	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
-	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
-	 */
-	async getMoveCallMetrics({ signal }: { signal?: AbortSignal } = {}): Promise<MoveCallMetrics> {
-		return await this.transport.request({
-			method: 'rtdx_getMoveCallMetrics',
-			params: [],
-			signal,
-		});
-	}
-
-	/**
-	 * Return the committee information for the asked epoch
-	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
-	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
-	 */
-	async getCurrentEpoch({ signal }: { signal?: AbortSignal } = {}): Promise<EpochInfo> {
-		return await this.transport.request({
-			method: 'rtdx_getCurrentEpoch',
-			params: [],
-			signal,
 		});
 	}
 

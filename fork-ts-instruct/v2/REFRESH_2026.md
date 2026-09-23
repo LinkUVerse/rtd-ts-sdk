@@ -6,7 +6,9 @@
 
 先用 `refresh-current-upstream.py` 对当前上游完整进行品牌迁移，再用 `trim-to-existing-fork.py` 以旧仓库 `rtd-ts-sdk/packages` 为只读基准精简。最终顶层目录严格保留 `bcs`、`build-scripts`、`dapp-kit`、`kiosk`、`slush-wallet`、`typescript`、`utils`、`wallet-standard`、`window-wallet-core` 九个。新版 `packages/rtd` 改名为 `packages/typescript`，内容仍以当前上游迁移后的实现为准；新版 dApp Kit 的 core/react 子包继续保留在 `packages/dapp-kit` 内。旧仓库只提供目录范围和 `build-scripts` 源文件，不覆盖新版 SDK 实现。
 
-已移除多余包、对应发布工作流、文档构建入口和 Kiosk 对已删除 `rtd-codegen` 的依赖。Kiosk 已提交的绑定仍可编译；重新生成须等 RTD 对应代码生成工具及链上部署就绪。`rtd-apis` 的当前公开 fork 仍含 `proto/sui`，不得运行会覆盖已生成 RTD gRPC 文件的更新命令；需先升级协议源。
+已移除多余包、对应发布工作流、文档构建入口和 Kiosk 对已删除 `rtd-codegen` 的依赖。Kiosk 已提交的绑定仍可编译；重新生成须等 RTD 对应代码生成工具及链上部署就绪。`rtd-apis` 已升级为 `proto/rtd`，其 v2 协议文件与 Rust SDK vendored 的 33 个 `.proto` 逐字节一致；主链扩展协议仍应在主链 fork 完成后重生成并校验。
+
+主链 2026-09-23 的 OpenRPC 有 56 个方法。精简后的 TypeScript JSON-RPC 客户端原有 46 个静态方法，其中 `rpc.discover` 由服务端单独注册，另有 7 个 `rtdx_*` 方法没有主链路由：`getNetworkMetrics`、`getAddressMetrics`、`getEpochMetrics`、`getAllEpochAddressMetrics`、`getEpochs`、`getMoveCallMetrics`、`getCurrentEpoch`。其中后两个只在主链未注册的 `ExtendedApi` trait 中声明。运行 `prune-unregistered-jsonrpc.py` 删除这些客户端入口及其 10 个无其他引用的响应类型。脚本仅适用于本次上游基线；迁移到更新版本前须重新对照主链 OpenRPC 与服务注册表。删除的是既有 TypeScript 公共 API，调用方若依赖这些方法需转用实际已提供的链服务。
 
 ## 初始完整品牌迁移阶段的补漏范围
 
@@ -29,6 +31,7 @@
 ```bash
 python3 fork-ts-instruct/v2/refresh-current-upstream.py
 python3 fork-ts-instruct/v2/trim-to-existing-fork.py
+python3 fork-ts-instruct/v2/prune-unregistered-jsonrpc.py
 corepack pnpm install --lockfile-only --ignore-scripts
 CI=1 corepack pnpm install --frozen-lockfile --ignore-scripts
 corepack pnpm exec prettier -w --ignore-unknown .

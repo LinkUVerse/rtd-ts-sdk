@@ -1,0 +1,246 @@
+diff --git a/packages/typescript/src/jsonRpc/client.ts b/packages/typescript/src/jsonRpc/client.ts
+index 20355acd..8f71c7c1 100644
+--- a/packages/typescript/src/jsonRpc/client.ts
++++ b/packages/typescript/src/jsonRpc/client.ts
+@@ -22,2 +21,0 @@ import type {
+-	AddressMetrics,
+-	AllEpochsAddressMetrics,
+@@ -36,3 +33,0 @@ import type {
+-	EpochInfo,
+-	EpochMetricsPage,
+-	EpochPage,
+@@ -65 +59,0 @@ import type {
+-	MoveCallMetrics,
+@@ -68 +61,0 @@ import type {
+-	NetworkMetrics,
+@@ -1018,100 +1010,0 @@ export class RtdJsonRpcClient extends BaseClient {
+-	/**
+-	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+-	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+-	 */
+-	async getNetworkMetrics({ signal }: { signal?: AbortSignal } = {}): Promise<NetworkMetrics> {
+-		return await this.transport.request({
+-			method: 'rtdx_getNetworkMetrics',
+-			params: [],
+-			signal,
+-		});
+-	}
+-
+-	/**
+-	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+-	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+-	 */
+-	async getAddressMetrics({ signal }: { signal?: AbortSignal } = {}): Promise<AddressMetrics> {
+-		return await this.transport.request({
+-			method: 'rtdx_getLatestAddressMetrics',
+-			params: [],
+-			signal,
+-		});
+-	}
+-
+-	/**
+-	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+-	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+-	 */
+-	async getEpochMetrics(
+-		input?: {
+-			descendingOrder?: boolean;
+-			signal?: AbortSignal;
+-		} & PaginationArguments<EpochMetricsPage['nextCursor']>,
+-	): Promise<EpochMetricsPage> {
+-		return await this.transport.request({
+-			method: 'rtdx_getEpochMetrics',
+-			params: [input?.cursor, input?.limit, input?.descendingOrder],
+-			signal: input?.signal,
+-		});
+-	}
+-
+-	/**
+-	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+-	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+-	 */
+-	async getAllEpochAddressMetrics(input?: {
+-		descendingOrder?: boolean;
+-		signal?: AbortSignal;
+-	}): Promise<AllEpochsAddressMetrics> {
+-		return await this.transport.request({
+-			method: 'rtdx_getAllEpochAddressMetrics',
+-			params: [input?.descendingOrder],
+-			signal: input?.signal,
+-		});
+-	}
+-
+-	/**
+-	 * Return the committee information for the asked epoch
+-	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+-	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+-	 */
+-	async getEpochs(
+-		input?: {
+-			descendingOrder?: boolean;
+-			signal?: AbortSignal;
+-		} & PaginationArguments<EpochPage['nextCursor']>,
+-	): Promise<EpochPage> {
+-		return await this.transport.request({
+-			method: 'rtdx_getEpochs',
+-			params: [input?.cursor, input?.limit, input?.descendingOrder],
+-			signal: input?.signal,
+-		});
+-	}
+-
+-	/**
+-	 * Returns list of top move calls by usage
+-	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+-	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+-	 */
+-	async getMoveCallMetrics({ signal }: { signal?: AbortSignal } = {}): Promise<MoveCallMetrics> {
+-		return await this.transport.request({
+-			method: 'rtdx_getMoveCallMetrics',
+-			params: [],
+-			signal,
+-		});
+-	}
+-
+-	/**
+-	 * Return the committee information for the asked epoch
+-	 * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+-	 * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+-	 */
+-	async getCurrentEpoch({ signal }: { signal?: AbortSignal } = {}): Promise<EpochInfo> {
+-		return await this.transport.request({
+-			method: 'rtdx_getCurrentEpoch',
+-			params: [],
+-			signal,
+-		});
+-	}
+-
+diff --git a/packages/typescript/src/jsonRpc/types/chain.ts b/packages/typescript/src/jsonRpc/types/chain.ts
+index 2add4d94..fd90f75d 100644
+--- a/packages/typescript/src/jsonRpc/types/chain.ts
++++ b/packages/typescript/src/jsonRpc/types/chain.ts
+@@ -11 +10,0 @@ import type {
+-	RtdValidatorSummary,
+@@ -24,66 +22,0 @@ export type ResolvedNameServiceNames = {
+-/**
+- * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+- * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+- */
+-export type EpochInfo = {
+-	epoch: string;
+-	validators: RtdValidatorSummary[];
+-	epochTotalTransactions: string;
+-	firstCheckpointId: string;
+-	epochStartTimestamp: string;
+-	endOfEpochInfo: EndOfEpochInfo | null;
+-	referenceGasPrice: number | null;
+-};
+-
+-/**
+- * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+- * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+- */
+-export type EpochMetrics = {
+-	epoch: string;
+-	epochTotalTransactions: string;
+-	firstCheckpointId: string;
+-	epochStartTimestamp: string;
+-	endOfEpochInfo: EndOfEpochInfo | null;
+-};
+-
+-/**
+- * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+- * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+- */
+-export type EpochPage = {
+-	data: EpochInfo[];
+-	nextCursor: string | null;
+-	hasNextPage: boolean;
+-};
+-
+-/**
+- * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+- * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+- */
+-export type EpochMetricsPage = {
+-	data: EpochMetrics[];
+-	nextCursor: string | null;
+-	hasNextPage: boolean;
+-};
+-
+-/**
+- * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+- * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+- */
+-export type EndOfEpochInfo = {
+-	lastCheckpointId: string;
+-	epochEndTimestamp: string;
+-	protocolVersion: string;
+-	referenceGasPrice: string;
+-	totalStake: string;
+-	storageFundReinvestment: string;
+-	storageCharge: string;
+-	storageRebate: string;
+-	storageFundBalance: string;
+-	stakeSubsidyAmount: string;
+-	totalGasFees: string;
+-	totalStakeRewardsDistributed: string;
+-	leftoverStorageFundInflow: string;
+-};
+-
+@@ -100,56 +32,0 @@ export type CheckpointPage = {
+-/**
+- * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+- * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+- */
+-export type NetworkMetrics = {
+-	currentTps: number;
+-	tps30Days: number;
+-	currentCheckpoint: string;
+-	currentEpoch: string;
+-	totalAddresses: string;
+-	totalObjects: string;
+-	totalPackages: string;
+-};
+-
+-/**
+- * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+- * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+- */
+-export type AddressMetrics = {
+-	checkpoint: number;
+-	epoch: number;
+-	timestampMs: number;
+-	cumulativeAddresses: number;
+-	cumulativeActiveAddresses: number;
+-	dailyActiveAddresses: number;
+-};
+-
+-/**
+- * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+- * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+- */
+-export type AllEpochsAddressMetrics = AddressMetrics[];
+-
+-/**
+- * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+- * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+- */
+-export type MoveCallMetrics = {
+-	rank3Days: MoveCallMetric[];
+-	rank7Days: MoveCallMetric[];
+-	rank30Days: MoveCallMetric[];
+-};
+-
+-/**
+- * @deprecated JSON-RPC APIs are deprecated in the Rtd TypeScript SDK. Use `RtdGrpcClient`
+- * from `rtd-typescript/grpc` or `RtdGraphQLClient` from `rtd-typescript/graphql` instead.
+- */
+-export type MoveCallMetric = [
+-	{
+-		module: string;
+-		package: string;
+-		function: string;
+-	},
+-	string,
+-];
+-
