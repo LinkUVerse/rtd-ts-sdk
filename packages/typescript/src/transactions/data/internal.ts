@@ -116,7 +116,17 @@ export const RtdAddress = pipe(
 export const ObjectID = RtdAddress;
 export const BCSBytes = string();
 export const JsonU64 = pipe(
-	union([string(), pipe(number(), integer())]),
+	union([
+		string(),
+		pipe(
+			number(),
+			integer(),
+			check(
+				(value: number) => Number.isSafeInteger(value),
+				'Use a string for u64 values beyond the safe integer range',
+			),
+		),
+	]),
 
 	check((val) => {
 		try {

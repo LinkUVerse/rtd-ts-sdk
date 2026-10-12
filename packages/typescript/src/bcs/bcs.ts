@@ -1,24 +1,12 @@
 // Copyright (c) LinkU Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import type { BcsType, BcsTypeOptions } from 'rtd-bcs';
+import type { BcsType } from 'rtd-bcs';
 import { bcs, fromBase58, fromBase64, fromHex, toBase58, toBase64, toHex } from 'rtd-bcs';
 
 import { isValidRtdAddress, normalizeRtdAddress, RTD_ADDRESS_LENGTH } from '../utils/rtd-types.js';
 import { TypeTagSerializer } from './type-tag-serializer.js';
 import type { TypeTag as TypeTagType } from './types.js';
-
-function unsafe_u64(options?: BcsTypeOptions<number>) {
-	return bcs
-		.u64({
-			name: 'unsafe_u64',
-			...(options as object),
-		})
-		.transform({
-			input: (val: number | string) => val,
-			output: (val) => Number(val),
-		});
-}
 
 function optionEnum<T extends BcsType<any, any>>(type: T) {
 	return bcs.enum('Option', {
@@ -288,7 +276,15 @@ export const Validity = bcs.struct('Validity', {
 
 export const TransactionExpiration = bcs.enum('TransactionExpiration', {
 	None: null,
-	Epoch: unsafe_u64(),
+	Epoch: bcs.u64().transform({
+		input: (value: string | number | bigint) => {
+			if (typeof value === 'number' && !Number.isSafeInteger(value)) {
+				throw new Error('Use a string or bigint for an exact expiration epoch');
+			}
+			return value;
+		},
+		output: (value) => value,
+	}),
 	ValidDuring: ValidDuring,
 	Validity,
 });

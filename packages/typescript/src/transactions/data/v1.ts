@@ -75,7 +75,7 @@ const TransactionInput = union([
 // Carried here rather than collapsed to `{ None: true }`, which silently dropped the expiration
 // (and its allowed proposers) from a `serialize()` -> `from()` round trip before signing.
 const TransactionExpiration = union([
-	object({ Epoch: pipe(number(), integer()) }),
+	object({ Epoch: JsonU64 }),
 	object({ None: nullable(literal(true)) }),
 	object({ ValidDuring: ValidDuringSchema }),
 	object({ Validity: ValiditySchema }),
@@ -88,7 +88,12 @@ function expirationToV1(
 
 	switch (expiration.$kind) {
 		case 'Epoch':
-			return { Epoch: Number(expiration.Epoch) };
+			return {
+				Epoch:
+					BigInt(expiration.Epoch) <= BigInt(Number.MAX_SAFE_INTEGER)
+						? Number(expiration.Epoch)
+						: String(expiration.Epoch),
+			};
 		case 'ValidDuring':
 			return { ValidDuring: expiration.ValidDuring };
 		case 'Validity':
