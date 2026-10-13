@@ -8,16 +8,16 @@ import { ExecutionStatus } from '../bcs/effects.js';
 import { TransactionDataBuilder } from '../transactions/TransactionData.js';
 import type { RtdClientTypes } from './types.js';
 
-const ordinalRules = new Intl.PluralRules('en-US', { type: 'ordinal' });
-const ordinalSuffixes = new Map([
-	['one', 'st'],
-	['two', 'nd'],
-	['few', 'rd'],
-	['other', 'th'],
-]);
-
 export function formatOrdinal(n: number): string {
-	return `${n}${ordinalSuffixes.get(ordinalRules.select(n))}`;
+	// Command indices use fixed English ordinals. Avoid requiring Intl.PluralRules
+	// just to load transaction parsing/simulation on native runtimes such as Hermes.
+	const value = Math.abs(n);
+	const lastTwo = value % 100;
+	const suffix =
+		Number.isInteger(value) && (lastTwo < 11 || lastTwo > 13)
+			? (({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[value % 10] ?? 'th')
+			: 'th';
+	return `${n}${suffix}`;
 }
 
 export function formatMoveAbortMessage(options: {
